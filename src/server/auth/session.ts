@@ -1,11 +1,21 @@
 import { getAuthProvider } from "./provider";
 import type { AuthContext, AuthDeps, PermissionRequest, SessionData } from "./types";
 
+export class AccessError extends Error {
+  constructor(
+    readonly code: "UNAUTHENTICATED" | "FORBIDDEN",
+    message: string
+  ) {
+    super(message);
+    this.name = "AccessError";
+  }
+}
+
 export async function requireSession(deps?: Pick<AuthDeps, "getSession">): Promise<SessionData> {
   const session = await (deps?.getSession ? deps.getSession() : getAuthProvider().getSession());
 
   if (!session?.user) {
-    throw new Error("Unauthorized");
+    throw new AccessError("UNAUTHENTICATED", "Unauthorized");
   }
 
   return session;
@@ -16,7 +26,12 @@ export async function requireActiveOrg(deps?: AuthDeps): Promise<AuthContext> {
     const context = await getAuthProvider().getActiveOrg();
 
     if (!context) {
-      throw new Error("No active organization");
+      // getActiveOrg returns null for both cases, so the session lookup runs on failures only.
+      const session = await getAuthProvider().getSession();
+      throw new AccessError(
+        session?.user ? "FORBIDDEN" : "UNAUTHENTICATED",
+        "No active organization"
+      );
     }
 
     return context;
@@ -26,7 +41,7 @@ export async function requireActiveOrg(deps?: AuthDeps): Promise<AuthContext> {
   const orgId = session.session.activeOrganizationId;
 
   if (!orgId) {
-    throw new Error("No active organization");
+    throw new AccessError("FORBIDDEN", "No active organization");
   }
 
   const member = deps?.getMember
@@ -34,7 +49,7 @@ export async function requireActiveOrg(deps?: AuthDeps): Promise<AuthContext> {
     : { role: session.session.roles?.[0] ?? "member" };
 
   if (!member) {
-    throw new Error("No active organization");
+    throw new AccessError("FORBIDDEN", "No active organization");
   }
 
   return {
@@ -56,7 +71,7 @@ export async function requireOrgAccess(
       : await getAuthProvider().hasPermission(permissions);
 
     if (!allowed) {
-      throw new Error(`Missing permissions: ${JSON.stringify(permissions)}`);
+      throw new AccessError("FORBIDDEN", `Missing permissions: ${JSON.stringify(permissions)}`);
     }
   }
 

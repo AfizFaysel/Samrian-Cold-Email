@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import { createSessionAction, createSessionRoute } from "../../../src/server/api/session-route";
 import { sessionOperations } from "../../../src/server/auth/policy";
+import { AccessError } from "../../../src/server/auth/session";
 
 describe("session route", () => {
   test("runs handler inside authenticated tenant context", async () => {
@@ -71,18 +72,59 @@ describe("session route", () => {
       {
         db: db as never,
         requireAccess: vi.fn(async () => {
-          throw new Error("Missing permissions");
+          throw new AccessError("FORBIDDEN", 'Missing permissions: {"contact":["update"]}');
         }),
         logger: { warn },
       }
     );
 
-    await expect(route()).rejects.toThrow("Missing permissions");
+    const response = await route();
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "You do not have permission to do that.",
+      code: "FORBIDDEN",
+    });
     expect(warn).toHaveBeenCalledWith("authorization.denied", {
       operationId: "contact.update",
-      reason: "Missing permissions",
+      reason: 'Missing permissions: {"contact":["update"]}',
     });
     expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  test("session action answers 401 without running the handler", async () => {
+    const handler = vi.fn();
+    const action = createSessionAction(sessionOperations.contactsUpdate, handler, {
+      db: { transaction: vi.fn() } as never,
+      requireAccess: vi.fn(async () => {
+        throw new AccessError("UNAUTHENTICATED", "Unauthorized");
+      }),
+      logger: { warn: vi.fn() },
+    });
+
+    const response = (await action()) as Response;
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "Please sign in to continue.",
+      code: "UNAUTHENTICATED",
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  test("unexpected authorization failures still surface as errors", async () => {
+    const route = createSessionRoute(
+      sessionOperations.contactsUpdate,
+      async () => Response.json({ ok: true }),
+      {
+        requireAccess: vi.fn(async () => {
+          throw new Error("provider outage");
+        }),
+        logger: { warn: vi.fn() },
+      }
+    );
+
+    await expect(route()).rejects.toThrow("provider outage");
   });
 
   test("rejects oversized bodies before auth or DB work", async () => {

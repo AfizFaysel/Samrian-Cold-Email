@@ -1,4 +1,4 @@
-import { requireOrgAccess } from "../auth/session";
+import { AccessError, requireOrgAccess } from "../auth/session";
 import type { AuthContext, PermissionRequest } from "../auth/types";
 import { getOperationPermissions, type SessionOperation } from "../auth/policy";
 import { getDb } from "../db/db";
@@ -46,6 +46,7 @@ export function createSessionRoute<Args extends unknown[], Result>(
     }
     const operationId = deps.operationId ?? operation.id;
     const auth = await authorizeOperation(operation, operationId, deps);
+    if (auth instanceof Response) return auth as Result;
     const request = args.find((value) => value instanceof Request) as Request | undefined;
     const limit = await checkUserLimit(auth, operationId, deps);
     if (limit instanceof Response) return limit as Result;
@@ -87,6 +88,7 @@ export function createSessionAction<Args extends unknown[], Result>(
     }
     const operationId = deps.operationId ?? operation.id;
     const auth = await authorizeOperation(operation, operationId, deps);
+    if (auth instanceof Response) return auth as Result;
     const limit = await checkUserLimit(auth, operationId, deps);
     if (limit instanceof Response) return limit as Result;
     if (!limit.allowed) return rateLimitResponse(limit) as Result;
@@ -164,6 +166,16 @@ async function authorizeOperation(
       operationId,
       reason: error instanceof Error ? error.message : "Authorization denied",
     });
+    if (error instanceof AccessError) return accessErrorResponse(error);
     throw error;
   }
+}
+
+function accessErrorResponse(error: AccessError) {
+  return error.code === "UNAUTHENTICATED"
+    ? Response.json({ error: "Please sign in to continue.", code: error.code }, { status: 401 })
+    : Response.json(
+        { error: "You do not have permission to do that.", code: error.code },
+        { status: 403 }
+      );
 }

@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { createApiRoute } from "../../src/server/api/route";
 import { createSessionRoute } from "../../src/server/api/session-route";
 import { sessionOperations } from "../../src/server/auth/policy";
+import { AccessError } from "../../src/server/auth/session";
 import { apiRequest, credential } from "./request";
 
 describe("authentication boundaries", () => {
@@ -10,10 +11,24 @@ describe("authentication boundaries", () => {
     const handler = vi.fn();
     const route = createSessionRoute(sessionOperations.contactsList, handler, {
       requireAccess: async () => {
-        throw new Error("Unauthorized");
+        throw new AccessError("UNAUTHENTICATED", "Unauthorized");
       },
     });
-    await expect(route()).rejects.toThrow("Unauthorized");
+    const response = (await route()) as Response;
+    expect(response.status).toBe(401);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  test("session route denies a missing permission before handler", async () => {
+    const handler = vi.fn();
+    const route = createSessionRoute(sessionOperations.contactDelete, handler, {
+      requireAccess: async () => {
+        throw new AccessError("FORBIDDEN", 'Missing permissions: {"contact":["delete"]}');
+      },
+    });
+    const response = (await route()) as Response;
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain("contact");
     expect(handler).not.toHaveBeenCalled();
   });
 
