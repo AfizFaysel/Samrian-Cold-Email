@@ -26,6 +26,7 @@ describe("sendCampaign", () => {
           id: "campaign_1",
           orgId: "org_1",
           name: "Launch",
+          status: "active",
           steps: [{ subject: "Hi", body: "Hello" }],
         },
       ],
@@ -73,6 +74,7 @@ describe("sendCampaign", () => {
           id: "campaign_1",
           orgId: "org_1",
           name: "Launch",
+          status: "active",
           steps: [{ subject: "Hi {{firstName}}", body: "<p>Hello {{firstName}}</p>" }],
         },
       ],
@@ -127,7 +129,9 @@ describe("sendCampaign", () => {
 
   test("returns stale before sending when event step is not current", async () => {
     const repos = new FakeRepos({
-      campaigns: [{ id: "campaign_1", orgId: "org_1", name: "Launch", steps: [] }],
+      campaigns: [
+        { id: "campaign_1", orgId: "org_1", status: "active", name: "Launch", steps: [] },
+      ],
       contacts: [{ id: "contact_1", orgId: "org_1", email: "ada@example.com", customVars: {} }],
       mailboxes: [{ id: "mailbox_1", orgId: "org_1", email: "sender@example.com" }],
       assignments: [{ id: "assignment_1", orgId: "org_1", currentStep: 1, status: "active" }],
@@ -160,7 +164,9 @@ describe("sendCampaign", () => {
 
   test("skips blocked contacts", async () => {
     const repos = new FakeRepos({
-      campaigns: [{ id: "campaign_1", orgId: "org_1", name: "Launch", steps: [] }],
+      campaigns: [
+        { id: "campaign_1", orgId: "org_1", status: "active", name: "Launch", steps: [] },
+      ],
       contacts: [{ id: "contact_1", orgId: "org_1", email: "blocked@example.com", customVars: {} }],
       mailboxes: [{ id: "mailbox_1", orgId: "org_1", email: "sender@example.com" }],
       assignments: [{ id: "assignment_1", orgId: "org_1", currentStep: 0, status: "active" }],
@@ -191,53 +197,6 @@ describe("sendCampaign", () => {
     expect(connector.sent).toHaveLength(0);
   });
 
-  test("skips before connector send when mailbox daily cap is reached", async () => {
-    const repos = new FakeRepos({
-      campaigns: [
-        {
-          id: "campaign_1",
-          orgId: "org_1",
-          name: "Launch",
-          steps: [{ subject: "Hi", body: "Hello" }],
-        },
-      ],
-      contacts: [{ id: "contact_1", orgId: "org_1", email: "ada@example.com", customVars: {} }],
-      mailboxes: [
-        {
-          id: "mailbox_1",
-          orgId: "org_1",
-          email: "sender@example.com",
-          sentToday: 25,
-          dailySendLimit: 25,
-        },
-      ],
-      assignments: [{ id: "assignment_1", orgId: "org_1", currentStep: 0, status: "active" }],
-    });
-    const connector = makeConnector();
-
-    await expect(
-      sendCampaign(
-        {
-          assignmentId: "assignment_1",
-          campaignId: "campaign_1",
-          contactId: "contact_1",
-          mailboxId: "mailbox_1",
-          orgId: "org_1",
-          stepNumber: 0,
-        },
-        {
-          repos,
-          connectorForMailbox: async () => connector,
-          generateUnsubscribeToken: async () => "token",
-          appUrl: "https://app.example.com",
-          now: () => 123,
-        }
-      )
-    ).resolves.toEqual({ status: "skipped", reason: "mailbox-limit" });
-
-    expect(connector.sent).toHaveLength(0);
-  });
-
   test("marks final step completed after successful send", async () => {
     const repos = new FakeRepos({
       campaigns: [
@@ -245,6 +204,7 @@ describe("sendCampaign", () => {
           id: "campaign_1",
           orgId: "org_1",
           name: "Launch",
+          status: "active",
           steps: [{ subject: "Hi", body: "Hello" }],
         },
       ],
@@ -285,6 +245,7 @@ describe("sendCampaign", () => {
           id: "campaign_1",
           orgId: "org_1",
           name: "Launch",
+          status: "active",
           steps: [
             { subject: "Hi", body: "Hello" },
             { subject: "Follow up", body: "Checking in", delayDays: 2 },

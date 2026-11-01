@@ -1,0 +1,1 @@
+ALTER TABLE "send_reservations" ADD COLUMN "claimed_at" timestamp with time zone;

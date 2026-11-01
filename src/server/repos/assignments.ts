@@ -1,6 +1,6 @@
-import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, ne, notExists, or, sql } from "drizzle-orm";
 
-import { campaigns, contactAssignments, contacts } from "../db/schema";
+import { campaigns, contactAssignments, contacts, sendReservations } from "../db/schema";
 import type {
   AdvanceStepInput,
   AssignmentId,
@@ -152,27 +152,44 @@ export class PostgresAssignmentRepo {
     }));
   }
 
-  async advanceStep(input: AdvanceStepInput): Promise<AdvanceStepResult> {
-    const current = await this.getById(input.id, input.orgId);
-    if (!current) return { status: "not-found" };
-    if (current.currentStep !== input.expectedStep) {
-      return { status: "stale", currentStep: current.currentStep };
-    }
+  async lockForSend(id: AssignmentId, orgId: OrgId): Promise<AssignmentRecord | null> {
+    const [row] = await this.db
+      .select()
+      .from(contactAssignments)
+      .where(and(eq(contactAssignments.id, id), eq(contactAssignments.orgId, orgId)))
+      .for("update");
+    return row ? toAssignment(row) : null;
+  }
 
-    const nextStep = current.currentStep + 1;
-    await this.db
+  async advanceStep(input: AdvanceStepInput): Promise<AdvanceStepResult> {
+    const nextStep = input.expectedStep + 1;
+    const next = input.completed ? "completed" : "active";
+    // A reply or bounce can land while a send is in flight, and it must keep its status.
+    const rows = await this.db
       .update(contactAssignments)
       .set({
         currentStep: nextStep,
         assignedMailboxId: input.mailboxId,
         lastEmailSentAt: new Date(input.sentAt),
         nextSendAt: input.nextSendAt ? new Date(input.nextSendAt) : null,
-        status: input.completed ? "completed" : "active",
+        status: sql`case when ${contactAssignments.status} = 'active'
+          then ${next}::assignment_status else ${contactAssignments.status} end`,
         updatedAt: new Date(),
       })
-      .where(and(eq(contactAssignments.id, input.id), eq(contactAssignments.orgId, input.orgId)));
+      .where(
+        and(
+          eq(contactAssignments.id, input.id),
+          eq(contactAssignments.orgId, input.orgId),
+          eq(contactAssignments.currentStep, input.expectedStep)
+        )
+      )
+      .returning();
+    if (rows.length > 0) return { status: "advanced", currentStep: nextStep };
 
-    return { status: "advanced", currentStep: nextStep };
+    const current = await this.getById(input.id, input.orgId);
+    return current
+      ? { status: "stale", currentStep: current.currentStep }
+      : { status: "not-found" };
   }
 
   async updateStatus(id: AssignmentId, orgId: OrgId, status: string): Promise<void> {
@@ -214,9 +231,24 @@ export class PostgresAssignmentRepo {
           or(
             isNull(contactAssignments.nextSendAt),
             lte(contactAssignments.nextSendAt, new Date(input.now))
+          ),
+          or(isNull(contacts.bounceStatus), ne(contacts.bounceStatus, "hard")),
+          or(isNull(contacts.verificationStatus), ne(contacts.verificationStatus, "invalid")),
+          notExists(
+            this.db
+              .select({ id: sendReservations.id })
+              .from(sendReservations)
+              .where(
+                and(
+                  eq(sendReservations.orgId, contactAssignments.orgId),
+                  eq(sendReservations.assignmentId, contactAssignments.id),
+                  eq(sendReservations.stepNumber, contactAssignments.currentStep)
+                )
+              )
           )
         )
       )
+      .orderBy(sql`${contactAssignments.nextSendAt} asc nulls first`, contactAssignments.id)
       .limit(input.limit);
 
     return rows.map((row) => ({

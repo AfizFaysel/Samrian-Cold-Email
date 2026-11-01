@@ -29,6 +29,13 @@
       "when": 1793524066755,
       "tag": "0003_invitations_created_at",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793527950321,
+      "tag": "0004_send_reservation_claim",
+      "breakpoints": true
     }
   ]
 }

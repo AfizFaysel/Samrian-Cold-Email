@@ -8,8 +8,10 @@ export function createInngestQueue(step: StepLike): JobQueue {
   return {
     enqueueCampaignSend: async (payload, options) => {
       await step.sendEvent(`enqueue-campaign-send-${payload.assignmentId}-${payload.stepNumber}`, {
+        id: options?.idempotencyKey,
         name: "campaign/send",
         data: payload,
+        ...(options?.delayMs ? { ts: Date.now() + options.delayMs } : {}),
       });
       return { jobId: options?.idempotencyKey ?? `${payload.campaignId}:${payload.contactId}` };
     },

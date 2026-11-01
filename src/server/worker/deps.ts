@@ -46,10 +46,6 @@ export function createWorkerDeps(queue?: JobQueue) {
           withTenant(db, { orgId, actorType: "worker" }, (tx) =>
             new PostgresSettingsRepo(tx).getCompliance(orgId)
           ),
-        getSendingSettings: (orgId) =>
-          withTenant(db, { orgId, actorType: "worker" }, (tx) =>
-            new PostgresSettingsRepo(tx).getSending(orgId)
-          ),
       });
     },
     pollMailbox: (payload) =>
@@ -92,6 +88,8 @@ export function createWorkerDeps(queue?: JobQueue) {
                 assignments: deps.repos.assignments,
                 campaignMailboxes: deps.campaignMailboxes,
                 blocklist: deps.repos.blocklist,
+                mailboxes: deps.repos.mailboxes,
+                events: deps.repos.events,
               });
             }
           ),

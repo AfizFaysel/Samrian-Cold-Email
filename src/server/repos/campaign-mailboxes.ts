@@ -1,6 +1,13 @@
-import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
 
-import { campaignMailboxes, mailboxes, orgSettings, sendReservations } from "../db/schema";
+import {
+  campaignMailboxes,
+  campaigns,
+  contactAssignments,
+  mailboxes,
+  orgSettings,
+  sendReservations,
+} from "../db/schema";
 import type { DbExecutor } from "../db/tx";
 import type { AssignmentId, CampaignId, DispatchMailboxRecord, MailboxId, OrgId } from "../ports";
 import { getProviderPolicy } from "../modules/providers";
@@ -171,6 +178,7 @@ export class PostgresCampaignMailboxRepo {
           eq(campaignMailboxes.orgId, orgId),
           eq(campaignMailboxes.status, "enabled"),
           eq(mailboxes.status, "active"),
+          ne(mailboxes.rampStatus, "paused"),
           isNull(mailboxes.archivedAt)
         )
       );
@@ -280,10 +288,52 @@ export class PostgresCampaignMailboxRepo {
       .where(and(eq(mailboxes.id, input.mailboxId), eq(mailboxes.orgId, input.orgId)));
   }
 
+  async listStaleClaims(now: number, limit: number) {
+    const rows = await this.db
+      .select({
+        orgId: sendReservations.orgId,
+        mailboxId: sendReservations.mailboxId,
+        assignmentId: sendReservations.assignmentId,
+        stepNumber: sendReservations.stepNumber,
+        campaignId: contactAssignments.campaignId,
+        contactId: contactAssignments.contactId,
+        steps: campaigns.steps,
+      })
+      .from(sendReservations)
+      .innerJoin(
+        contactAssignments,
+        and(
+          eq(contactAssignments.id, sendReservations.assignmentId),
+          eq(contactAssignments.orgId, sendReservations.orgId)
+        )
+      )
+      .innerJoin(
+        campaigns,
+        and(
+          eq(campaigns.id, contactAssignments.campaignId),
+          eq(campaigns.orgId, contactAssignments.orgId)
+        )
+      )
+      .where(
+        and(isNotNull(sendReservations.claimedAt), lte(sendReservations.expiresAt, new Date(now)))
+      )
+      .limit(limit);
+    return rows.map((row) => ({
+      ...row,
+      steps: Array.isArray(row.steps) ? (row.steps as unknown[]) : [],
+    }));
+  }
+
   private async releaseExpired(orgId: OrgId, now: number) {
     const expired = await this.db
       .delete(sendReservations)
-      .where(and(eq(sendReservations.orgId, orgId), lte(sendReservations.expiresAt, new Date(now))))
+      .where(
+        and(
+          eq(sendReservations.orgId, orgId),
+          lte(sendReservations.expiresAt, new Date(now)),
+          isNull(sendReservations.claimedAt)
+        )
+      )
       .returning();
     const counts = new Map<string, number>();
     for (const row of expired) counts.set(row.mailboxId, (counts.get(row.mailboxId) ?? 0) + 1);

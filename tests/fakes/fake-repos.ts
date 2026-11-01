@@ -82,6 +82,8 @@ export class FakeRepos {
           mailbox.reservedSends = Math.max(0, (mailbox.reservedSends ?? 0) - 1);
         }
       },
+      claimSend: async () => true,
+      unclaimSend: async () => {},
       releaseReservation: async (id, orgId) => {
         const mailbox = mailboxes.find((item) => item.id === id && item.orgId === orgId);
         if (mailbox) mailbox.reservedSends = Math.max(0, (mailbox.reservedSends ?? 0) - 1);
@@ -114,6 +116,8 @@ export class FakeRepos {
     this.assignments = {
       data: assignments,
       getById: async (id, orgId) =>
+        assignments.find((item) => item.id === id && item.orgId === orgId) ?? null,
+      lockForSend: async (id, orgId) =>
         assignments.find((item) => item.id === id && item.orgId === orgId) ?? null,
       getByCampaignAndContact: async (_campaignId, _contactId, orgId) =>
         assignments.find((item) => item.orgId === orgId) ?? null,

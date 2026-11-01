@@ -78,6 +78,7 @@ export const sendReservations = pgTable(
     assignmentId: text("assignment_id").notNull(),
     stepNumber: integer("step_number").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

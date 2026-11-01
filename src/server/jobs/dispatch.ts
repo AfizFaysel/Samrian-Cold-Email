@@ -9,11 +9,32 @@ import type {
   OrgId,
 } from "../ports";
 import { getObservabilityContext } from "../observability";
+import { failedEvent, recordEvent } from "../modules/events";
 import { getMailboxCapacity } from "../modules/ramp";
 import type { LimitGuard } from "../modules/limits";
-import { DISPATCH_BATCH_LIMIT, getJitterMs, isInSendWindow, nextWindowStart } from "./schedule";
+import type { JobRepos } from "./types";
+import {
+  DISPATCH_BATCH_LIMIT,
+  getJitterMs,
+  getStepDelayMs,
+  isInSendWindow,
+  nextWindowStart,
+} from "./schedule";
+
+const CAPACITY_RETRY_MS = 15 * 60 * 1000;
+const SKIPPED_RETRY_MS = 24 * 60 * 60 * 1000;
 
 export type DueAssignment = DispatchAssignmentRecord;
+
+export type StaleClaim = {
+  orgId: OrgId;
+  mailboxId: MailboxId;
+  assignmentId: AssignmentId;
+  stepNumber: number;
+  campaignId: CampaignId;
+  contactId: ContactId;
+  steps: readonly unknown[];
+};
 
 export type DispatchMailbox = DispatchMailboxRecord;
 
@@ -22,8 +43,12 @@ export type DispatchRepos = {
     listDueForDispatch(input: { now: number; limit: number }): Promise<DueAssignment[]>;
     markEnqueued(id: AssignmentId, orgId: OrgId, at: number): Promise<void>;
     deferUntil(id: AssignmentId, orgId: OrgId, at: number): Promise<void>;
+    advanceStep: JobRepos["assignments"]["advanceStep"];
   };
+  mailboxes: Pick<JobRepos["mailboxes"], "incrementSentToday">;
+  events?: JobRepos["events"];
   campaignMailboxes: {
+    listStaleClaims(now: number, limit: number): Promise<StaleClaim[]>;
     listDispatchMailboxes(campaignId: CampaignId, orgId: OrgId): Promise<DispatchMailbox[]>;
     updateLastUsed(
       campaignId: CampaignId,
@@ -103,18 +128,24 @@ export async function dispatchDueSends(
       if (!deps.repos) throw new Error("Dispatch repositories are not configured");
       return operation(deps.repos);
     });
+  const stale = await run((repos) => repos.campaignMailboxes.listStaleClaims(now, limit));
+  for (const claim of stale) {
+    await run((repos) => resolveStaleClaim(repos, claim, now), claim.orgId);
+  }
+
   const due = await run((repos) => repos.assignments.listDueForDispatch({ now, limit }));
 
   for (const item of due.slice(0, limit)) {
     const tenant = <T>(operation: (repos: DispatchRepos) => Promise<T>) =>
       run(operation, item.orgId);
 
-    if (shouldSkip(item)) {
-      result.skipped += 1;
-      continue;
-    }
-
-    if (await tenant((repos) => repos.blocklist.isBlocked(item.contactEmail, item.orgId))) {
+    if (
+      shouldSkip(item) ||
+      (await tenant((repos) => repos.blocklist.isBlocked(item.contactEmail, item.orgId)))
+    ) {
+      await tenant((repos) =>
+        repos.assignments.deferUntil(item.assignmentId, item.orgId, now + SKIPPED_RETRY_MS)
+      );
       result.skipped += 1;
       continue;
     }
@@ -148,6 +179,9 @@ export async function dispatchDueSends(
       )
     );
     if (!mailbox) {
+      await tenant((repos) =>
+        repos.assignments.deferUntil(item.assignmentId, item.orgId, now + CAPACITY_RETRY_MS)
+      );
       result.missingCapacity += 1;
       continue;
     }
@@ -178,6 +212,9 @@ export async function dispatchDueSends(
       })
     );
     if (!available) {
+      await tenant((repos) =>
+        repos.assignments.deferUntil(item.assignmentId, item.orgId, now + CAPACITY_RETRY_MS)
+      );
       result.missingCapacity += 1;
       continue;
     }
@@ -221,6 +258,35 @@ export async function dispatchDueSends(
   }
 
   return result;
+}
+
+// The provider may have accepted this email, so it counts as sent and is never retried.
+async function resolveStaleClaim(repos: DispatchRepos, claim: StaleClaim, now: number) {
+  const nextStep = claim.stepNumber + 1;
+  const completed = nextStep >= claim.steps.length;
+  await repos.assignments.advanceStep({
+    id: claim.assignmentId,
+    orgId: claim.orgId,
+    expectedStep: claim.stepNumber,
+    mailboxId: claim.mailboxId,
+    sentAt: now,
+    completed,
+    nextSendAt: completed ? undefined : now + getStepDelayMs(claim.steps, nextStep),
+  });
+  await repos.mailboxes.incrementSentToday(claim.mailboxId, claim.orgId, claim);
+  await recordEvent(
+    failedEvent({
+      orgId: claim.orgId,
+      campaignId: claim.campaignId,
+      contactId: claim.contactId,
+      mailboxId: claim.mailboxId,
+      assignmentId: claim.assignmentId,
+      stepNumber: claim.stepNumber,
+      occurredAt: now,
+      reason: "delivery_outcome_unknown",
+    }),
+    { events: repos.events }
+  );
 }
 
 function queueMetadata() {

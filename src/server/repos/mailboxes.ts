@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 
 import { campaignMailboxes, mailboxes, sendReservations } from "../db/schema";
 import type { DbExecutor } from "../db/tx";
@@ -6,6 +6,8 @@ import type { MailboxFailure } from "../modules/mailboxes";
 import type { AssignmentId, MailboxId, MailboxRecord, OrgId } from "../ports";
 import type { RampDecision, RampStatus } from "../modules/ramp";
 import { newId } from "./ids";
+
+const SEND_CLAIM_MS = 10 * 60 * 1000;
 
 export type MailboxProvider = "smtp" | "puzzle" | "mailpool" | "google" | "microsoft";
 export type MailboxStatus = "active" | "disconnected" | "limit_reached";
@@ -318,12 +320,56 @@ export class PostgresMailboxRepo {
       .where(and(eq(mailboxes.id, id), eq(mailboxes.orgId, orgId)));
   }
 
+  async claimSend(
+    id: MailboxId,
+    orgId: OrgId,
+    reservation: { assignmentId: AssignmentId; stepNumber: number },
+    now: number
+  ): Promise<boolean> {
+    const rows = await this.db
+      .update(sendReservations)
+      .set({ claimedAt: new Date(now), expiresAt: new Date(now + SEND_CLAIM_MS) })
+      .where(
+        and(
+          eq(sendReservations.orgId, orgId),
+          eq(sendReservations.mailboxId, id),
+          eq(sendReservations.assignmentId, reservation.assignmentId),
+          eq(sendReservations.stepNumber, reservation.stepNumber),
+          isNull(sendReservations.claimedAt),
+          gt(sendReservations.expiresAt, new Date(now))
+        )
+      )
+      .returning();
+    return rows.length === 1;
+  }
+
+  async unclaimSend(
+    id: MailboxId,
+    orgId: OrgId,
+    reservation: { assignmentId: AssignmentId; stepNumber: number }
+  ): Promise<void> {
+    await this.db
+      .update(sendReservations)
+      .set({ claimedAt: null })
+      .where(
+        and(
+          eq(sendReservations.orgId, orgId),
+          eq(sendReservations.mailboxId, id),
+          eq(sendReservations.assignmentId, reservation.assignmentId),
+          eq(sendReservations.stepNumber, reservation.stepNumber)
+        )
+      );
+  }
+
+  // A claimed row may already have reached the provider, so it stays until its outcome is known.
   async releaseReservation(
     id: MailboxId,
     orgId: OrgId,
     reservation?: { assignmentId: AssignmentId; stepNumber: number }
   ): Promise<void> {
-    const released = reservation ? await this.deleteReservation(id, orgId, reservation) : 1;
+    const released = reservation
+      ? await this.deleteReservation(id, orgId, reservation, isNull(sendReservations.claimedAt))
+      : 1;
     if (released === 0) return;
     await this.db
       .update(mailboxes)
@@ -337,7 +383,8 @@ export class PostgresMailboxRepo {
   private async deleteReservation(
     id: MailboxId,
     orgId: OrgId,
-    reservation: { assignmentId: AssignmentId; stepNumber: number }
+    reservation: { assignmentId: AssignmentId; stepNumber: number },
+    condition?: SQL
   ) {
     const rows = await this.db
       .delete(sendReservations)
@@ -346,7 +393,8 @@ export class PostgresMailboxRepo {
           eq(sendReservations.orgId, orgId),
           eq(sendReservations.mailboxId, id),
           eq(sendReservations.assignmentId, reservation.assignmentId),
-          eq(sendReservations.stepNumber, reservation.stepNumber)
+          eq(sendReservations.stepNumber, reservation.stepNumber),
+          condition
         )
       )
       .returning();

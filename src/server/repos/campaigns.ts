@@ -147,6 +147,7 @@ function toCampaign(row: typeof campaigns.$inferSelect): CampaignRecord {
     orgId: row.orgId,
     name: row.name,
     status: row.status,
+    schedule: row.schedule,
     listUnsubscribeEnabled: row.listUnsubscribeEnabled,
     steps: Array.isArray(row.steps) ? row.steps : [],
   };

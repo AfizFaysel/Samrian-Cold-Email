@@ -17,6 +17,7 @@ export type CampaignRecord = {
   name: string;
   steps: readonly unknown[];
   status?: string;
+  schedule?: unknown;
   listUnsubscribeEnabled?: boolean | null;
 };
 
@@ -266,12 +267,24 @@ export interface MailboxRepo {
     orgId: OrgId,
     reservation?: { assignmentId: AssignmentId; stepNumber: number }
   ): Promise<void>;
+  claimSend(
+    id: MailboxId,
+    orgId: OrgId,
+    reservation: { assignmentId: AssignmentId; stepNumber: number },
+    now: number
+  ): Promise<boolean>;
+  unclaimSend(
+    id: MailboxId,
+    orgId: OrgId,
+    reservation: { assignmentId: AssignmentId; stepNumber: number }
+  ): Promise<void>;
   updateLastPolledAt(id: MailboxId, orgId: OrgId, at: number): Promise<void>;
   resetDailyCounters(): Promise<number>;
 }
 
 export interface AssignmentRepo {
   getById(id: AssignmentId, orgId: OrgId): Promise<AssignmentRecord | null>;
+  lockForSend(id: AssignmentId, orgId: OrgId): Promise<AssignmentRecord | null>;
   getByCampaignAndContact(
     campaignId: CampaignId,
     contactId: ContactId,

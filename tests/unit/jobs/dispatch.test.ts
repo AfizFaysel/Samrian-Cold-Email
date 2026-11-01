@@ -35,8 +35,11 @@ function makeDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
         listDueForDispatch: async () => due,
         markEnqueued: async () => {},
         deferUntil: async () => {},
+        advanceStep: async () => ({ status: "advanced", currentStep: 1 }),
       },
+      mailboxes: { incrementSentToday: async () => {} },
       campaignMailboxes: {
+        listStaleClaims: async () => [],
         listDispatchMailboxes: async () => [
           {
             mailboxId: "mailbox_2",
