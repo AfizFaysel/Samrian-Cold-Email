@@ -169,6 +169,7 @@ function createDeps(calls: string[]): WorkerDeps {
         skipped: 0,
         missingCapacity: 0,
         stale: 0,
+        failed: 0,
         limit: 100,
       } as const;
     }),

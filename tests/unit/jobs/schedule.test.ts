@@ -15,6 +15,36 @@ const schedule = {
 };
 
 describe("send schedule", () => {
+  describe("invalid timezones", () => {
+    const now = Date.parse("2026-07-06T14:00:00.000Z");
+    const nairobi = { timezone: "Africa/Nairobi", startTime: "09:00", endTime: "12:00" };
+
+    test("falls back from the contact to the campaign timezone", () => {
+      const window = { schedule: nairobi, contactTimezone: "Mars/Olympus", now };
+
+      expect(isInSendWindow(window)).toBe(false);
+      expect(nextWindowStart(window)).toBe(nextWindowStart({ schedule: nairobi, now }));
+    });
+
+    test("falls back from the campaign timezone to its default", () => {
+      expect(
+        nextWindowStart({
+          schedule: { ...nairobi, timezone: "Mars/Olympus", defaultTimezone: "Africa/Nairobi" },
+          now,
+        })
+      ).toBe(nextWindowStart({ schedule: nairobi, now }));
+    });
+
+    test.each(["", "Mars/Olympus"])("uses UTC when nothing is valid (%j)", (contactTimezone) => {
+      const schedule = { timezone: "Mars/Olympus", startTime: "13:00", endTime: "15:00" };
+
+      expect(isInSendWindow({ schedule, contactTimezone, now })).toBe(true);
+      expect(new Date(nextWindowStart({ schedule, contactTimezone, now })).toISOString()).toBe(
+        "2026-07-07T13:00:00.000Z"
+      );
+    });
+  });
+
   describe("the schedule the campaign wizard saves", () => {
     const wizard = {
       defaultTimezone: "America/New_York",

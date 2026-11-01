@@ -1,3 +1,4 @@
+import { isTimezone } from "@samrian/contracts";
 import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 
 export const DISPATCH_BATCH_LIMIT = 100;
@@ -87,8 +88,10 @@ export function getJitterMs(
   return Math.round(minMs + (maxMs - minMs) * random());
 }
 
+// Stored rows can predate input validation, and one bad value must not stop sending.
 function resolveTimezone(schedule: CampaignSchedule, contactTimezone: string | undefined) {
-  return contactTimezone ?? schedule.timezone ?? schedule.defaultTimezone ?? "UTC";
+  const candidates = [contactTimezone, schedule.timezone, schedule.defaultTimezone];
+  return candidates.find((value) => value && isTimezone(value)) ?? "UTC";
 }
 
 function parseTime(value: string): number {

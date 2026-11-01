@@ -67,6 +67,70 @@ function makeDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
 }
 
 describe("dispatchDueSends", () => {
+  test("uses the campaign schedule when a contact timezone is invalid", async () => {
+    const deps = makeDeps();
+    const [item] = await deps.repos.assignments.listDueForDispatch({ now: 0, limit: 1 });
+    deps.repos.assignments.listDueForDispatch = async () => [
+      { ...item, contactTimezone: "Mars/Olympus" },
+    ];
+
+    await expect(dispatchDueSends(deps)).resolves.toMatchObject({ enqueued: 1, failed: 0 });
+  });
+
+  test("defers a failing assignment and dispatches the rest of the batch", async () => {
+    const deps = makeDeps();
+    const deferred: string[] = [];
+    const [item] = await deps.repos.assignments.listDueForDispatch({ now: 0, limit: 1 });
+    deps.repos.assignments.listDueForDispatch = async () => [
+      { ...item, assignmentId: "assignment_broken", campaignSchedule: { daysAllowed: "monday" } },
+      item,
+    ];
+    deps.repos.assignments.deferUntil = async (id) => {
+      deferred.push(id);
+    };
+
+    await expect(dispatchDueSends(deps)).resolves.toMatchObject({ enqueued: 1, failed: 1 });
+    expect(deferred).toEqual(["assignment_broken"]);
+  });
+
+  test("keeps going when a failing assignment cannot be deferred", async () => {
+    const deps = makeDeps();
+    const [item] = await deps.repos.assignments.listDueForDispatch({ now: 0, limit: 1 });
+    deps.repos.assignments.listDueForDispatch = async () => [
+      { ...item, assignmentId: "assignment_broken", campaignSchedule: { daysAllowed: "monday" } },
+      item,
+    ];
+    deps.repos.assignments.deferUntil = async () => {
+      throw new Error("database unavailable");
+    };
+
+    await expect(dispatchDueSends(deps)).resolves.toMatchObject({ enqueued: 1, failed: 1 });
+  });
+
+  test("dispatches due work after a stale claim fails", async () => {
+    const deps = makeDeps();
+    deps.repos.campaignMailboxes.listStaleClaims = async () => [
+      {
+        orgId: "org_2",
+        mailboxId: "mailbox_9",
+        assignmentId: "assignment_stale",
+        stepNumber: 0,
+        campaignId: "campaign_9",
+        contactId: "contact_9",
+        steps: [],
+      },
+    ];
+    deps.repos.assignments.advanceStep = async () => {
+      throw new Error("database unavailable");
+    };
+
+    await expect(dispatchDueSends(deps)).resolves.toMatchObject({
+      enqueued: 1,
+      stale: 0,
+      failed: 1,
+    });
+  });
+
   test("enqueues due assignment with assignment-step idempotency key", async () => {
     const deps = makeDeps();
 

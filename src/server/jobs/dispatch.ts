@@ -9,6 +9,7 @@ import type {
   OrgId,
 } from "../ports";
 import { getObservabilityContext } from "../observability";
+import { logger } from "../observability/runtime";
 import { failedEvent, recordEvent } from "../modules/events";
 import { getMailboxCapacity } from "../modules/ramp";
 import type { LimitGuard } from "../modules/limits";
@@ -106,6 +107,7 @@ export type DispatchResult = {
   skipped: number;
   missingCapacity: number;
   stale: number;
+  failed: number;
   limit: number;
 };
 
@@ -120,6 +122,7 @@ export async function dispatchDueSends(
     skipped: 0,
     missingCapacity: 0,
     stale: 0,
+    failed: 0,
     limit,
   };
   const run: DispatchTransaction =
@@ -130,7 +133,16 @@ export async function dispatchDueSends(
     });
   const stale = await run((repos) => repos.campaignMailboxes.listStaleClaims(now, limit));
   for (const claim of stale) {
-    await run((repos) => resolveStaleClaim(repos, claim, now), claim.orgId);
+    try {
+      await run((repos) => resolveStaleClaim(repos, claim, now), claim.orgId);
+    } catch (error) {
+      logger.error("dispatch.stale_claim_failed", {
+        orgId: claim.orgId,
+        assignmentId: claim.assignmentId,
+        error,
+      });
+      result.failed += 1;
+    }
   }
 
   const due = await run((repos) => repos.assignments.listDueForDispatch({ now, limit }));
@@ -139,122 +151,134 @@ export async function dispatchDueSends(
     const tenant = <T>(operation: (repos: DispatchRepos) => Promise<T>) =>
       run(operation, item.orgId);
 
-    if (
-      shouldSkip(item) ||
-      (await tenant((repos) => repos.blocklist.isBlocked(item.contactEmail, item.orgId)))
-    ) {
-      await tenant((repos) =>
-        repos.assignments.deferUntil(item.assignmentId, item.orgId, now + SKIPPED_RETRY_MS)
-      );
-      result.skipped += 1;
-      continue;
-    }
-
-    if (
-      !isInSendWindow({
-        schedule: item.campaignSchedule as never,
-        contactTimezone: item.contactTimezone,
-        now,
-      })
-    ) {
-      await tenant((repos) =>
-        repos.assignments.deferUntil(
-          item.assignmentId,
-          item.orgId,
-          nextWindowStart({
-            schedule: item.campaignSchedule as never,
-            contactTimezone: item.contactTimezone,
-            now,
-          })
-        )
-      );
-      result.deferred += 1;
-      continue;
-    }
-
-    const mailbox = await tenant(async (repos) =>
-      pickMailbox(
-        await repos.campaignMailboxes.listDispatchMailboxes(item.campaignId, item.orgId),
-        now
-      )
-    );
-    if (!mailbox) {
-      await tenant((repos) =>
-        repos.assignments.deferUntil(item.assignmentId, item.orgId, now + CAPACITY_RETRY_MS)
-      );
-      result.missingCapacity += 1;
-      continue;
-    }
-
-    if (deps.limits) {
-      const backpressure = await deps.limits.checkSubject({
-        operationId: "jobs.dispatch",
-        subjectType: "worker",
-        subject: item.orgId,
-      });
-      if (!backpressure.allowed) {
+    try {
+      if (
+        shouldSkip(item) ||
+        (await tenant((repos) => repos.blocklist.isBlocked(item.contactEmail, item.orgId)))
+      ) {
         await tenant((repos) =>
-          repos.assignments.deferUntil(item.assignmentId, item.orgId, backpressure.resetAt)
+          repos.assignments.deferUntil(item.assignmentId, item.orgId, now + SKIPPED_RETRY_MS)
+        );
+        result.skipped += 1;
+        continue;
+      }
+
+      if (
+        !isInSendWindow({
+          schedule: item.campaignSchedule as never,
+          contactTimezone: item.contactTimezone,
+          now,
+        })
+      ) {
+        await tenant((repos) =>
+          repos.assignments.deferUntil(
+            item.assignmentId,
+            item.orgId,
+            nextWindowStart({
+              schedule: item.campaignSchedule as never,
+              contactTimezone: item.contactTimezone,
+              now,
+            })
+          )
         );
         result.deferred += 1;
         continue;
       }
-    }
 
-    const available = await tenant((repos) =>
-      repos.campaignMailboxes.reserveCapacity({
-        mailboxId: mailbox.mailboxId,
-        assignmentId: item.assignmentId,
-        stepNumber: item.currentStep,
-        orgId: item.orgId,
-        limit: capacity(mailbox).campaignLimit,
-        now,
-      })
-    );
-    if (!available) {
-      await tenant((repos) =>
-        repos.assignments.deferUntil(item.assignmentId, item.orgId, now + CAPACITY_RETRY_MS)
+      const mailbox = await tenant(async (repos) =>
+        pickMailbox(
+          await repos.campaignMailboxes.listDispatchMailboxes(item.campaignId, item.orgId),
+          now
+        )
       );
-      result.missingCapacity += 1;
-      continue;
-    }
-    try {
-      await deps.queue.enqueueCampaignSend(
-        {
-          assignmentId: item.assignmentId,
-          campaignId: item.campaignId,
-          contactId: item.contactId,
-          mailboxId: mailbox.mailboxId,
-          orgId: item.orgId,
-          stepNumber: item.currentStep,
-        },
-        {
-          delayMs: getJitterMs({ random: deps.random }),
-          idempotencyKey: `${item.assignmentId}:${item.currentStep}`,
-          metadata: queueMetadata(),
+      if (!mailbox) {
+        await tenant((repos) =>
+          repos.assignments.deferUntil(item.assignmentId, item.orgId, now + CAPACITY_RETRY_MS)
+        );
+        result.missingCapacity += 1;
+        continue;
+      }
+
+      if (deps.limits) {
+        const backpressure = await deps.limits.checkSubject({
+          operationId: "jobs.dispatch",
+          subjectType: "worker",
+          subject: item.orgId,
+        });
+        if (!backpressure.allowed) {
+          await tenant((repos) =>
+            repos.assignments.deferUntil(item.assignmentId, item.orgId, backpressure.resetAt)
+          );
+          result.deferred += 1;
+          continue;
         }
-      );
-    } catch (error) {
-      await tenant((repos) =>
-        repos.campaignMailboxes.releaseCapacity({
+      }
+
+      const available = await tenant((repos) =>
+        repos.campaignMailboxes.reserveCapacity({
           mailboxId: mailbox.mailboxId,
           assignmentId: item.assignmentId,
           stepNumber: item.currentStep,
           orgId: item.orgId,
+          limit: capacity(mailbox).campaignLimit,
+          now,
         })
       );
-      throw error;
+      if (!available) {
+        await tenant((repos) =>
+          repos.assignments.deferUntil(item.assignmentId, item.orgId, now + CAPACITY_RETRY_MS)
+        );
+        result.missingCapacity += 1;
+        continue;
+      }
+      try {
+        await deps.queue.enqueueCampaignSend(
+          {
+            assignmentId: item.assignmentId,
+            campaignId: item.campaignId,
+            contactId: item.contactId,
+            mailboxId: mailbox.mailboxId,
+            orgId: item.orgId,
+            stepNumber: item.currentStep,
+          },
+          {
+            delayMs: getJitterMs({ random: deps.random }),
+            idempotencyKey: `${item.assignmentId}:${item.currentStep}`,
+            metadata: queueMetadata(),
+          }
+        );
+      } catch (error) {
+        await tenant((repos) =>
+          repos.campaignMailboxes.releaseCapacity({
+            mailboxId: mailbox.mailboxId,
+            assignmentId: item.assignmentId,
+            stepNumber: item.currentStep,
+            orgId: item.orgId,
+          })
+        );
+        throw error;
+      }
+      await tenant(async (repos) => {
+        await repos.assignments.markEnqueued(item.assignmentId, item.orgId, now);
+        await repos.campaignMailboxes.updateLastUsed(
+          item.campaignId,
+          mailbox.mailboxId,
+          item.orgId,
+          now
+        );
+      });
+      result.enqueued += 1;
+    } catch (error) {
+      logger.error("dispatch.item_failed", {
+        orgId: item.orgId,
+        assignmentId: item.assignmentId,
+        error,
+      });
+      result.failed += 1;
+      await tenant((repos) =>
+        repos.assignments.deferUntil(item.assignmentId, item.orgId, now + CAPACITY_RETRY_MS)
+      ).catch(() => undefined);
     }
-    await tenant(async (repos) => {
-      await repos.assignments.markEnqueued(item.assignmentId, item.orgId, now);
-      await repos.campaignMailboxes.updateLastUsed(
-        item.campaignId,
-        mailbox.mailboxId,
-        item.orgId,
-        now
-      );
-    });
-    result.enqueued += 1;
   }
 
   return result;
