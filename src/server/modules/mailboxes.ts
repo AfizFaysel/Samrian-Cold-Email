@@ -136,6 +136,12 @@ export async function checkMailbox(
   }
 }
 
+// These failures prove the provider refused the message. Anything else, such as a dropped
+// connection, may have delivered it, so sending again could reach the recipient twice.
+export function provedNotDelivered(failure: MailboxFailure) {
+  return ["auth", "config", "quota", "rate-limit"].includes(failure.kind);
+}
+
 export function classifyMailboxError(error: unknown): MailboxFailure {
   if (isConnectionTestResult(error)) {
     if (error.requiresReconnect) {

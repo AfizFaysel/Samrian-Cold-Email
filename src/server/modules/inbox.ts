@@ -1,7 +1,9 @@
 import type { ConnectorFactory } from "../jobs/types";
 import type { JobRepos } from "../jobs/types";
 import type { OrgId, ThreadRecord, UserId } from "../ports";
+import { escapeHtml } from "./compliance";
 import { buildEmailDisplay, getSafeEmailLinks, parseEmailSender } from "./email-display";
+import { classifyMailboxError, provedNotDelivered } from "./mailboxes";
 import { getProviderPolicy } from "./providers";
 import { getMailboxCapacity } from "./ramp";
 
@@ -28,6 +30,8 @@ export type SendReplyResult = {
   threadId?: string;
   messageId?: string;
 };
+
+const REPLY_UNKNOWN = "manual-reply-unknown";
 
 export async function listInbox(
   input: { orgId: OrgId; userId: UserId; limit?: number },
@@ -87,6 +91,9 @@ export async function sendReply(
       return operation(deps.repos);
     });
 
+  const html = escapeHtml(body).replace(/\r?\n/g, "<br>");
+
+  // The claim commits before delivery, so a retry or a racing request can never send again.
   const prepared = await run(async (repos) => {
     const existing = await repos.threads.findByClientRequestId?.(
       input.clientRequestId,
@@ -108,9 +115,72 @@ export async function sendReply(
       providerThreadId: thread.providerThreadId,
       limit: 200,
     })) ?? [thread];
-    return { thread, mailbox, conversation } as const;
+
+    if (
+      mailbox.archivedAt ||
+      mailbox.status === "disconnected" ||
+      mailbox.status === "limit_reached"
+    ) {
+      throw new Error("Mailbox is not available");
+    }
+    const recipient = getReplyRecipient(thread);
+    if (!recipient) throw new Error("Reply recipient not found");
+
+    const dailyLimit = mailbox.dailySendLimit ?? Number.MAX_SAFE_INTEGER;
+    const { effectiveLimit } = getMailboxCapacity({
+      providerLimit: mailbox.provider
+        ? getProviderPolicy(mailbox.provider).maxSafeDailyLimit
+        : dailyLimit,
+      userLimit: dailyLimit,
+      rampEnabled: mailbox.rampEnabled,
+      rampLimit: mailbox.rampCurrentLimit,
+      sentToday: mailbox.sentToday,
+      reserved: mailbox.reservedSends,
+    });
+    if (!(await repos.mailboxes.claimReplySend(mailbox.id, input.orgId, effectiveLimit))) {
+      throw new Error("Mailbox daily capacity reached");
+    }
+
+    const latest = conversation.at(-1) ?? thread;
+    const inReplyTo = getMessageId(latest) ?? getMessageId(thread);
+    const references = mergeReferences(latest.references ?? thread.references, inReplyTo);
+    const subject = input.subject?.trim() || toReplySubject(thread.subject);
+
+    const claim = await repos.threads.claimReply({
+      orgId: input.orgId,
+      campaignId: thread.campaignId,
+      contactId: thread.contactId,
+      mailboxId: thread.mailboxId,
+      messageId: `pending:${input.clientRequestId}`,
+      clientRequestId: input.clientRequestId,
+      inReplyTo,
+      references,
+      providerThreadId: thread.providerThreadId,
+      classification: "manual-reply-pending",
+      direction: "sent",
+      from: mailbox.email,
+      to: [recipient],
+      subject,
+      textBody: body,
+      htmlBody: html,
+      headers: {},
+      sentAt: deps.now(),
+    });
+    if (!claim) {
+      await repos.mailboxes.refundReplySend(mailbox.id, input.orgId);
+      const winner = await repos.threads.findByClientRequestId?.(
+        input.clientRequestId,
+        input.orgId
+      );
+      return { existing: winner ?? thread } as const;
+    }
+
+    return { thread, mailbox, claim, recipient, subject, inReplyTo, references } as const;
   });
   if (prepared.existing) {
+    if (prepared.existing.classification === REPLY_UNKNOWN) {
+      throw new Error("Earlier delivery of this reply could not be confirmed");
+    }
     return {
       status: "duplicate",
       threadId: prepared.existing.id,
@@ -118,74 +188,47 @@ export async function sendReply(
     };
   }
 
-  const { thread, mailbox, conversation } = prepared;
-  if (
-    mailbox.archivedAt ||
-    mailbox.status === "disconnected" ||
-    mailbox.status === "limit_reached"
-  ) {
-    throw new Error("Mailbox is not available");
-  }
-  const dailyLimit = mailbox.dailySendLimit ?? Number.MAX_SAFE_INTEGER;
-  const capacity = getMailboxCapacity({
-    providerLimit: mailbox.provider
-      ? getProviderPolicy(mailbox.provider).maxSafeDailyLimit
-      : dailyLimit,
-    userLimit: dailyLimit,
-    rampEnabled: mailbox.rampEnabled,
-    rampLimit: mailbox.rampCurrentLimit,
-    sentToday: mailbox.sentToday,
-    reserved: mailbox.reservedSends,
+  const { thread, mailbox, claim, recipient, subject, inReplyTo, references } = prepared;
+  const release = () =>
+    run(async (repos) => {
+      await repos.threads.releaseReply(claim.id, input.orgId);
+      await repos.mailboxes.refundReplySend(mailbox.id, input.orgId);
+    });
+
+  const connector = await deps.connectorForMailbox(mailbox).catch(async (error: unknown) => {
+    await release();
+    throw error;
   });
-  if (capacity.available <= 0) throw new Error("Mailbox daily capacity reached");
-
-  const recipient = getReplyRecipient(thread);
-  if (!recipient) throw new Error("Reply recipient not found");
-
-  const latest = conversation.at(-1) ?? thread;
-  const inReplyTo = getMessageId(latest) ?? getMessageId(thread);
-  const references = mergeReferences(latest.references ?? thread.references, inReplyTo);
-  const subject = input.subject?.trim() || toReplySubject(thread.subject);
-
-  const connector = await deps.connectorForMailbox(mailbox);
   try {
     const result = await connector.send({
       from: mailbox.email,
       to: recipient,
       subject,
       text: body,
-      html: body,
+      html,
       inReplyTo,
       references,
       providerThreadId: thread.providerThreadId,
     });
 
-    const sent = await run(async (repos) => {
-      const stored = await repos.threads.insert({
-        orgId: input.orgId,
-        campaignId: thread.campaignId,
-        contactId: thread.contactId,
-        mailboxId: thread.mailboxId,
+    await run((repos) =>
+      repos.threads.updateReply(claim.id, input.orgId, {
         messageId: result.messageId,
-        clientRequestId: input.clientRequestId,
-        inReplyTo,
-        references,
-        providerThreadId: thread.providerThreadId,
+        providerThreadId: result.providerThreadId,
         classification: "manual-reply",
-        direction: "sent",
-        from: mailbox.email,
-        to: [recipient],
-        subject,
-        textBody: body,
-        htmlBody: body,
-        headers: {},
-        sentAt: deps.now(),
-      });
-      await repos.mailboxes.incrementSentToday(thread.mailboxId!, input.orgId);
-      return stored;
-    });
+      })
+    );
 
-    return { status: "sent", threadId: sent.id, messageId: result.messageId };
+    return { status: "sent", threadId: claim.id, messageId: result.messageId };
+  } catch (error) {
+    if (provedNotDelivered(classifyMailboxError(error))) {
+      await release();
+    } else {
+      await run((repos) =>
+        repos.threads.updateReply(claim.id, input.orgId, { classification: REPLY_UNKNOWN })
+      );
+    }
+    throw error;
   } finally {
     await connector.close();
   }

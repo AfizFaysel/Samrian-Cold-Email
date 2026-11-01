@@ -91,7 +91,7 @@ export function resolveListUnsubscribeEnabled(input: {
   return input.campaignEnabled ?? input.orgEnabled ?? false;
 }
 
-function escapeHtml(value: string) {
+export function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

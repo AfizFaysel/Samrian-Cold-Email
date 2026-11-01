@@ -82,6 +82,12 @@ export default function InboxPage() {
     refetchThread();
   }
 
+  // Kept across retries so an uncertain send cannot be repeated as a new reply.
+  const replyRequestId = React.useRef<string | undefined>(undefined);
+  React.useEffect(() => {
+    replyRequestId.current = undefined;
+  }, [selectedId]);
+
   async function sendReply() {
     if (!selectedId || !draft.trim()) return;
     setSending(true);
@@ -92,13 +98,14 @@ export default function InboxPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           body: draft,
-          clientRequestId: crypto.randomUUID(),
+          clientRequestId: (replyRequestId.current ??= crypto.randomUUID()),
         }),
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `Request failed: ${response.status}`);
       }
+      replyRequestId.current = undefined;
       setDraft("");
       refetchThread();
       refetch();

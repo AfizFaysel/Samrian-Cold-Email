@@ -300,6 +300,31 @@ export class PostgresMailboxRepo {
     return rows.map(toMailbox);
   }
 
+  async claimReplySend(id: MailboxId, orgId: OrgId, limit: number): Promise<boolean> {
+    const rows = await this.db
+      .update(mailboxes)
+      .set({ emailsSentToday: sql`${mailboxes.emailsSentToday} + 1`, updatedAt: new Date() })
+      .where(
+        and(
+          eq(mailboxes.id, id),
+          eq(mailboxes.orgId, orgId),
+          sql`${mailboxes.emailsSentToday} + ${mailboxes.reservedSends} < ${limit}`
+        )
+      )
+      .returning();
+    return rows.length === 1;
+  }
+
+  async refundReplySend(id: MailboxId, orgId: OrgId): Promise<void> {
+    await this.db
+      .update(mailboxes)
+      .set({
+        emailsSentToday: sql`greatest(${mailboxes.emailsSentToday} - 1, 0)`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(mailboxes.id, id), eq(mailboxes.orgId, orgId)));
+  }
+
   async incrementSentToday(
     id: MailboxId,
     orgId: OrgId,

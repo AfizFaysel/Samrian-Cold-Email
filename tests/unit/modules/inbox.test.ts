@@ -117,30 +117,90 @@ describe("inbox module", () => {
     expect(repos.mailboxes.data[0]?.sentToday).toBe(1);
   });
 
-  test("does not insert sent reply when connector fails", async () => {
+  const input = (body = "Thanks.") => ({
+    orgId: "org_1",
+    userId: "user_1",
+    threadId: "thread_inbound",
+    body,
+    clientRequestId: "req_1",
+  });
+
+  test("escapes the reply and keeps its line breaks in the html part", async () => {
+    const repos = baseRepos();
+    const sent = vi.fn(async () => ({ messageId: "m_1", accepted: [], rejected: [] }));
+
+    await sendReply(input("Hi Sam,\n\nIs a < b?"), {
+      repos,
+      connectorForMailbox: connector(sent),
+      now: () => 1000,
+    });
+
+    expect(sent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "Hi Sam,\n\nIs a < b?",
+        html: "Hi Sam,<br><br>Is a &lt; b?",
+      })
+    );
+  });
+
+  test("keeps the provider thread the send reports", async () => {
+    const repos = baseRepos();
+    const sent = vi.fn(async () => ({
+      messageId: "m_1",
+      providerThreadId: "thread_new",
+      accepted: [],
+      rejected: [],
+    }));
+
+    await sendReply(input(), { repos, connectorForMailbox: connector(sent), now: () => 1000 });
+
+    expect(repos.threads.data.find((thread) => thread.messageId === "m_1")).toMatchObject({
+      providerThreadId: "thread_new",
+      classification: "manual-reply",
+    });
+  });
+
+  test("gives capacity back when the provider clearly refused", async () => {
+    const repos = baseRepos();
+    const refused = vi.fn().mockRejectedValue(new Error("rate limit exceeded"));
+
+    await expect(
+      sendReply(input(), { repos, connectorForMailbox: connector(refused), now: () => 1000 })
+    ).rejects.toThrow("rate limit");
+
+    expect(repos.threads.data.some((thread) => thread.clientRequestId === "req_1")).toBe(false);
+    expect(repos.mailboxes.data[0]?.sentToday).toBe(0);
+  });
+
+  test("releases the claim when no connector could be built", async () => {
     const repos = baseRepos();
 
     await expect(
-      sendReply(
-        {
-          orgId: "org_1",
-          userId: "user_1",
-          threadId: "thread_inbound",
-          body: "Thanks.",
-          clientRequestId: "req_1",
+      sendReply(input(), {
+        repos,
+        connectorForMailbox: async () => {
+          throw new Error("connection refused");
         },
-        {
-          repos,
-          connectorForMailbox: connector(vi.fn().mockRejectedValue(new Error("provider down"))),
-          now: () => 1000,
-        }
-      )
-    ).rejects.toThrow("provider down");
+        now: () => 1000,
+      })
+    ).rejects.toThrow("connection refused");
 
-    expect(repos.threads.data.some((thread) => thread.classification === "manual-reply")).toBe(
-      false
-    );
-    expect(repos.mailboxes.data[0]?.sentToday).toBeUndefined();
+    expect(repos.threads.data.some((thread) => thread.clientRequestId === "req_1")).toBe(false);
+  });
+
+  test("records an uncertain send and refuses to repeat it", async () => {
+    const repos = baseRepos();
+    const lost = vi.fn().mockRejectedValue(new Error("provider down"));
+    const deps = { repos, connectorForMailbox: connector(lost), now: () => 1000 };
+
+    await expect(sendReply(input(), deps)).rejects.toThrow("provider down");
+    await expect(sendReply(input(), deps)).rejects.toThrow("could not be confirmed");
+
+    expect(lost).toHaveBeenCalledOnce();
+    expect(repos.mailboxes.data[0]?.sentToday).toBe(1);
+    expect(repos.threads.data.find((thread) => thread.clientRequestId === "req_1")).toMatchObject({
+      classification: "manual-reply-unknown",
+    });
   });
 
   test("keeps manual replies inside total mailbox capacity", async () => {

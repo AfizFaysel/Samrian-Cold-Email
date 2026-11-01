@@ -84,6 +84,17 @@ export class FakeRepos {
       },
       claimSend: async () => true,
       unclaimSend: async () => {},
+      claimReplySend: async (id, orgId, limit) => {
+        const mailbox = mailboxes.find((item) => item.id === id && item.orgId === orgId);
+        if (!mailbox) return false;
+        if ((mailbox.sentToday ?? 0) + (mailbox.reservedSends ?? 0) >= limit) return false;
+        mailbox.sentToday = (mailbox.sentToday ?? 0) + 1;
+        return true;
+      },
+      refundReplySend: async (id, orgId) => {
+        const mailbox = mailboxes.find((item) => item.id === id && item.orgId === orgId);
+        if (mailbox) mailbox.sentToday = Math.max(0, (mailbox.sentToday ?? 0) - 1);
+      },
       releaseReservation: async (id, orgId) => {
         const mailbox = mailboxes.find((item) => item.id === id && item.orgId === orgId);
         if (mailbox) mailbox.reservedSends = Math.max(0, (mailbox.reservedSends ?? 0) - 1);
@@ -214,6 +225,20 @@ export class FakeRepos {
             ((thread.messageId && messageIds.includes(normalizeMessageId(thread.messageId))) ||
               Boolean(providerThreadId && thread.providerThreadId === providerThreadId))
         ) ?? null,
+      claimReply: async (input) => {
+        const taken = threads.some(
+          (item) => item.clientRequestId === input.clientRequestId && item.orgId === input.orgId
+        );
+        return taken ? null : this.threads.insert(input);
+      },
+      updateReply: async (id, orgId, input) => {
+        const thread = threads.find((item) => item.id === id && item.orgId === orgId);
+        if (thread) Object.assign(thread, input);
+      },
+      releaseReply: async (id, orgId) => {
+        const index = threads.findIndex((item) => item.id === id && item.orgId === orgId);
+        if (index !== -1) threads.splice(index, 1);
+      },
       insertReceived: async (input) => {
         const existing = threads.find(
           (item) =>

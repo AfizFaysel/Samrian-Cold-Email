@@ -58,6 +58,6 @@ function statusFor(error: unknown): number {
   const message = error instanceof Error ? error.message : "";
   if (message.includes("required")) return 400;
   if (message.includes("not found")) return 404;
-  if (message.includes("not available")) return 409;
+  if (message.includes("not available") || message.includes("not be confirmed")) return 409;
   return 500;
 }

@@ -257,6 +257,8 @@ export interface ContactRepo {
 
 export interface MailboxRepo {
   getById(id: MailboxId, orgId: OrgId): Promise<MailboxRecord | null>;
+  claimReplySend(id: MailboxId, orgId: OrgId, limit: number): Promise<boolean>;
+  refundReplySend(id: MailboxId, orgId: OrgId): Promise<void>;
   listActive(): Promise<MailboxRecord[]>;
   incrementSentToday(
     id: MailboxId,
@@ -320,6 +322,13 @@ export interface ThreadRepo {
     providerThreadId?: string;
   }): Promise<ThreadRecord | null>;
   insertReceived(input: InsertThreadInput): Promise<ThreadRecord & { created: boolean }>;
+  claimReply(input: InsertThreadInput): Promise<ThreadRecord | null>;
+  updateReply(
+    id: ThreadId,
+    orgId: OrgId,
+    input: { messageId?: string; providerThreadId?: string; classification: string }
+  ): Promise<void>;
+  releaseReply(id: ThreadId, orgId: OrgId): Promise<void>;
   insert(input: InsertThreadInput): Promise<ThreadRecord>;
 }
 

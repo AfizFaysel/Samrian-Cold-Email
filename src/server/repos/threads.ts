@@ -208,6 +208,30 @@ export class PostgresThreadRepo {
     return { ...toThread(existing), created: false };
   }
 
+  async claimReply(input: InsertThreadInput): Promise<ThreadRecord | null> {
+    const [row] = await this.db
+      .insert(threads)
+      .values(toRow(input))
+      .onConflictDoNothing()
+      .returning();
+    return row ? toThread(row) : null;
+  }
+
+  async updateReply(
+    id: ThreadId,
+    orgId: OrgId,
+    input: { messageId?: string; providerThreadId?: string; classification: string }
+  ): Promise<void> {
+    await this.db
+      .update(threads)
+      .set(input)
+      .where(and(eq(threads.id, id), eq(threads.orgId, orgId)));
+  }
+
+  async releaseReply(id: ThreadId, orgId: OrgId): Promise<void> {
+    await this.db.delete(threads).where(and(eq(threads.id, id), eq(threads.orgId, orgId)));
+  }
+
   async insert(input: InsertThreadInput): Promise<ThreadRecord> {
     if (input.messageId) {
       const existing = await this.getByMessageId(input.messageId, input.orgId);

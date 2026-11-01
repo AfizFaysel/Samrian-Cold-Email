@@ -8,7 +8,11 @@ import type {
   SendResult,
 } from "./types";
 import { assessContact } from "../modules/contacts";
-import { classifyMailboxError, type MailboxFailureKind } from "../modules/mailboxes";
+import {
+  classifyMailboxError,
+  provedNotDelivered,
+  type MailboxFailureKind,
+} from "../modules/mailboxes";
 import { notifyCampaignHeld, notifySendFailed } from "../modules/notifications";
 import { failedEvent, recordEvent, sentEvent } from "../modules/events";
 import { applyTracking } from "../modules/tracking";
@@ -28,15 +32,6 @@ type CampaignStep = {
 };
 
 const COMPLIANCE_RETRY_MS = 60 * 60 * 1000;
-
-// These failures prove the provider refused the message. Anything else, such as a dropped
-// connection, may have delivered it, so sending again could reach the recipient twice.
-const NOT_DELIVERED_FAILURES: ReadonlySet<MailboxFailureKind> = new Set([
-  "auth",
-  "config",
-  "quota",
-  "rate-limit",
-]);
 
 export type SendCampaignDeps = {
   repos?: JobRepos;
@@ -95,7 +90,7 @@ export async function sendCampaign(
       result = await connector.send(message);
     } catch (error) {
       const failure = classifyMailboxError(error);
-      const notDelivered = NOT_DELIVERED_FAILURES.has(failure.kind);
+      const notDelivered = provedNotDelivered(failure);
       await run(async (repos) => {
         if (notDelivered) {
           await repos.mailboxes.unclaimSend(payload.mailboxId, payload.orgId, payload);
