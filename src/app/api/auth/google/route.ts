@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createOAuthState } from "../../../../../lib/oauth-state";
+import { createOAuthState, hasOAuthStateSecret } from "../../../../../lib/oauth-state";
 import {
   accessRedirect,
   authorizeOAuthMailbox,
@@ -36,6 +36,10 @@ async function start(request: NextRequest) {
     session = await authorizeOAuthMailbox("google", mailboxId);
   } catch (error) {
     return accessRedirect(appUrl, error, "google");
+  }
+
+  if (!hasOAuthStateSecret()) {
+    return NextResponse.redirect(`${appUrl}/dashboard/mailboxes?error=missing_oauth_secret`);
   }
 
   // Create signed, timestamped, org-bound state

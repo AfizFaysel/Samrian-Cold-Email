@@ -4,7 +4,7 @@
  * Used by both Google and Microsoft OAuth routes.
  *
  * State format: base64url({ nonce, orgId, userId, mailboxId?, ts, sig })
- * sig = HMAC-SHA256(nonce|orgId|userId|ts, BETTER_AUTH_SECRET)
+ * sig = HMAC-SHA256(nonce|orgId|userId|ts, OAUTH_STATE_SECRET or BETTER_AUTH_SECRET)
  *
  * Security properties:
  * - CSRF: random nonce + httpOnly cookie verification
@@ -43,10 +43,14 @@ export interface ValidatedState {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+export function hasOAuthStateSecret(): boolean {
+  return Boolean(process.env.OAUTH_STATE_SECRET || process.env.BETTER_AUTH_SECRET);
+}
+
 function getSigningSecret(): string {
-  const secret = process.env.BETTER_AUTH_SECRET;
+  const secret = process.env.OAUTH_STATE_SECRET || process.env.BETTER_AUTH_SECRET;
   if (!secret) {
-    throw new Error("BETTER_AUTH_SECRET is required for OAuth state signing");
+    throw new Error("OAUTH_STATE_SECRET or BETTER_AUTH_SECRET is required for OAuth state signing");
   }
   return secret;
 }

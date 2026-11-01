@@ -78,6 +78,44 @@ describe.each(providers)("$provider mailbox OAuth access", ({ provider, start, c
     expect(response.headers.get("location")).toMatch(/^https:\/\/(accounts\.google|login\.micro)/);
   });
 
+  test("signs state with the provider-neutral secret when there is no Better Auth", async () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", "");
+    vi.stubEnv("OAUTH_STATE_SECRET", "state-secret-state-secret-state-secret");
+
+    const response = await start(new NextRequest(`${app}/api/auth/${provider}`));
+
+    expect(response.headers.get("location")).toMatch(/^https:\/\/(accounts\.google|login\.micro)/);
+  });
+
+  test("explains a missing signing secret instead of crashing", async () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", "");
+    vi.stubEnv("OAUTH_STATE_SECRET", "");
+
+    const response = await start(new NextRequest(`${app}/api/auth/${provider}`));
+
+    expect(response.headers.get("location")).toBe(
+      `${app}/dashboard/mailboxes?error=missing_oauth_secret`
+    );
+  });
+
+  test("a provider's token error stays out of the redirect", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("secret provider detail", { status: 400 }))
+    );
+    const state = createOAuthState("org_a", "user_a");
+
+    const response = await callback(
+      new NextRequest(`${app}/api/auth/${provider}/callback?code=abc&state=${state}`, {
+        headers: { cookie: `${provider}_oauth_state=${state}` },
+      })
+    );
+
+    expect(response.headers.get("location")).toBe(
+      `${app}/dashboard/mailboxes?error=token_exchange_failed`
+    );
+  });
+
   test("the callback denies before exchanging the code", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
