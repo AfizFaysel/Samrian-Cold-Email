@@ -33,6 +33,7 @@ export type SendOptions = {
 
 export type SendResult = {
   messageId: string;
+  providerThreadId?: string;
   accepted: string[];
   rejected: string[];
 };
@@ -66,7 +67,7 @@ export type AttachmentDownload = {
 
 export type MailboxConnector = {
   send(message: SendOptions): Promise<SendResult>;
-  pollNewMessages(): Promise<RawMessage[]>;
+  pollNewMessages(options?: { since?: number }): Promise<RawMessage[]>;
   markMessageProcessed?(message: RawMessage): Promise<void>;
   getAttachment?(
     providerMessageId: string,

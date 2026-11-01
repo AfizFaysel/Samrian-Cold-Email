@@ -14,9 +14,11 @@ import type {
   SendOptions,
   SendResult,
   RawMessage,
+  PollOptions,
   ConnectionTestResult,
 } from "./types";
 import { MailboxConnectionError } from "./errors";
+import { logger } from "../../src/server/observability/runtime";
 import { resolveOutboundHost, type OutboundHost } from "../../src/server/network/outbound";
 
 type HostResolver = (host: string) => Promise<OutboundHost>;
@@ -25,6 +27,14 @@ const connectionTimeout = 10_000;
 const socketTimeout = 60_000;
 const maxPollMessages = 50;
 const maxMessageBytes = 1024 * 1024;
+const maxBodyParts = 100;
+
+type BodyNode = {
+  part?: string;
+  type?: string;
+  disposition?: string;
+  childNodes?: BodyNode[];
+};
 
 export class SmtpImapConnector implements MailboxConnector {
   private imap: ImapFlow | null = null;
@@ -96,7 +106,7 @@ export class SmtpImapConnector implements MailboxConnector {
 
   // ── Poll ────────────────────────────────────────────────────────────────────
 
-  async pollNewMessages(): Promise<RawMessage[]> {
+  async pollNewMessages(options?: PollOptions): Promise<RawMessage[]> {
     const { imapHost, imapPort, username } = this.mailbox;
 
     if (!imapHost || !imapPort || !username) {
@@ -132,8 +142,13 @@ export class SmtpImapConnector implements MailboxConnector {
 
       const lock = await client.getMailboxLock("INBOX");
       try {
-        const unseen = await client.search({ seen: false }, { uid: true });
+        const unseen = await client.search(
+          { seen: false, ...(options?.since ? { since: new Date(options.since) } : {}) },
+          { uid: true }
+        );
         const uids = unseen ? unseen.slice(-maxPollMessages) : [];
+        const fetched: Array<{ raw: string; uid: number; envelope: unknown; nodes: BodyNode[] }> =
+          [];
         for await (const msg of client.fetch(
           uids,
           {
@@ -145,13 +160,30 @@ export class SmtpImapConnector implements MailboxConnector {
           },
           { uid: true }
         )) {
-          const raw = msg.source?.toString() ?? "";
-          const parsed = parseRawEmail(raw, {
-            envelope: msg.envelope,
+          fetched.push({
+            raw: msg.source?.toString() ?? "",
             uid: msg.uid,
+            envelope: msg.envelope,
+            nodes: flattenBody(msg.bodyStructure as BodyNode | undefined),
           });
+        }
 
-          messages.push(parsed);
+        // Commands cannot run during a fetch, so bodies are read once it has finished.
+        for (const { raw, uid, envelope, nodes } of fetched) {
+          try {
+            const text = await readPart(client, uid, findPart(nodes, "text/plain"));
+            const report = await readPart(client, uid, findPart(nodes, "message/delivery-status"));
+            const html = await readPart(client, uid, findPart(nodes, "text/html"));
+            messages.push({
+              ...parseRawEmail(raw, { envelope, uid }),
+              textBody: [text, report].filter(Boolean).join("\n") || undefined,
+              htmlBody: html,
+              partMimeTypes: nodes.flatMap((node) => (node.type ? [node.type] : [])),
+            });
+          } catch {
+            // Left unread, so the rescan window retries it without blocking later mail.
+            logger.warn("mailbox.imap_body_failed", { uid });
+          }
         }
       } finally {
         lock.release();
@@ -289,6 +321,33 @@ export class SmtpImapConnector implements MailboxConnector {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+function flattenBody(root?: BodyNode): BodyNode[] {
+  const nodes: BodyNode[] = [];
+  const pending = root ? [root] : [];
+  while (pending.length > 0 && nodes.length < maxBodyParts) {
+    const node = pending.shift()!;
+    nodes.push(node);
+    pending.unshift(...(node.childNodes ?? []));
+  }
+  return nodes;
+}
+
+function findPart(nodes: BodyNode[], type: string): BodyNode | undefined {
+  return nodes.find((node) => node.type === type && node.disposition !== "attachment");
+}
+
+// A single-part message has no part number in its structure, and is part 1 on the wire.
+async function readPart(client: ImapFlow, uid: number, node?: BodyNode) {
+  if (!node) return undefined;
+  const { content } = await client.download(String(uid), node.part ?? "1", {
+    uid: true,
+    maxBytes: maxMessageBytes,
+  });
+  const chunks: Buffer[] = [];
+  for await (const chunk of content) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 /**
  * Extract a RawMessage from an ImapFlow fetch result.
  * Parses headers from the raw source string.
@@ -321,8 +380,6 @@ function parseRawEmail(raw: string, msg: { envelope: any; uid: number }): RawMes
     from: envelope.from?.[0]?.address ?? headers["from"] ?? "",
     to: toAddresses,
     subject: envelope.subject ?? headers["subject"] ?? "",
-    textBody: undefined, // Full body parsing left to caller if needed
-    htmlBody: undefined,
     headers,
     inReplyTo: headers["in-reply-to"],
     references: headers["references"]

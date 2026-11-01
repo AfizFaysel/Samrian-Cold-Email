@@ -16,6 +16,7 @@ import type {
   SendOptions,
   SendResult,
   RawMessage,
+  PollOptions,
   ConnectionTestResult,
   AttachmentDownload,
   AttachmentRef,
@@ -24,6 +25,7 @@ import { deadlineSignal } from "../../src/server/network/deadline";
 import { readJsonResponse } from "../../src/server/http/body";
 
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
+const MAX_POLL_PAGES = 5;
 const MAX_MIME_DEPTH = 10;
 
 export class GmailApiConnector implements MailboxConnector {
@@ -71,11 +73,8 @@ export class GmailApiConnector implements MailboxConnector {
     const encoded = base64urlEncode(raw);
 
     const body: Record<string, unknown> = { raw: encoded };
-    // Thread-aware: if replying, Gmail needs the threadId
-    // We pass it via a custom field on SendOptions if available
-    const opts = message as SendOptions & { gmailThreadId?: string };
-    if (opts.gmailThreadId) {
-      body.threadId = opts.gmailThreadId;
+    if (message.providerThreadId) {
+      body.threadId = message.providerThreadId;
     }
 
     const response = await fetch(`${GMAIL_API_BASE}/messages/send`, {
@@ -103,36 +102,65 @@ export class GmailApiConnector implements MailboxConnector {
 
     const data = await readJsonResponse<{ id: string; threadId: string }>(response, 64 * 1024);
     return {
-      messageId: `<${data.id}@mail.gmail.com>`,
+      messageId: (await this.readSentMessageId(data.id, token)) ?? `<${data.id}@mail.gmail.com>`,
+      providerThreadId: data.threadId,
       accepted: [message.to],
       rejected: [],
     };
   }
 
+  // The email has already left, so a failed lookup must not report the send as failed.
+  private async readSentMessageId(id: string, token: string): Promise<string | undefined> {
+    try {
+      const response = await fetch(
+        `${GMAIL_API_BASE}/messages/${encodeURIComponent(id)}?format=metadata&metadataHeaders=Message-ID`,
+        { headers: { Authorization: `Bearer ${token}` }, signal: deadlineSignal() }
+      );
+      if (!response.ok) return undefined;
+      const data = await readJsonResponse<GmailMessage>(response, 64 * 1024);
+      return data.payload?.headers?.find((item) => item.name.toLowerCase() === "message-id")?.value;
+    } catch {
+      return undefined;
+    }
+  }
+
   // ── Poll ────────────────────────────────────────────────────────────────────
 
-  async pollNewMessages(): Promise<RawMessage[]> {
+  async pollNewMessages(options?: PollOptions): Promise<RawMessage[]> {
     const token = await this.getFreshAccessToken();
+    const query = options?.since
+      ? `is:unread after:${Math.floor(options.since / 1000)}`
+      : "is:unread";
 
-    // List unread messages
-    const listResp = await fetch(`${GMAIL_API_BASE}/messages?q=is%3Aunread&maxResults=50`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: deadlineSignal(),
-    });
+    const ids: string[] = [];
+    let pageToken: string | undefined;
+    for (let page = 0; page < MAX_POLL_PAGES; page += 1) {
+      const params = new URLSearchParams({
+        q: query,
+        maxResults: "50",
+        ...(pageToken ? { pageToken } : {}),
+      });
+      const listResp = await fetch(`${GMAIL_API_BASE}/messages?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: deadlineSignal(),
+      });
 
-    if (!listResp.ok) {
-      throw new MailboxConnectionError(`Gmail API list failed (${listResp.status})`, "google");
+      if (!listResp.ok) {
+        throw new MailboxConnectionError(`Gmail API list failed (${listResp.status})`, "google");
+      }
+
+      const listData = await readJsonResponse<{
+        messages?: Array<{ id: string; threadId: string }>;
+        nextPageToken?: string;
+      }>(listResp, 1024 * 1024);
+      ids.push(...(listData.messages ?? []).map((item) => item.id));
+      pageToken = listData.nextPageToken;
+      if (!pageToken) break;
     }
-
-    const listData = await readJsonResponse<{
-      messages?: Array<{ id: string; threadId: string }>;
-    }>(listResp, 1024 * 1024);
-
-    if (!listData.messages?.length) return [];
 
     const messages: RawMessage[] = [];
 
-    for (const { id } of listData.messages) {
+    for (const id of ids) {
       const msgResp = await fetch(`${GMAIL_API_BASE}/messages/${id}?format=full`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: deadlineSignal(),

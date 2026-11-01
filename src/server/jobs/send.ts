@@ -410,6 +410,7 @@ function buildSentThread(params: {
     contactId: params.payload.contactId,
     mailboxId: params.payload.mailboxId,
     messageId: params.result.messageId,
+    providerThreadId: params.result.providerThreadId,
     direction: "sent" as const,
     from: params.from,
     to: [params.contact.email],

@@ -15,6 +15,9 @@ import { logger } from "../observability/runtime";
 import type { ThreadRecord } from "../ports";
 import { processBounce } from "./bounce";
 
+// Unmatched mail stays unread on purpose, so polling from a time keeps it from filling the scan.
+const POLL_OVERLAP_MS = 60 * 60 * 1000;
+
 export async function dispatchMailboxPolls(deps: PollDispatchDeps) {
   const mailboxes = await deps.repos.mailboxes.listActive();
 
@@ -45,7 +48,9 @@ export async function pollMailbox(
 
   const connector = await deps.connectorForMailbox(mailbox);
   try {
-    const messages = await connector.pollNewMessages();
+    const messages = await connector.pollNewMessages({
+      since: mailbox.lastPolledAt ? mailbox.lastPolledAt - POLL_OVERLAP_MS : undefined,
+    });
     let matched = 0;
     let ignored = 0;
     let bounced = 0;

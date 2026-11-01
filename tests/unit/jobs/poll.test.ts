@@ -5,6 +5,41 @@ import type { RawMessage } from "../../../src/server/jobs/types";
 import { FakeJobQueue } from "../../fakes/fake-queue";
 import { FakeRepos } from "../../fakes/fake-repos";
 
+describe("poll cursor", () => {
+  async function pollFrom(lastPolledAt?: number) {
+    const repos = new FakeRepos({
+      mailboxes: [{ id: "mailbox_1", orgId: "org_1", email: "s@example.com", lastPolledAt }],
+    });
+    const seen: unknown[] = [];
+    await pollMailbox(
+      { mailboxId: "mailbox_1", orgId: "org_1" },
+      {
+        repos,
+        connectorForMailbox: async () => ({
+          async send() {
+            throw new Error("unused");
+          },
+          async pollNewMessages(options) {
+            seen.push(options);
+            return [];
+          },
+          async close() {},
+        }),
+        now: () => 10_000_000,
+      }
+    );
+    return seen[0];
+  }
+
+  test("rescans a safety window before the last poll", async () => {
+    await expect(pollFrom(9_000_000)).resolves.toEqual({ since: 9_000_000 - 60 * 60 * 1000 });
+  });
+
+  test("scans everything unread on a first poll", async () => {
+    await expect(pollFrom(undefined)).resolves.toEqual({ since: undefined });
+  });
+});
+
 describe("poll jobs", () => {
   test("dispatches one poll job per active mailbox", async () => {
     const repos = new FakeRepos({

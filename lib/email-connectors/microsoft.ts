@@ -17,6 +17,7 @@ import type {
   SendOptions,
   SendResult,
   RawMessage,
+  PollOptions,
   ConnectionTestResult,
   AttachmentDownload,
 } from "./types";
@@ -26,6 +27,7 @@ import { readJsonResponse } from "../../src/server/http/body";
 const GRAPH_API_BASE = "https://graph.microsoft.com/v1.0/me";
 const MAX_CONCURRENT = 4;
 const MAX_RETRIES = 3;
+const MAX_POLL_PAGES = 5;
 
 export class MicrosoftGraphConnector implements MailboxConnector {
   /** Cached access token */
@@ -81,63 +83,73 @@ export class MicrosoftGraphConnector implements MailboxConnector {
     }
 
     const body = {
-      message: {
-        subject: message.subject,
-        body: {
-          contentType: "HTML",
-          content: message.html,
+      subject: message.subject,
+      body: {
+        contentType: "HTML",
+        content: message.html,
+      },
+      toRecipients: [
+        {
+          emailAddress: { address: message.to },
         },
-        toRecipients: [
-          {
-            emailAddress: { address: message.to },
-          },
+      ],
+      from: {
+        emailAddress: { address: message.from },
+      },
+      ...(message.inReplyTo && {
+        internetMessageHeaders: [
+          { name: "In-Reply-To", value: message.inReplyTo },
+          ...(message.references?.length
+            ? [{ name: "References", value: message.references.join(" ") }]
+            : []),
         ],
-        from: {
-          emailAddress: { address: message.from },
-        },
-        ...(message.inReplyTo && {
-          internetMessageHeaders: [
-            { name: "In-Reply-To", value: message.inReplyTo },
-            ...(message.references?.length
-              ? [{ name: "References", value: message.references.join(" ") }]
-              : []),
-          ],
-        }),
-      },
-      saveToSentItems: true,
+      }),
     };
 
-    await this.fetchWithThrottle(`${GRAPH_API_BASE}/sendMail`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    // Graph API sendMail returns 202 with no body — generate a synthetic Message-ID
-    const messageId = `<${Date.now()}.${Math.random().toString(36).slice(2)}@graph.microsoft.com>`;
-
-    return {
-      messageId,
-      accepted: [message.to],
-      rejected: [],
-    };
+    return this.sendDraft(message, token, "application/json", JSON.stringify(body));
   }
 
   private async sendMime(message: SendOptions, token: string): Promise<SendResult> {
-    await this.fetchWithThrottle(`${GRAPH_API_BASE}/sendMail`, {
+    return this.sendDraft(message, token, "text/plain", base64Encode(buildMimeMessage(message)));
+  }
+
+  // sendMail returns nothing, so sending a draft is the way to learn the IDs replies will cite.
+  private async sendDraft(
+    message: SendOptions,
+    token: string,
+    contentType: string,
+    body: string
+  ): Promise<SendResult> {
+    const authorization = { Authorization: `Bearer ${token}` };
+    const created = await this.fetchWithThrottle(`${GRAPH_API_BASE}/messages`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "text/plain",
-      },
-      body: base64Encode(buildMimeMessage(message)),
+      headers: { ...authorization, "Content-Type": contentType },
+      body,
     });
+    const draft = await readJsonResponse<{
+      id: string;
+      internetMessageId?: string;
+      conversationId?: string;
+    }>(created, 5 * 1024 * 1024);
+    const draftUrl = `${GRAPH_API_BASE}/messages/${encodeURIComponent(draft.id)}`;
+
+    try {
+      await this.fetchWithThrottle(`${draftUrl}/send`, {
+        method: "POST",
+        headers: authorization,
+      });
+    } catch (error) {
+      await this.fetchWithThrottle(draftUrl, { method: "DELETE", headers: authorization }).catch(
+        () => undefined
+      );
+      throw error;
+    }
 
     return {
-      messageId: `<${Date.now()}.${Math.random().toString(36).slice(2)}@graph.microsoft.com>`,
+      messageId:
+        draft.internetMessageId ??
+        `<${Date.now()}.${Math.random().toString(36).slice(2)}@graph.microsoft.com>`,
+      providerThreadId: draft.conversationId,
       accepted: [message.to],
       rejected: [],
     };
@@ -145,31 +157,38 @@ export class MicrosoftGraphConnector implements MailboxConnector {
 
   // ── Poll ────────────────────────────────────────────────────────────────────
 
-  async pollNewMessages(): Promise<RawMessage[]> {
+  async pollNewMessages(options?: PollOptions): Promise<RawMessage[]> {
     const token = await this.getFreshAccessToken();
+    const filter = options?.since
+      ? `receivedDateTime ge ${new Date(options.since).toISOString()} and isRead eq false&$orderby=receivedDateTime desc`
+      : "isRead eq false";
 
-    const url =
+    let url: string | undefined =
       `${GRAPH_API_BASE}/messages` +
-      `?$filter=isRead eq false` +
+      `?$filter=${filter}` +
       `&$top=50` +
       `&$select=id,conversationId,subject,from,toRecipients,body,receivedDateTime,internetMessageId,internetMessageHeaders,webLink` +
       `&$expand=attachments($select=id,name,contentType,size,isInline)`;
 
-    const response = await this.fetchWithThrottle(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const data = await readJsonResponse<{
-      value?: GraphMessage[];
-    }>(response, 5 * 1024 * 1024);
-
-    if (!data.value?.length) return [];
-
     const messages: RawMessage[] = [];
 
-    for (const msg of data.value) {
-      const parsed = parseGraphMessage(msg);
-      if (parsed) messages.push(parsed);
+    for (let page = 0; url && page < MAX_POLL_PAGES; page += 1) {
+      const response: Response = await this.fetchWithThrottle(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await readJsonResponse<{
+        value?: GraphMessage[];
+        "@odata.nextLink"?: string;
+      }>(response, 5 * 1024 * 1024);
+
+      for (const msg of data.value ?? []) {
+        const parsed = parseGraphMessage(msg);
+        if (parsed) messages.push(parsed);
+      }
+
+      const next: string | undefined = data["@odata.nextLink"];
+      url = next?.startsWith(`${GRAPH_API_BASE}/`) ? next : undefined;
     }
 
     return messages;

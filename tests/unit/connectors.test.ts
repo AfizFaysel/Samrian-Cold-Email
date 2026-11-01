@@ -112,7 +112,7 @@ describe("mailbox connector headers", () => {
   });
 
   test("Microsoft Graph uses MIME when standard unsubscribe headers are present", async () => {
-    const fetch = vi.fn(async () => new Response(null, { status: 202 }));
+    const fetch = vi.fn(async () => Response.json({ id: "draft_1" }, { status: 201 }));
     vi.stubGlobal("fetch", fetch);
 
     const connector = new MicrosoftGraphConnector(
@@ -129,7 +129,7 @@ describe("mailbox connector headers", () => {
   });
 
   test("Microsoft Graph keeps JSON send path when headers are disabled", async () => {
-    const fetch = vi.fn(async () => new Response(null, { status: 202 }));
+    const fetch = vi.fn(async () => Response.json({ id: "draft_1" }, { status: 201 }));
     vi.stubGlobal("fetch", fetch);
 
     const connector = new MicrosoftGraphConnector(

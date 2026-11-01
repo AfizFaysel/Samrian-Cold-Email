@@ -58,10 +58,12 @@ export interface SendOptions {
   headers?: Record<string, string>;
   inReplyTo?: string;
   references?: string[];
+  providerThreadId?: string;
 }
 
 export interface SendResult {
   messageId: string;
+  providerThreadId?: string;
   accepted: string[];
   rejected: string[];
 }
@@ -88,6 +90,10 @@ export interface RawMessage {
   attachments?: AttachmentRef[];
   providerUrl?: string;
   receivedAt: number;
+}
+
+export interface PollOptions {
+  since?: number;
 }
 
 export interface AttachmentRef {
@@ -125,8 +131,8 @@ export interface MailboxConnector {
   /** Send an email message */
   send(message: SendOptions): Promise<SendResult>;
 
-  /** Poll for new/unread messages */
-  pollNewMessages(): Promise<RawMessage[]>;
+  /** Poll for unread messages, from `since` when given */
+  pollNewMessages(options?: PollOptions): Promise<RawMessage[]>;
 
   /** Mark an inbound message processed after DB side effects succeed */
   markMessageProcessed?(message: RawMessage): Promise<void>;

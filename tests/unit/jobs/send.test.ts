@@ -58,6 +58,21 @@ describe("campaign email compliance", () => {
     };
   }
 
+  test("keeps the provider thread so replies can be matched", async () => {
+    const repos = seed();
+    const connector = makeConnector();
+    connector.send = async (message) => ({
+      messageId: "message_1",
+      providerThreadId: "thread_9",
+      accepted: [message.to],
+      rejected: [],
+    });
+
+    await sendCampaign(payload, deps(repos, connector, { physicalAddress: "1 Main St" }));
+
+    expect(repos.threads.data[0]).toMatchObject({ providerThreadId: "thread_9" });
+  });
+
   test("adds the opt-out and address even with List-Unsubscribe off", async () => {
     const connector = makeConnector();
 
