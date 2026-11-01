@@ -43,6 +43,13 @@
       "when": 1793529783024,
       "tag": "0005_mailbox_counters_day",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793549031918,
+      "tag": "0006_blocklist_normalize_emails",
+      "breakpoints": true
     }
   ]
 }

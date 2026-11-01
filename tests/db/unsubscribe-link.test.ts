@@ -75,4 +75,28 @@ describe.skipIf(!adminUrl || !appUrl)("unsubscribe link on the app database role
     const events = await admin.select().from(emailEvents).where(eq(emailEvents.orgId, orgId));
     expect(events).toMatchObject([{ type: "unsubscribe", mailboxId: mailbox.id }]);
   });
+
+  test("records the opt-out over an earlier manual block", async () => {
+    const campaign = await new PostgresCampaignRepo(admin).create({
+      orgId,
+      name: "Launch",
+      schedule: {},
+      steps: [],
+    });
+    await admin
+      .insert(contacts)
+      .values({ id: "contact_link", orgId, email: "lead@example.com", customVars: {} });
+    await admin
+      .insert(blocklist)
+      .values({ id: "block_link", orgId, email: "lead@example.com", reason: "manual" });
+
+    await unsubscribeContact({
+      contactId: "contact_link",
+      campaignId: campaign.id,
+      token: createUnsubscribeToken({ orgId, contactId: "contact_link", campaignId: campaign.id }),
+    });
+
+    const entries = await admin.select().from(blocklist).where(eq(blocklist.orgId, orgId));
+    expect(entries).toMatchObject([{ reason: "unsubscribed" }]);
+  });
 });

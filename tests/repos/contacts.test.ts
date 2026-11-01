@@ -76,7 +76,7 @@ describe.skipIf(!testUrl)("postgres blocklist repo", () => {
     await expect(repo.isBlocked("blocked@example.com", "org_repo")).resolves.toBe(true);
     await expect(repo.isBlocked("blocked@example.com", "org_other")).resolves.toBe(false);
     await expect(repo.list("org_repo")).resolves.toHaveLength(1);
-    await expect(repo.remove("blocked@example.com", "org_repo")).resolves.toBe(true);
+    await expect(repo.remove("blocked@example.com", "org_repo")).resolves.toBe("removed");
     await expect(repo.isBlocked("blocked@example.com", "org_repo")).resolves.toBe(false);
   });
 });

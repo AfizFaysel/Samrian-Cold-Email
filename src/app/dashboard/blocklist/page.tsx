@@ -253,6 +253,7 @@ export default function BlocklistPage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
+                            hidden={entry.reason === "unsubscribed"}
                             onClick={() => handleRemove(entry.email)}
                             className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
                             title="Remove from blocklist"

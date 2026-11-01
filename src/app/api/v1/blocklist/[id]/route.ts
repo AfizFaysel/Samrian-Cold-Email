@@ -10,9 +10,14 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     credentials,
     handler: async ({ principal }) => {
       const { id } = await context.params;
-      const removed = await new PostgresBlocklistRepo(getDb()).removeById(id, principal.orgId);
-      if (!removed) throw new ApiRouteError("NOT_FOUND", "Blocklist entry not found", 404);
-      return { data: { removed } };
+      const result = await new PostgresBlocklistRepo(getDb()).removeById(id, principal.orgId);
+      if (result === "missing") {
+        throw new ApiRouteError("NOT_FOUND", "Blocklist entry not found", 404);
+      }
+      if (result === "opt-out") {
+        throw new ApiRouteError("CONFLICT", "This address unsubscribed", 409);
+      }
+      return { data: { removed: true } };
     },
   })(request);
 }
