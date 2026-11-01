@@ -2,10 +2,63 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   launchCampaign,
+  resumeCampaign,
   saveCampaignDraft,
   validateCampaignLaunch,
 } from "../../../src/server/modules/campaigns";
 import type { ContactRecord } from "../../../src/server/ports";
+
+describe("campaign resume", () => {
+  const input = { campaignId: "campaign_1", orgId: "org_1" };
+
+  test("reactivates a paused campaign without touching its audience or mailboxes", async () => {
+    const deps = createDeps({ status: "paused" });
+    const replace = vi.spyOn(deps.campaignMailboxes, "replaceForCampaign");
+    const assign = vi.spyOn(deps.assignments, "createManyForCampaign");
+
+    await expect(resumeCampaign(input, deps)).resolves.toEqual({
+      status: "resumed",
+      campaignId: "campaign_1",
+    });
+
+    expect(deps.campaigns.status).toBe("active");
+    expect(replace).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  test.each(["draft", "active", "completed"] as const)("refuses a %s campaign", async (status) => {
+    await expect(resumeCampaign(input, createDeps({ status }))).rejects.toMatchObject({
+      issues: ["Only paused campaigns can be resumed"],
+    });
+  });
+
+  test("refuses when another request resumed it first", async () => {
+    const deps = createDeps({ status: "paused" });
+    deps.campaigns.resumePaused = async () => false;
+
+    await expect(resumeCampaign(input, deps)).rejects.toMatchObject({
+      issues: ["Only paused campaigns can be resumed"],
+    });
+  });
+
+  test("reports a missing campaign", async () => {
+    await expect(
+      resumeCampaign(input, createDeps({ missingCampaign: true }))
+    ).rejects.toMatchObject({ issues: ["Campaign not found"] });
+  });
+
+  test("stays paused until compliance and a mailbox are in place", async () => {
+    const deps = createDeps({ status: "paused", compliance: {}, mailboxes: [] });
+
+    await expect(resumeCampaign(input, deps)).rejects.toMatchObject({
+      issues: [
+        "Physical mailing address is required",
+        "Campaign needs at least one active mailbox",
+      ],
+    });
+    expect(deps.campaigns.status).toBe("paused");
+  });
+});
 
 describe("campaign launch module", () => {
   test("saves campaign draft and mailbox links through one module", async () => {
@@ -259,6 +312,11 @@ function createDeps(input?: {
       },
       async activateDraft() {
         if (this.status !== "draft") return false;
+        this.status = "active";
+        return true;
+      },
+      async resumePaused() {
+        if (this.status !== "paused") return false;
         this.status = "active";
         return true;
       },

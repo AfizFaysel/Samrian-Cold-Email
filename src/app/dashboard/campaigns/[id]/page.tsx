@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { ArrowLeft, Pause, CheckCircle, Send } from "lucide-react";
+import { ArrowLeft, Pause, Play, CheckCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { CampaignAnalytics } from "@/components/campaigns/campaign-analytics";
 import { ContactActivity } from "@/components/campaigns/contact-activity";
@@ -26,6 +26,19 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   const [showCompleteConfirm, setShowCompleteConfirm] = React.useState(false);
 
   const isLoading = data === undefined;
+
+  const handleResume = async () => {
+    setIsUpdating(true);
+    try {
+      await requestJson(`/api/campaigns/${campaignId}/resume`, { method: "POST" });
+      refetch();
+      toast.success("Campaign resumed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to resume campaign");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   // Reusable status update handler (DRY - single source of truth)
   const handleStatusChange = async (newStatus: string, actionLabel: string) => {
@@ -115,6 +128,16 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
               >
                 <Pause className="h-4 w-4" />
                 {isUpdating ? "Pausing..." : "Pause Campaign"}
+              </button>
+            )}
+            {campaign.status === "paused" && (
+              <button
+                onClick={handleResume}
+                disabled={isUpdating}
+                className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 shadow-sm transition-colors hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play className="h-4 w-4" />
+                {isUpdating ? "Resuming..." : "Resume Campaign"}
               </button>
             )}
             {(campaign.status === "active" || campaign.status === "paused") && (

@@ -85,6 +85,8 @@ export type CampaignLaunchValidation = {
   warnings: string[];
 };
 
+const NOT_PAUSED = "Only paused campaigns can be resumed";
+
 export class CampaignLaunchError extends Error {
   constructor(
     readonly issues: string[],
@@ -98,6 +100,7 @@ export type LaunchCampaignDeps = {
   campaigns: {
     getLaunch(id: CampaignId, orgId: OrgId): Promise<CampaignLaunchRecord | null>;
     activateDraft(id: CampaignId, orgId: OrgId): Promise<boolean>;
+    resumePaused(id: CampaignId, orgId: OrgId): Promise<boolean>;
   };
   campaignMailboxes: {
     replaceForCampaign(input: {
@@ -183,6 +186,30 @@ export async function launchCampaign(
     skippedContacts,
     warnings: [],
   };
+}
+
+// Resuming keeps the launched audience and mailboxes, so it rechecks only what sending needs.
+export async function resumeCampaign(
+  input: { campaignId: CampaignId; orgId: OrgId },
+  deps: Pick<LaunchCampaignDeps, "campaigns" | "campaignMailboxes" | "mailboxes" | "compliance">
+) {
+  const campaign = await deps.campaigns.getLaunch(input.campaignId, input.orgId);
+  if (!campaign) throw new CampaignLaunchError(["Campaign not found"]);
+  if (campaign.status !== "paused") throw new CampaignLaunchError([NOT_PAUSED]);
+
+  const issues = validateCampaign(campaign);
+  if (deps.compliance) {
+    issues.push(...validateCompliance(await deps.compliance.getSettings(input.orgId, campaign.id)));
+  }
+  const linked = await deps.campaignMailboxes.listForCampaign(campaign.id, input.orgId);
+  const active = await deps.mailboxes.listActiveByIds(linked, input.orgId);
+  if (active.length === 0) issues.push("Campaign needs at least one active mailbox");
+  if (issues.length > 0) throw new CampaignLaunchError(issues);
+
+  if (!(await deps.campaigns.resumePaused(campaign.id, input.orgId))) {
+    throw new CampaignLaunchError([NOT_PAUSED]);
+  }
+  return { status: "resumed" as const, campaignId: campaign.id };
 }
 
 export async function validateCampaignLaunch(

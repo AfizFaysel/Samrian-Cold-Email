@@ -119,6 +119,15 @@ export class PostgresCampaignRepo {
     return rows.length > 0;
   }
 
+  async resumePaused(id: CampaignId, orgId: OrgId): Promise<boolean> {
+    const rows = await this.db
+      .update(campaigns)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(and(eq(campaigns.id, id), eq(campaigns.orgId, orgId), eq(campaigns.status, "paused")))
+      .returning();
+    return rows.length > 0;
+  }
+
   async getStats(campaignId: CampaignId, orgId: OrgId): Promise<CampaignStats | null> {
     const rows = await this.db
       .select({

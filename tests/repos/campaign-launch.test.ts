@@ -40,6 +40,7 @@ describe.skipIf(!testUrl)("postgres campaign launch repos", () => {
       status: "draft",
     });
 
+    await expect(campaignsRepo.resumePaused(campaign.id, "org_launch")).resolves.toBe(false);
     await expect(campaignsRepo.activateDraft(campaign.id, "org_launch")).resolves.toBe(true);
     await expect(campaignsRepo.getById(campaign.id, "org_launch")).resolves.toMatchObject({
       status: "active",

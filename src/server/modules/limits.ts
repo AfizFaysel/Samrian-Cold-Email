@@ -133,7 +133,12 @@ const bulkOperations = new Set([
   "analytics.export",
 ]);
 const providerOperations = new Set(["domains.check", "mailboxes.check"]);
-const highOperations = new Set(["campaigns.launch", "inbox.reply", "jobs.send"]);
+const highOperations = new Set([
+  "campaigns.launch",
+  "campaigns.resume",
+  "inbox.reply",
+  "jobs.send",
+]);
 
 export function getOperationPolicy(operationId: string): OperationPolicy {
   if (operationId === "jobs.dispatch") return policies.dispatch;
