@@ -59,7 +59,8 @@ type OperationPolicy = {
     | "public.auth"
     | "public.oauth"
     | "public.tracking"
-    | "public.token";
+    | "public.token"
+    | "worker.dispatch";
   units: number;
   perMinute: Record<Exclude<PlanTier, "enterprise" | "self-hosted">, number>;
 };
@@ -118,6 +119,11 @@ const policies = {
     units: 0,
     perMinute: { starter: 120, pro: 300, business: 600 },
   },
+  dispatch: {
+    id: "worker.dispatch",
+    units: 1,
+    perMinute: { starter: 300, pro: 900, business: 3000 },
+  },
 } as const satisfies Record<string, OperationPolicy>;
 
 const bulkOperations = new Set([
@@ -125,12 +131,12 @@ const bulkOperations = new Set([
   "contacts.import-preview",
   "groups.preview",
   "analytics.export",
-  "jobs.dispatch",
 ]);
 const providerOperations = new Set(["domains.check", "mailboxes.check"]);
 const highOperations = new Set(["campaigns.launch", "inbox.reply", "jobs.send"]);
 
 export function getOperationPolicy(operationId: string): OperationPolicy {
+  if (operationId === "jobs.dispatch") return policies.dispatch;
   if (operationId.startsWith("auth.")) return policies.auth;
   if (operationId.startsWith("oauth.")) return policies.oauth;
   if (operationId.startsWith("tracking.")) return policies.tracking;

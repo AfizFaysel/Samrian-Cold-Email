@@ -9,6 +9,26 @@ import {
 import { MemoryRateLimiter } from "../../../src/server/limits/memory";
 
 describe("rate limits", () => {
+  it("admits a full dispatch batch on the starter tier", async () => {
+    const guard = createLimitGuard({
+      limiter: new MemoryRateLimiter(),
+      mode: "enforce",
+      tier: "starter",
+    });
+    let allowed = 0;
+
+    for (let index = 0; index < 100; index += 1) {
+      const decision = await guard.checkSubject({
+        operationId: "jobs.dispatch",
+        subjectType: "worker",
+        subject: "org_1",
+      });
+      if (decision.allowed) allowed += 1;
+    }
+
+    expect(allowed).toBe(100);
+  });
+
   it("assigns stable weighted policies by operation cost", () => {
     expect(getOperationPolicy("contacts.list")).toMatchObject({
       id: "api.read",
