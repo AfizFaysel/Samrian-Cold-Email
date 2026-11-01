@@ -79,6 +79,7 @@ export function unsubscribeEvent(input: {
   orgId: string;
   campaignId?: string;
   contactId?: string;
+  mailboxId?: string;
   threadId?: string;
   messageId?: string;
   occurredAt: number;
@@ -94,6 +95,7 @@ export function bounceEvent(input: {
   orgId: string;
   campaignId: string;
   contactId: string;
+  mailboxId?: string;
   messageId: string;
   email: string;
   bounceType: "hard" | "soft";

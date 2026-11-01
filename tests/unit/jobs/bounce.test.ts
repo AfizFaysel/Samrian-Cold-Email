@@ -16,7 +16,7 @@ describe("bounce jobs", () => {
       campaigns: [{ id: "campaign_1", orgId: "org_1", name: "Launch", steps: [] }],
       contacts: [{ id: "contact_1", orgId: "org_1", email: "bad@example.com", customVars: {} }],
       assignments: [{ id: "assignment_1", orgId: "org_1", currentStep: 0, status: "active" }],
-      campaignStats: [{ campaignId: "campaign_1", total: 10, bounced: 1 }],
+      campaignStats: [{ campaignId: "campaign_1", total: 40, sent: 20, bounced: 2 }],
     });
 
     await expect(
@@ -44,5 +44,66 @@ describe("bounce jobs", () => {
       { email: "bad@example.com", reason: "bounced_hard" },
     ]);
     expect(repos.campaigns.data[0].status).toBe("paused");
+  });
+
+  describe("campaign health", () => {
+    function bounceWith(stats: { total: number; sent: number; bounced: number }) {
+      const repos = new FakeRepos({
+        campaigns: [{ id: "campaign_1", orgId: "org_1", name: "Launch", steps: [] }],
+        contacts: [{ id: "contact_1", orgId: "org_1", email: "bad@example.com", customVars: {} }],
+        assignments: [{ id: "assignment_1", orgId: "org_1", currentStep: 1, status: "active" }],
+        campaignStats: [{ campaignId: "campaign_1", ...stats }],
+      });
+      return processBounce(
+        {
+          messageId: "message_1",
+          orgId: "org_1",
+          campaignId: "campaign_1",
+          contactId: "contact_1",
+          dsnCode: "5.1.1",
+        },
+        { repos, bounceRateThreshold: 0.05 }
+      );
+    }
+
+    test("does not count the current bounce twice", async () => {
+      await expect(bounceWith({ total: 20, sent: 20, bounced: 1 })).resolves.toMatchObject({
+        campaignPaused: false,
+      });
+    });
+
+    test("measures against contacts actually sent to, not everyone enrolled", async () => {
+      await expect(bounceWith({ total: 1000, sent: 20, bounced: 2 })).resolves.toMatchObject({
+        campaignPaused: true,
+      });
+    });
+
+    test("does not pause on a sample too small to mean anything", async () => {
+      await expect(bounceWith({ total: 100, sent: 3, bounced: 1 })).resolves.toMatchObject({
+        campaignPaused: false,
+      });
+    });
+  });
+
+  test("attributes the bounce to the mailbox that sent the email", async () => {
+    const repos = new FakeRepos({
+      campaigns: [{ id: "campaign_1", orgId: "org_1", name: "Launch", steps: [] }],
+      contacts: [{ id: "contact_1", orgId: "org_1", email: "bad@example.com", customVars: {} }],
+      assignments: [{ id: "assignment_1", orgId: "org_1", currentStep: 1, status: "active" }],
+    });
+
+    await processBounce(
+      {
+        messageId: "message_1",
+        orgId: "org_1",
+        campaignId: "campaign_1",
+        contactId: "contact_1",
+        mailboxId: "mailbox_1",
+        dsnCode: "5.1.1",
+      },
+      { repos, bounceRateThreshold: 0.05 }
+    );
+
+    expect(repos.events.data).toMatchObject([{ type: "bounce_hard", mailboxId: "mailbox_1" }]);
   });
 });

@@ -209,6 +209,7 @@ export type CountUnreadNotificationsInput = {
 export type CampaignStats = {
   campaignId: CampaignId;
   total: number;
+  sent?: number;
   bounced: number;
   unsubscribed?: number;
 };

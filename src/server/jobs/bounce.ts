@@ -1,7 +1,7 @@
 import type { BouncePayload, JobRepos } from "./types";
 import { classifyBounce } from "../modules/bounces";
 import { bounceEvent, recordEvent } from "../modules/events";
-import { evaluateCampaignHealth } from "../modules/health";
+import { evaluateCampaignHealth, MIN_HEALTH_SAMPLE } from "../modules/health";
 
 export { classifyBounce } from "../modules/bounces";
 
@@ -45,6 +45,7 @@ export async function processBounce(
       orgId: payload.orgId,
       campaignId: payload.campaignId,
       contactId: payload.contactId,
+      mailboxId: payload.mailboxId,
       messageId: payload.messageId,
       email,
       bounceType,
@@ -63,14 +64,14 @@ export async function processBounce(
           orgId: payload.orgId,
           campaignName: campaign?.name,
           stats: {
-            total: stats.total,
-            bounced: stats.bounced + 1,
+            total: stats.sent ?? stats.total,
+            bounced: stats.bounced,
             unsubscribed: stats.unsubscribed ?? 0,
           },
           thresholds: {
             bouncePauseRate: deps.bounceRateThreshold,
             unsubscribePauseRate: 1,
-            minSample: 1,
+            minSample: MIN_HEALTH_SAMPLE,
           },
         },
         { campaigns: deps.repos.campaigns, notifications: deps.repos.notifications }

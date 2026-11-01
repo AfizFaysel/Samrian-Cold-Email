@@ -2,7 +2,7 @@ import crypto from "crypto";
 
 import { getDb } from "../db/db";
 import { withTenant } from "../db/tenant";
-import { evaluateCampaignHealth } from "./health";
+import { evaluateCampaignHealth, MIN_HEALTH_SAMPLE } from "./health";
 import {
   PostgresAssignmentRepo,
   PostgresBlocklistRepo,
@@ -79,6 +79,7 @@ export async function unsubscribeContact(input: {
         orgId: verified.orgId,
         campaignId: verified.campaignId,
         contactId: verified.contactId,
+        mailboxId: assignment?.assignedMailboxId,
         occurredAt: Date.now(),
       }),
       { events }
@@ -96,14 +97,14 @@ export async function unsubscribeContact(input: {
           orgId: verified.orgId,
           campaignName: campaign?.name,
           stats: {
-            total: stats.total,
+            total: stats.sent ?? stats.total,
             bounced: stats.bounced,
             unsubscribed: stats.unsubscribed ?? 0,
           },
           thresholds: {
             bouncePauseRate: compliance.bouncePauseRate,
             unsubscribePauseRate: compliance.unsubscribePauseRate,
-            minSample: 20,
+            minSample: MIN_HEALTH_SAMPLE,
           },
         },
         { campaigns, notifications }

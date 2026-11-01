@@ -220,6 +220,9 @@ describe("poll jobs", () => {
 
     expect(repos.contacts.data[0].bounceStatus).toBe("hard");
     expect(repos.assignments.data[0].status).toBe("bounced");
+    expect(repos.events.data).toContainEqual(
+      expect.objectContaining({ type: "bounce_hard", mailboxId: "mailbox_1" })
+    );
     expect(repos.blocklist.data).toMatchObject([
       { email: "bad@example.com", reason: "bounced_hard" },
     ]);
@@ -324,6 +327,9 @@ describe("poll jobs", () => {
     expect(repos.blocklist.data).toMatchObject([
       { email: "ada@example.com", reason: "unsubscribed" },
     ]);
+    expect(repos.events.data).toContainEqual(
+      expect.objectContaining({ type: "unsubscribe", mailboxId: "mailbox_1" })
+    );
   });
 
   test("does not ack message when processing fails before side effects finish", async () => {

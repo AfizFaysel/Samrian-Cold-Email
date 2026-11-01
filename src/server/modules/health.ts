@@ -1,6 +1,8 @@
 import { notifyCampaignPaused } from "./notifications";
 import type { CampaignId, NotificationRepo, OrgId } from "../ports";
 
+export const MIN_HEALTH_SAMPLE = 20;
+
 export type CampaignHealthInput = {
   campaignId: CampaignId;
   orgId: OrgId;

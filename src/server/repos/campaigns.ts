@@ -121,7 +121,11 @@ export class PostgresCampaignRepo {
 
   async getStats(campaignId: CampaignId, orgId: OrgId): Promise<CampaignStats | null> {
     const rows = await this.db
-      .select({ status: contactAssignments.status, count: sql<number>`count(*)::int` })
+      .select({
+        status: contactAssignments.status,
+        count: sql<number>`count(*)::int`,
+        sent: sql<number>`count(${contactAssignments.lastEmailSentAt})::int`,
+      })
       .from(contactAssignments)
       .where(
         and(eq(contactAssignments.campaignId, campaignId), eq(contactAssignments.orgId, orgId))
@@ -135,6 +139,7 @@ export class PostgresCampaignRepo {
     return {
       campaignId,
       total,
+      sent: rows.reduce((sum, row) => sum + row.sent, 0),
       bounced: counts.get("bounced") ?? 0,
       unsubscribed: counts.get("unsubscribed") ?? 0,
     };

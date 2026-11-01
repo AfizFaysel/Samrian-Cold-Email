@@ -116,6 +116,7 @@ describe.skipIf(!testUrl)("campaign list repos", () => {
         campaignId: campaign.id,
         contactId: "con_2",
         status: "bounced",
+        lastEmailSentAt: new Date(),
       },
       {
         id: "asg_stats_3",
@@ -129,12 +130,14 @@ describe.skipIf(!testUrl)("campaign list repos", () => {
     await expect(campaignsRepo.getStats(campaign.id, "org_list_a")).resolves.toEqual({
       campaignId: campaign.id,
       total: 2,
+      sent: 1,
       bounced: 1,
       unsubscribed: 0,
     });
     await expect(campaignsRepo.getStats(campaign.id, "org_list_b")).resolves.toEqual({
       campaignId: campaign.id,
       total: 1,
+      sent: 0,
       bounced: 0,
       unsubscribed: 1,
     });

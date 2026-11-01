@@ -24,6 +24,7 @@ export type BounceJob = {
   orgId: OrgId;
   campaignId: CampaignId;
   contactId: ContactId;
+  mailboxId?: MailboxId;
   bounceType?: "hard" | "soft";
   dsnCode?: string;
 };

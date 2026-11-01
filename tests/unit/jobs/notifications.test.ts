@@ -62,7 +62,7 @@ describe("job notification writes", () => {
       ],
       contacts: [{ id: "contact_1", orgId: "org_1", email: "ada@example.com", customVars: {} }],
       assignments: [{ id: "assignment_1", orgId: "org_1", currentStep: 0, status: "active" }],
-      campaignStats: [{ campaignId: "campaign_1", total: 10, bounced: 1 }],
+      campaignStats: [{ campaignId: "campaign_1", total: 20, sent: 20, bounced: 2 }],
     });
     const notifications = new FakeNotificationRepo();
 
