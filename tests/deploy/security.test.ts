@@ -77,8 +77,8 @@ describe("security workflow deployment files", () => {
       dependencies: Record<string, string>;
     };
     expect(pkg.dependencies.next).toBe("16.3.0");
-    expect(pkg.dependencies["better-auth"]).toBe("1.6.27");
-    expect(pkg.dependencies["@better-auth/api-key"]).toBe("1.6.27");
+    expect(pkg.dependencies["better-auth"]).toBe("1.7.14");
+    expect(pkg.dependencies["@better-auth/api-key"]).toBe("1.7.14");
     expect(pkg.dependencies.nodemailer).toBe("9.0.5");
     expect(pkg.dependencies.imapflow).toBe("1.7.0");
   });

@@ -38,6 +38,7 @@ export const invitations = pgTable(
     role: text("role").notNull(),
     status: text("status").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     inviterId: text("inviter_id").notNull(),
   },
   (table) => [

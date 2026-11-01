@@ -25,6 +25,8 @@ after its first public release.
 - Standardized product identity as Samrian.
 - Replaced npm lock policy with Bun workspaces and `bun.lock`.
 - Object storage is now optional, and `/api/health` reports it as disabled when unconfigured.
+- Upgraded Better Auth to 1.7. Apply migration `0003_invitations_created_at` before deploying,
+  because Better Auth now rejects auth requests when the database schema does not match.
 
 ### Removed
 
