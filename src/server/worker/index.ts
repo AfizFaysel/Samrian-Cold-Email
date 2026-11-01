@@ -21,6 +21,20 @@ export function startWorker(queue?: JobQueue) {
   return createBullMqWorkers(config, createWorkerDeps(queue));
 }
 
+// In-flight jobs still enqueue and consume limits, so everything they use closes after the drain.
+export function createWorkerShutdown(input: {
+  worker: { close(): Promise<void> };
+  queue: { close(): Promise<void> };
+  closeLimits: () => Promise<void>;
+}) {
+  let stopping: Promise<void> | undefined;
+  const stop = async () => {
+    await input.worker.close();
+    await Promise.all([input.queue.close(), input.closeLimits()]);
+  };
+  return () => (stopping ??= stop());
+}
+
 export async function scheduleWorkerJobs(queue: JobQueue) {
   await Promise.all([
     queue.scheduleCampaignDispatch({ cron: "*/5 * * * *", timezone: "UTC" }),

@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   createBullMqWorkerProcessors,
+  createWorkerShutdown,
   scheduleWorkerJobs,
   type WorkerDeps,
   type WorkerProcessorMap,
@@ -67,6 +68,39 @@ describe("BullMQ worker processors", () => {
         stepNumber: 0,
       })
     ).rejects.toThrow("connector failed");
+  });
+
+  test("drains workers before closing what they depend on, once", async () => {
+    const order: string[] = [];
+    let finishDrain = () => {};
+    const stop = createWorkerShutdown({
+      worker: {
+        close: () =>
+          new Promise<void>((resolve) => {
+            finishDrain = () => {
+              order.push("worker");
+              resolve();
+            };
+          }),
+      },
+      queue: {
+        close: async () => {
+          order.push("queue");
+        },
+      },
+      closeLimits: async () => {
+        order.push("limits");
+      },
+    });
+
+    const first = stop();
+    const second = stop();
+    expect(order).toEqual([]);
+    finishDrain();
+    await Promise.all([first, second]);
+
+    expect(order[0]).toBe("worker");
+    expect(order.slice(1).sort()).toEqual(["limits", "queue"]);
   });
 
   test("registers recurring worker schedules", async () => {
