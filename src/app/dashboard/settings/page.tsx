@@ -98,7 +98,8 @@ export default function SettingsPage() {
       body: JSON.stringify(settings),
     });
     if (!response.ok) {
-      setStatus("Could not save settings");
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      setStatus(body.error ?? "Could not save settings");
       return;
     }
     setSettings({ ...fallbackSettings, ...(await response.json()) });
@@ -202,6 +203,9 @@ export default function SettingsPage() {
               setSettings((current) => ({ ...current, physicalAddress: event.target.value }))
             }
           />
+          <p className="text-xs text-slate-500">
+            Required to send. Added to the end of every campaign email.
+          </p>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -214,6 +218,9 @@ export default function SettingsPage() {
             }
             placeholder="Unsubscribe: {{unsubscribeUrl}}"
           />
+          <p className="text-xs text-slate-500">
+            Must include {"{{unsubscribeUrl}}"}. Leave blank to use the example shown.
+          </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">

@@ -56,28 +56,17 @@ export class PostgresSettingsRepo {
 
   async upsertCompliance(orgId: OrgId, input: Partial<ComplianceConfig>): Promise<void> {
     const current = await this.getRaw(orgId);
-    const values = {
-      physicalAddress: input.physicalAddress,
-      defaultSenderName: input.defaultSenderName,
-      unsubscribeFooter: input.unsubscribeFooter,
-      unsubscribeMailto: input.unsubscribeMailto,
-      listUnsubscribeEnabled: input.listUnsubscribeEnabled ?? false,
-      clickTrackingEnabled: input.clickTrackingEnabled ?? false,
-      openTrackingEnabled: input.openTrackingEnabled ?? false,
-      bouncePauseRate: input.bouncePauseRate ?? 0.05,
-      unsubscribePauseRate: input.unsubscribePauseRate ?? 0.1,
-      complaintPauseRate: input.complaintPauseRate ?? 0.001,
-    };
 
     if (current) {
-      await this.db.update(orgSettings).set(values).where(eq(orgSettings.orgId, orgId));
+      if (Object.keys(input).length === 0) return;
+      await this.db.update(orgSettings).set(input).where(eq(orgSettings.orgId, orgId));
       return;
     }
 
     await this.db.insert(orgSettings).values({
       id: newId("org_settings"),
       orgId,
-      ...values,
+      ...input,
     });
   }
 

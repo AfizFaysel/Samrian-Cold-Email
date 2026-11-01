@@ -1,8 +1,34 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { createSessionRoute } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
+import { isUsableFooter } from "@/server/modules/compliance";
 import { PostgresSettingsRepo } from "@/server/repos";
+
+const text = z
+  .string()
+  .trim()
+  .max(2000)
+  .transform((value) => value || null)
+  .nullable();
+const rate = z.number().min(0).max(1);
+
+const complianceUpdateSchema = z
+  .object({
+    listUnsubscribeEnabled: z.boolean(),
+    clickTrackingEnabled: z.boolean(),
+    openTrackingEnabled: z.boolean(),
+    physicalAddress: text,
+    defaultSenderName: text,
+    unsubscribeFooter: text.refine(isUsableFooter, "Footer must include {{unsubscribeUrl}}"),
+    unsubscribeMailto: text,
+    bouncePauseRate: rate,
+    unsubscribePauseRate: rate,
+    complaintPauseRate: rate,
+  })
+  .strict()
+  .partial();
 
 export const GET = createSessionRoute(
   sessionOperations.complianceRead,
@@ -15,31 +41,13 @@ export const GET = createSessionRoute(
 export const PATCH = createSessionRoute(
   sessionOperations.complianceUpdate,
   async ({ db, orgId }, request: Request) => {
-    const body = await request.json();
+    const parsed = complianceUpdateSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
+    }
+
     const repo = new PostgresSettingsRepo(db);
-
-    await repo.upsertCompliance(orgId, {
-      listUnsubscribeEnabled: Boolean(body.listUnsubscribeEnabled),
-      clickTrackingEnabled: Boolean(body.clickTrackingEnabled),
-      openTrackingEnabled: Boolean(body.openTrackingEnabled),
-      physicalAddress: nullableString(body.physicalAddress),
-      defaultSenderName: nullableString(body.defaultSenderName),
-      unsubscribeFooter: nullableString(body.unsubscribeFooter),
-      unsubscribeMailto: nullableString(body.unsubscribeMailto),
-      bouncePauseRate: numberOr(body.bouncePauseRate, 0.05),
-      unsubscribePauseRate: numberOr(body.unsubscribePauseRate, 0.1),
-      complaintPauseRate: numberOr(body.complaintPauseRate, 0.001),
-    });
-
+    await repo.upsertCompliance(orgId, parsed.data);
     return NextResponse.json(await repo.getCompliance(orgId));
   }
 );
-
-function nullableString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function numberOr(value: unknown, fallback: number) {
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}

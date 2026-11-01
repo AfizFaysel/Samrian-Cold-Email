@@ -59,4 +59,40 @@ describe("compliance settings api", () => {
       expect.objectContaining({ listUnsubscribeEnabled: true })
     );
   });
+
+  const patch = (body: unknown) =>
+    PATCH(
+      new NextRequest("http://localhost/api/settings/compliance", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      })
+    );
+
+  test("passes on only the fields that were sent", async () => {
+    await patch({ openTrackingEnabled: true });
+
+    expect(repo.upsertCompliance).toHaveBeenCalledWith("org_1", { openTrackingEnabled: true });
+  });
+
+  test("treats a blank value as clearing the field and trims the rest", async () => {
+    await patch({ physicalAddress: " 1 Main St ", unsubscribeMailto: "  " });
+
+    expect(repo.upsertCompliance).toHaveBeenCalledWith("org_1", {
+      physicalAddress: "1 Main St",
+      unsubscribeMailto: null,
+    });
+  });
+
+  test.each([
+    [{ bouncePauseRate: 2 }],
+    [{ openTrackingEnabled: "yes" }],
+    [{ unsubscribeFooter: "No way out" }],
+    [{ unknownSetting: true }],
+    ["not an object"],
+  ])("rejects %j without writing", async (body) => {
+    const response = await patch(body);
+
+    expect(response.status).toBe(400);
+    expect(repo.upsertCompliance).not.toHaveBeenCalled();
+  });
 });
