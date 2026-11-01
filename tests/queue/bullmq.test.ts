@@ -7,6 +7,30 @@ import { redisConnectionOptions } from "../../src/server/queue/bullmq";
 
 const testRedisUrl = process.env.TEST_REDIS_URL;
 
+describe("redis connection options", () => {
+  test("uses TLS with certificate checks for rediss URLs", () => {
+    expect(redisConnectionOptions("rediss://:secret@cache.example.com:6380/1")).toMatchObject({
+      host: "cache.example.com",
+      port: 6380,
+      db: 1,
+      tls: { servername: "cache.example.com" },
+    });
+    expect(redisConnectionOptions("rediss://cache.example.com")).not.toMatchObject({
+      tls: { rejectUnauthorized: false },
+    });
+  });
+
+  test("uses a plain connection for redis URLs", () => {
+    expect(redisConnectionOptions("redis://localhost:6379")).not.toHaveProperty("tls");
+  });
+
+  test("rejects other URL schemes", () => {
+    expect(() => redisConnectionOptions("https://cache.example.com")).toThrow(
+      "REDIS_URL must use redis:// or rediss://"
+    );
+  });
+});
+
 describe("queue config", () => {
   test("defaults to inngest provider", () => {
     expect(readQueueConfig({})).toMatchObject({ provider: "inngest", concurrency: 5 });

@@ -185,6 +185,9 @@ function isEnvelope<T>(data: T | BullMqJobEnvelope<T>): data is BullMqJobEnvelop
 
 export function redisConnectionOptions(redisUrl: string): ConnectionOptions {
   const parsed = new URL(redisUrl);
+  if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:") {
+    throw new Error("REDIS_URL must use redis:// or rediss://");
+  }
   return {
     host: parsed.hostname,
     port: parsed.port ? Number.parseInt(parsed.port, 10) : 6379,
@@ -192,5 +195,6 @@ export function redisConnectionOptions(redisUrl: string): ConnectionOptions {
     password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
     db: parsed.pathname.length > 1 ? Number.parseInt(parsed.pathname.slice(1), 10) : 0,
     maxRetriesPerRequest: null,
+    ...(parsed.protocol === "rediss:" ? { tls: { servername: parsed.hostname } } : {}),
   };
 }
