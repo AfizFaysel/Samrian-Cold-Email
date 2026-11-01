@@ -140,7 +140,8 @@ export class BullMqQueue implements JobQueue {
     return {
       attempts: options?.attempts ?? this.defaultAttempts,
       delay: options?.delayMs,
-      jobId: options?.idempotencyKey,
+      // BullMQ reserves colons in custom job IDs.
+      jobId: options?.idempotencyKey?.replaceAll(":", "-"),
       removeOnComplete: 100,
       removeOnFail: 500,
     };

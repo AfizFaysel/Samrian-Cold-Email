@@ -1,4 +1,4 @@
-import { fromZonedTime, toZonedTime } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 
 export const DISPATCH_BATCH_LIMIT = 100;
 export const DISPATCH_CRON = "*/5 * * * *";
@@ -12,6 +12,7 @@ type CampaignSchedule = {
   defaultTimezone?: string;
   startTime?: string;
   endTime?: string;
+  daysAllowed?: readonly string[];
   daysOfWeek?: readonly string[];
   days?: readonly string[];
 };
@@ -31,8 +32,8 @@ export function isInSendWindow(input: WindowInput): boolean {
   const schedule = input.schedule ?? {};
   const timezone = resolveTimezone(schedule, input.contactTimezone);
   const zoned = toZonedTime(new Date(input.now), timezone);
-  const day = weekday(zoned);
-  const allowedDays = schedule.daysOfWeek ?? schedule.days;
+  const day = formatInTimeZone(new Date(input.now), timezone, "EEEE").toLowerCase();
+  const allowedDays = schedule.daysAllowed ?? schedule.daysOfWeek ?? schedule.days;
 
   if (allowedDays?.length && !allowedDays.map((item) => item.toLowerCase()).includes(day)) {
     return false;
@@ -93,8 +94,4 @@ function resolveTimezone(schedule: CampaignSchedule, contactTimezone: string | u
 function parseTime(value: string): number {
   const [hour, minute] = value.split(":").map((part) => Number.parseInt(part, 10));
   return hour * 60 + minute;
-}
-
-function weekday(date: Date): string {
-  return date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }).toLowerCase();
 }

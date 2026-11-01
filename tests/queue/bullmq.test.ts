@@ -90,8 +90,25 @@ describe.skipIf(!testRedisUrl)("BullMqQueue", () => {
     expect(jobs[0]?.opts).toMatchObject({
       delay: 1_000,
       attempts: 3,
-      jobId: "campaign_1:contact_1:1",
+      jobId: "campaign_1-contact_1-1",
     });
+  });
+
+  test("accepts the key dispatch generates and still deduplicates it", async () => {
+    const payload: CampaignSendJob = {
+      assignmentId: "assignment_1",
+      campaignId: "campaign_1",
+      contactId: "contact_1",
+      mailboxId: "mailbox_1",
+      orgId: "org_1",
+      stepNumber: 0,
+    };
+
+    await queue.enqueueCampaignSend(payload, { idempotencyKey: "assignment_1:0" });
+    await queue.enqueueCampaignSend(payload, { idempotencyKey: "assignment_1:0" });
+    await queue.enqueueCampaignSend(payload, { idempotencyKey: "assignment_1:1" });
+
+    await expect(queue.getJobs("campaign.send")).resolves.toHaveLength(2);
   });
 
   test("enqueues mailbox poll, bounce, and daily reset jobs", async () => {

@@ -15,6 +15,42 @@ const schedule = {
 };
 
 describe("send schedule", () => {
+  describe("the schedule the campaign wizard saves", () => {
+    const wizard = {
+      defaultTimezone: "America/New_York",
+      daysAllowed: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+      startTime: "09:00",
+      endTime: "17:00",
+    };
+
+    test("does not send on an excluded day", () => {
+      const saturdayNoonInNewYork = Date.parse("2026-11-07T17:00:00.000Z");
+
+      expect(isInSendWindow({ schedule: wizard, now: saturdayNoonInNewYork })).toBe(false);
+    });
+
+    test("sends on an allowed day inside the window", () => {
+      const mondayNoonInNewYork = Date.parse("2026-11-02T17:00:00.000Z");
+
+      expect(isInSendWindow({ schedule: wizard, now: mondayNoonInNewYork })).toBe(true);
+    });
+
+    test("uses the campaign timezone's day, not UTC's", () => {
+      const allDay = { ...wizard, startTime: "00:00", endTime: "23:59" };
+      const sundayEveningInNewYork = Date.parse("2026-11-02T02:00:00.000Z");
+
+      expect(isInSendWindow({ schedule: allDay, now: sundayEveningInNewYork })).toBe(false);
+    });
+
+    test("defers to the next allowed day", () => {
+      const fridayEvening = Date.parse("2026-11-06T23:00:00.000Z");
+
+      expect(
+        new Date(nextWindowStart({ schedule: wizard, now: fridayEvening })).toISOString()
+      ).toBe("2026-11-09T14:00:00.000Z");
+    });
+  });
+
   test("detects inside and outside send window", () => {
     expect(
       isInSendWindow({
