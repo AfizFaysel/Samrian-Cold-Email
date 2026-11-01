@@ -93,7 +93,7 @@ function toText(input: EmailDisplayInput): string {
   return htmlToText(input.htmlBody ?? "");
 }
 
-function htmlToText(value: string): string {
+export function htmlToText(value: string): string {
   return compactWhitespace(
     value
       .replace(/<(script|style|svg|math|iframe|object|embed|form)\b[\s\S]*?<\/\1\s*>/gi, "")

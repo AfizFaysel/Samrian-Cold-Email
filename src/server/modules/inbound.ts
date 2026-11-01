@@ -1,4 +1,5 @@
 import type { RawMessage } from "../jobs/types";
+import { htmlToText } from "./email-display";
 
 export type InboundKind = "reply" | "unsubscribe" | "bounce" | "auto-reply" | "ignored";
 
@@ -9,7 +10,6 @@ export type InboundClassification = {
 };
 
 export type InboundRejectReason =
-  | "body-too-large"
   | "too-many-headers"
   | "header-too-large"
   | "too-many-parts"
@@ -57,17 +57,39 @@ const UNSUBSCRIBE_PHRASES = [
   "do not email",
   "stop emailing",
   "stop sending",
+  "darme de baja",
+  "eliminenme",
+  "eliminarme",
+  "no me contacten",
+  "no me escriban",
+  "desinscrire",
+  "desabonner",
+  "me retirer de",
+  "ne plus recevoir",
+  "ne me contactez plus",
+  "austragen",
+  "bitte abmelden",
+  "keine e-mails mehr",
+  "keine emails mehr",
+  "entfernen sie mich",
+  "descadastre",
+  "descadastrar",
+  "remova-me",
+  "nao me contate",
+  "cancellarmi",
+  "disiscrivermi",
+  "rimuovetemi",
+  "non contattatemi",
 ] as const;
 
-const BOUNCE_PHRASES = [
-  "delivery status notification",
-  "delivery has failed",
-  "undeliverable",
-  "returned mail",
-  "message could not be delivered",
-  "no such user",
-  "mailbox not found",
-] as const;
+const REPLY_SUBJECT = /^\s*(re|fw|fwd|aw|wg|sv|tr|rv)\s*:/i;
+const QUOTED_HTML = /<blockquote\b|<div[^>]+(?:class|id)="[^"]*(?:gmail_quote|divRplyFwdMsg)/i;
+const QUOTE_HEADERS = [
+  /^(on|el|le|am|il|em)\b.*(wrote|escribió|a écrit|schrieb|ha scritto|escreveu)\s*:\s*$/i,
+  /^-{2,}\s*(original|forwarded) message/i,
+  /^from:\s.+\s(sent|date|to):\s/i,
+  /^_{5,}$/,
+];
 
 export function normalizeMessageId(value?: string): string {
   return (value ?? "").trim().replace(/^<|>$/g, "").toLowerCase();
@@ -93,9 +115,6 @@ export function normalizeInboundMessage(message: RawMessage): InboundNormalizati
   ) {
     return { ok: false, reason: "invalid-attachments" };
   }
-  if ((message.textBody?.length ?? 0) + (message.htmlBody?.length ?? 0) > MAX_BODY_LENGTH) {
-    return { ok: false, reason: "body-too-large" };
-  }
   if (
     !message.messageId ||
     message.messageId.length > MAX_ENVELOPE_LENGTH ||
@@ -112,6 +131,9 @@ export function normalizeInboundMessage(message: RawMessage): InboundNormalizati
   ) {
     return { ok: false, reason: "invalid-envelope" };
   }
+
+  const textBody = message.textBody?.slice(0, MAX_BODY_LENGTH);
+  const htmlBody = message.htmlBody?.slice(0, MAX_BODY_LENGTH - (textBody?.length ?? 0));
 
   const headers: Record<string, string> = {};
   for (const [name, value] of entries) {
@@ -135,8 +157,8 @@ export function normalizeInboundMessage(message: RawMessage): InboundNormalizati
       from: cleanText(message.from),
       to: message.to.map(cleanText),
       subject: cleanText(message.subject),
-      textBody: cleanOptional(message.textBody),
-      htmlBody: cleanOptional(message.htmlBody),
+      textBody: cleanOptional(textBody),
+      htmlBody: cleanOptional(htmlBody),
       headers,
       inReplyTo: cleanOptional(message.inReplyTo),
       references: message.references?.slice(0, 50).map(cleanText),
@@ -185,7 +207,6 @@ function collectMatchIds(message: RawMessage): string[] {
 function isBounce(message: RawMessage): boolean {
   const contentType = getHeader(message.headers, "content-type")?.toLowerCase() ?? "";
   const from = message.from.toLowerCase();
-  const body = bodyText(message);
 
   return (
     Boolean(getHeader(message.headers, "x-failed-recipients")) ||
@@ -196,9 +217,7 @@ function isBounce(message: RawMessage): boolean {
       message.partMimeTypes?.some((part) => part.toLowerCase().includes("delivery-status"))
     ) ||
     from.includes("mailer-daemon") ||
-    from.includes("postmaster") ||
-    BOUNCE_PHRASES.some((phrase) => body.includes(phrase)) ||
-    /\b[45]\.\d+\.\d+\b/.test(body)
+    from.includes("postmaster")
   );
 }
 
@@ -206,7 +225,7 @@ function isAutoReply(message: RawMessage): boolean {
   const contentType = getHeader(message.headers, "content-type")?.toLowerCase() ?? "";
   const autoSubmitted = getHeader(message.headers, "auto-submitted")?.toLowerCase();
   const precedence = getHeader(message.headers, "precedence")?.toLowerCase();
-  const body = bodyText(message);
+  const body = authoredText(message);
 
   return (
     contentType.includes("report-type=disposition-notification") ||
@@ -223,15 +242,35 @@ function isAutoReply(message: RawMessage): boolean {
 }
 
 function isUnsubscribe(message: RawMessage): boolean {
-  const body = bodyText(message);
+  const body = authoredText(message);
   return UNSUBSCRIBE_PHRASES.some((phrase) => body.includes(phrase));
 }
 
-function bodyText(message: RawMessage): string {
-  return [message.subject, message.textBody, message.htmlBody]
-    .filter(Boolean)
-    .join("\n")
-    .toLowerCase();
+// Quoted history repeats our own footer, so only the sender's new words can signal intent.
+function authoredText(message: RawMessage): string {
+  const subject = REPLY_SUBJECT.test(message.subject) ? "" : message.subject;
+  const body = message.textBody?.trim()
+    ? stripQuotedLines(message.textBody)
+    : htmlToText(stripQuotedHtml(message.htmlBody ?? ""));
+
+  return `${subject}\n${body}`.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+function stripQuotedLines(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const kept: string[] = [];
+  for (const [index, line] of lines.entries()) {
+    const current = line.trim();
+    const wrapped = `${current} ${lines[index + 1]?.trim() ?? ""}`;
+    if (QUOTE_HEADERS.some((header) => header.test(current) || header.test(wrapped))) break;
+    if (!current.startsWith(">")) kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+function stripQuotedHtml(html: string): string {
+  const quote = html.search(QUOTED_HTML);
+  return quote === -1 ? html : html.slice(0, quote);
 }
 
 function splitReferences(value?: string): string[] {

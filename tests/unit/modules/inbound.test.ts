@@ -63,14 +63,93 @@ describe("inbound classification", () => {
     expect(normalizeMessageId(" <Sent_1@Example.com> ")).toBe("sent_1@example.com");
   });
 
-  test("rejects oversized bodies without throwing", () => {
-    expect(
-      normalizeInboundMessage(
-        raw({
-          textBody: "x".repeat(256 * 1024 + 1),
-        })
-      )
-    ).toEqual({ ok: false, reason: "body-too-large" });
+  test("keeps the start of an oversized message so its intent is not lost", () => {
+    const normalized = normalizeInboundMessage(
+      raw({
+        textBody: `Please remove me${"x".repeat(256 * 1024)}`,
+        htmlBody: "y".repeat(256 * 1024),
+      })
+    );
+
+    expect(normalized.ok).toBe(true);
+    if (!normalized.ok) return;
+    expect(normalized.message.textBody).toHaveLength(256 * 1024);
+    expect(normalized.message.htmlBody).toBe("");
+    expect(classifyInbound(normalized.message).kind).toBe("unsubscribe");
+  });
+
+  describe("what the sender wrote", () => {
+    const kind = (message: Partial<RawMessage>) =>
+      classifyInbound(raw({ inReplyTo: "sent_1", ...message })).kind;
+    const quotedFooter = "> To unsubscribe, click here";
+
+    test.each([
+      [`Yes, interested!\n\nOn Tuesday Sam wrote:\n${quotedFooter}`],
+      [
+        `Yes, interested!\n\nOn Tue, Jan 6, 2026 at 3:00 PM Sam Lee <\nsam@x.com> wrote:\n${quotedFooter}`,
+      ],
+      [`Si, me interesa\n\nEl mar, 6 ene 2026, Sam escribió:\n${quotedFooter}`],
+      [`Oui, merci\n\nLe mar. 6 janv. 2026, Sam a écrit :\n${quotedFooter}`],
+      [`Yes\n\n-----Original Message-----\nFrom: Sam\nTo unsubscribe, click here`],
+      [`Yes\n\nFrom: Sam Lee\nSent: Tuesday\nTo unsubscribe, click here`],
+    ])("ignores a quoted footer in %j", (textBody) => {
+      expect(kind({ textBody })).toBe("reply");
+    });
+
+    test("still sees an opt-out written below the quote", () => {
+      expect(kind({ textBody: `${quotedFooter}\n\nPlease remove me` })).toBe("unsubscribe");
+    });
+
+    test.each([
+      ["<p>Yes!</p><blockquote>To unsubscribe, click here</blockquote>"],
+      ['<p>Yes!</p><div class="gmail_quote">To unsubscribe, click here</div>'],
+      ['<p>Yes!</p><div id="divRplyFwdMsg">To unsubscribe, click here</div>'],
+    ])("ignores quoted html in %j", (htmlBody) => {
+      expect(kind({ htmlBody })).toBe("reply");
+    });
+
+    test("does not read an inherited subject as the sender's words", () => {
+      expect(kind({ subject: "Re: How to unsubscribe users", textBody: "Sounds good" })).toBe(
+        "reply"
+      );
+    });
+
+    test("does read a subject the sender wrote", () => {
+      expect(kind({ subject: "Unsubscribe", textBody: "" })).toBe("unsubscribe");
+    });
+
+    test("does not treat a quoted out-of-office as an auto-reply", () => {
+      expect(kind({ textBody: "Great\n\nOn Tuesday Sam wrote:\n> I am out of office" })).toBe(
+        "reply"
+      );
+    });
+
+    test.each([
+      ["Por favor, elimínenme de su lista"],
+      ["Quiero darme de baja"],
+      ["Veuillez me désinscrire"],
+      ["Merci de me retirer de votre liste"],
+      ["Bitte austragen"],
+      ["Bitte keine E-Mails mehr"],
+      ["Por favor, me descadastre"],
+      ["Vi prego di cancellarmi dalla lista"],
+    ])("recognizes the opt-out %j", (textBody) => {
+      expect(kind({ textBody })).toBe("unsubscribe");
+    });
+
+    test.each([
+      ["We are on version 5.1.1 of the app"],
+      ["The delivery status notification page is broken"],
+      ["Our last order was undeliverable, can you help?"],
+    ])("does not treat the human reply %j as a bounce", (textBody) => {
+      expect(kind({ textBody })).toBe("reply");
+    });
+
+    test("still recognizes a plain bounce from a mail system", () => {
+      expect(
+        kind({ from: "MAILER-DAEMON@example.com", textBody: "Your message was undeliverable" })
+      ).toBe("bounce");
+    });
   });
 
   test("rejects excessive headers and mime parts", () => {
