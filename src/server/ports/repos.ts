@@ -349,7 +349,7 @@ export interface NotificationRepo {
   getById(id: NotificationId, orgId: OrgId): Promise<NotificationRecord | null>;
   listLatest(input: ListNotificationsInput): Promise<NotificationRecord[]>;
   countUnread(input: CountUnreadNotificationsInput): Promise<number>;
-  markRead(id: NotificationId, orgId: OrgId, at?: Date): Promise<void>;
+  markRead(id: NotificationId, orgId: OrgId, at?: Date, userId?: string): Promise<void>;
   markAllRead(input: CountUnreadNotificationsInput, at?: Date): Promise<number>;
 }
 

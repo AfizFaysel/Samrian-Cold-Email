@@ -65,11 +65,22 @@ export class PostgresNotificationRepo {
     return row?.value ?? 0;
   }
 
-  async markRead(id: NotificationId, orgId: OrgId, at = new Date()): Promise<void> {
+  async markRead(
+    id: NotificationId,
+    orgId: OrgId,
+    at = new Date(),
+    userId?: string
+  ): Promise<void> {
     await this.db
       .update(notifications)
       .set({ readAt: at })
-      .where(and(eq(notifications.id, id), eq(notifications.orgId, orgId)));
+      .where(
+        and(
+          eq(notifications.id, id),
+          eq(notifications.orgId, orgId),
+          userId ? visibleTo(userId) : undefined
+        )
+      );
   }
 
   async markAllRead(input: CountUnreadNotificationsInput, at = new Date()): Promise<number> {

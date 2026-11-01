@@ -6,10 +6,14 @@ import { PostgresNotificationRepo } from "@/server/repos";
 
 export const PATCH = createSessionRoute(
   sessionOperations.notificationUpdate,
-  async ({ db, orgId }, _request: Request, context: { params: Promise<{ id: string }> }) => {
+  async (
+    { db, orgId, userId },
+    _request: Request,
+    context: { params: Promise<{ id: string }> }
+  ) => {
     const { id } = await context.params;
 
-    await new PostgresNotificationRepo(db).markRead(id, orgId);
+    await new PostgresNotificationRepo(db).markRead(id, orgId, undefined, userId);
     return NextResponse.json({ success: true });
   }
 );

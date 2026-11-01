@@ -16,6 +16,24 @@ describe.skipIf(!testUrl)("postgres notification repo", () => {
     await db.delete(notifications).where(eq(notifications.orgId, "org_other"));
   });
 
+  test("a member can mark only their own or shared notices read", async () => {
+    const personal = await repo.create({
+      orgId: "org_repo",
+      userId: "user_2",
+      type: "reply",
+      title: "Personal",
+    });
+    const shared = await repo.create({ orgId: "org_repo", type: "reply", title: "Shared" });
+
+    await repo.markRead(personal.id, "org_repo", undefined, "user_1");
+    await repo.markRead(shared.id, "org_repo", undefined, "user_1");
+
+    await expect(repo.getById(personal.id, "org_repo")).resolves.toMatchObject({
+      readAt: undefined,
+    });
+    expect((await repo.getById(shared.id, "org_repo"))?.readAt).toBeDefined();
+  });
+
   test("organization-wide notices reach every member, unlike personal ones", async () => {
     await repo.create({ orgId: "org_repo", type: "reply", title: "For everyone" });
     await repo.create({ orgId: "org_repo", userId: "user_2", type: "reply", title: "Personal" });
