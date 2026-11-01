@@ -10,6 +10,43 @@ import {
 } from "../../../src/server/modules/contacts";
 import type { ContactRecord } from "../../../src/server/ports";
 
+describe("contact timezones", () => {
+  test("skips invalid timezones, treats blank ones as unset, and trims valid ones", async () => {
+    const created: Array<{ email: string; timezone?: string }> = [];
+
+    const report = await importContacts(
+      {
+        orgId: "org_1",
+        rows: [
+          { email: "bad@example.com", timezone: "Mars/Olympus" },
+          { email: "blank@example.com", timezone: "  " },
+          { email: "good@example.com", timezone: " Europe/Paris " },
+        ],
+      },
+      {
+        contacts: {
+          getByEmail: async () => null,
+          create: async (input) => {
+            created.push({ email: input.email, timezone: input.timezone });
+            return { id: input.email, orgId: input.orgId, email: input.email, customVars: {} };
+          },
+          update: async () => null,
+        },
+        blocklist: { isBlocked: async () => false },
+      }
+    );
+
+    expect(report.invalidRows).toBe(1);
+    expect(report.errors).toMatchObject([
+      { index: 0, email: "bad@example.com", reason: "invalid-timezone" },
+    ]);
+    expect(created).toEqual([
+      { email: "blank@example.com", timezone: undefined },
+      { email: "good@example.com", timezone: "Europe/Paris" },
+    ]);
+  });
+});
+
 describe("contact hygiene module", () => {
   test("previews import quality without writing contacts", async () => {
     const write = async () => {

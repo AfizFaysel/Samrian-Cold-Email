@@ -1,3 +1,4 @@
+import { isTimezone } from "@samrian/contracts";
 import { NextResponse } from "next/server";
 
 import { createSessionAction, createSessionRoute } from "@/server/api/session-route";
@@ -57,6 +58,9 @@ export const PATCH = createSessionRoute(
 
     if (!body.ids?.length || !body.timezone) {
       return NextResponse.json({ error: "ids and timezone are required" }, { status: 400 });
+    }
+    if (!isTimezone(body.timezone)) {
+      return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
     }
 
     const result = await new PostgresContactRepo(db).bulkUpdateTimezone(

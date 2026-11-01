@@ -1,3 +1,5 @@
+import { isTimezone } from "@samrian/contracts";
+
 import type {
   ContactId,
   ContactRecord,
@@ -160,6 +162,12 @@ async function processContacts(
       continue;
     }
 
+    const timezone = row.timezone?.trim() || undefined;
+    if (timezone && !isTimezone(timezone)) {
+      addSkipped(report, "invalidRows", { index, email, reason: "invalid-timezone" });
+      continue;
+    }
+
     const existing = await deps.contacts.getByEmail(email, input.orgId);
     if (await deps.blocklist.isBlocked(email, input.orgId)) {
       addSkipped(report, "blockedRows", { index, email, reason: "blocked" });
@@ -185,7 +193,7 @@ async function processContacts(
           email,
           domain,
           customVars: row.customVars,
-          timezone: row.timezone,
+          timezone,
           ...verificationPatch(verification),
         });
         if (updated) report.ids.push(updated.id);
@@ -200,7 +208,7 @@ async function processContacts(
         email,
         domain,
         customVars: row.customVars,
-        timezone: row.timezone,
+        timezone,
         verification,
       });
       report.ids.push(created.id);

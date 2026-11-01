@@ -536,10 +536,19 @@ export const replyResultSchema = z
   })
   .strict();
 
+export function isTimezone(value: string) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const contactUpdateSchema = z
   .object({
     customVars: z.record(z.string(), z.unknown()).optional(),
-    timezone: z.string().nullable().optional(),
+    timezone: z.string().refine(isTimezone, "Invalid timezone").nullable().optional(),
   })
   .strict()
   .refine((value) => value.customVars !== undefined || value.timezone !== undefined, {
@@ -559,7 +568,15 @@ export const groupWriteSchema = z
 export const campaignDraftSchema = z
   .object({
     name: z.string().trim().min(1).max(160),
-    schedule: z.record(z.string(), z.unknown()),
+    schedule: z
+      .record(z.string(), z.unknown())
+      .refine(
+        ({ timezone, defaultTimezone }) =>
+          [timezone, defaultTimezone].every(
+            (value) => value == null || (typeof value === "string" && isTimezone(value))
+          ),
+        "Invalid timezone"
+      ),
     steps: z.array(z.unknown()).min(1).max(100),
     targetGroupId: z.string().optional(),
     targetContactIds: z.array(z.string()).max(10_000).optional(),
