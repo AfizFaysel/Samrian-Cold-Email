@@ -6,7 +6,7 @@ describe("local Inngest runtime", () => {
   test("uses a pinned official dev server with explicit local mode", async () => {
     const compose = await readFile("docker-compose.inngest.yml", "utf8");
 
-    expect(compose).toContain("inngest/inngest:v1.22.0");
+    expect(compose).toContain("inngest/inngest:v1.49.0");
     expect(compose).toContain('INNGEST_DEV: "1"');
     expect(compose).toContain("INNGEST_BASE_URL: http://inngest:8288");
     expect(compose).toContain("http://dev-app:3000/api/inngest");

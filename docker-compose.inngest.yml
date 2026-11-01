@@ -27,7 +27,7 @@ services:
         condition: service_healthy
 
   inngest:
-    image: inngest/inngest:v1.22.0
+    image: inngest/inngest:v1.49.0
     container_name: samrian-inngest
     command:
       - inngest
