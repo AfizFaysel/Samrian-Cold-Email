@@ -110,6 +110,16 @@ export function createApiRoute<T>(options: ApiRouteOptions<T>) {
 
         const principal = await options.credentials.verify(value);
         if (!principal) {
+          // Every caller without a trusted proxy shares "unknown", so one attacker cannot lock it.
+          if (source !== "unknown") {
+            const sourcePenalty = await limitGuard.checkSubject({
+              operationId: "token.verify",
+              subjectType: "ip",
+              subject: source,
+              penalty: true,
+            });
+            if (!sourcePenalty.allowed) throw rateLimitError(sourcePenalty);
+          }
           const penalty = await limitGuard.checkSubject({
             operationId: "token.verify",
             subjectType: "token",
@@ -179,7 +189,11 @@ export function createApiRoute<T>(options: ApiRouteOptions<T>) {
                 options.transaction === "explicit"
                   ? scopedStore(context, options.idempotency)
                   : options.idempotency(context);
-              result = await runIdempotent({ key, payload }, store, () => options.handler(context));
+              result = await runIdempotent(
+                { key, payload: { target: new URL(request.url).pathname, body: payload } },
+                store,
+                () => options.handler(context)
+              );
             } catch (error) {
               if (error instanceof Error && error.message.includes("different payload")) {
                 throw new ApiRouteError("IDEMPOTENCY_CONFLICT", error.message, 409);

@@ -3,7 +3,7 @@ import type { IdempotencyStore } from "../../src/server/api/idempotency";
 import type { AutomationPrincipal, MachineCredential } from "../../src/server/auth/machine";
 import type { Logger } from "../../src/server/observability/logs";
 import type { LimitGuard } from "../../src/server/modules/limits";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const principal: AutomationPrincipal = {
   credentialId: "key_1",
@@ -24,6 +24,17 @@ function credentials(value: AutomationPrincipal = principal): MachineCredential 
     revoke: vi.fn(),
   };
 }
+
+const launched = {
+  status: "launched" as const,
+  campaignId: "campaign_a",
+  assignmentCount: 1,
+  createdAssignments: 1,
+  existingAssignments: 0,
+  linkedMailboxCount: 1,
+  skippedContacts: { blocked: 0, bounced: 0, invalid: 0, missing: 0 },
+  warnings: [],
+};
 
 describe("v1 route wrapper", () => {
   it("rejects a missing bearer credential with stable response", async () => {
@@ -236,6 +247,91 @@ describe("v1 route wrapper", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "VALIDATION_FAILED" },
     });
+  });
+
+  describe("failed credentials", () => {
+    const allowed = {
+      allowed: true,
+      policyId: "public.token",
+      limit: 120,
+      remaining: 119,
+      retryAfterMs: 0,
+      resetAt: 5_000,
+    };
+
+    async function reject(forwardedFor: string | null, checkSubject = vi.fn()) {
+      checkSubject.mockResolvedValue(allowed);
+      const verify = vi.fn().mockResolvedValue(null);
+      const route = createApiRoute({
+        operation: "identity.me",
+        credentials: { ...credentials(), verify },
+        tenant,
+        limits: { check: vi.fn(), checkPublic: vi.fn(), checkSubject },
+        handler: async () => ({ data: {} as never }),
+      });
+      await route(
+        new Request("http://localhost/api/v1/me", {
+          headers: {
+            authorization: "Bearer sam_wrong",
+            ...(forwardedFor ? { "x-forwarded-for": forwardedFor } : {}),
+          },
+        })
+      );
+      return checkSubject;
+    }
+
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("charges the source address, so rotating tokens does not dodge the limit", async () => {
+      vi.stubEnv("TRUSTED_PROXY_MODE", "single");
+
+      expect(await reject("203.0.113.9")).toHaveBeenCalledWith(
+        expect.objectContaining({ subjectType: "ip", subject: "203.0.113.9", penalty: true })
+      );
+    });
+
+    it("does not charge the shared bucket used when the address is unknown", async () => {
+      expect(await reject(null)).not.toHaveBeenCalledWith(
+        expect.objectContaining({ subjectType: "ip", penalty: true })
+      );
+    });
+  });
+
+  it("does not replay a key used on a different target", async () => {
+    const results = new Map<string, { fingerprint: string; result?: unknown }>();
+    const store: IdempotencyStore = {
+      get: async (key) => results.get(key) ?? null,
+      reserve: async (key, fingerprint) => {
+        results.set(key, { fingerprint });
+        return true;
+      },
+      complete: async (key, result) => {
+        const entry = results.get(key);
+        if (entry) entry.result = result;
+      },
+    };
+    const route = createApiRoute({
+      operation: "campaigns.launch",
+      credentials: credentials({ ...principal, scopes: ["campaigns:launch"] }),
+      tenant,
+      idempotency: () => store,
+      handler: async () => ({ data: launched }),
+    });
+    const launch = (id: string) =>
+      route(
+        new Request(`http://localhost/api/v1/campaigns/${id}/launch`, {
+          method: "POST",
+          headers: {
+            authorization: "Bearer sam_test",
+            "content-type": "application/json",
+            "idempotency-key": "same_key",
+          },
+          body: JSON.stringify({ mailboxIds: ["mailbox_1"] }),
+        })
+      );
+
+    expect((await launch("campaign_a")).status).toBe(200);
+    expect((await launch("campaign_b")).status).toBe(409);
   });
 
   it("replays completed idempotent write without rerunning handler", async () => {
