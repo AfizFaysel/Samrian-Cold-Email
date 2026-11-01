@@ -11,7 +11,6 @@ import {
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const credentials = await getMachineCredential();
-  const db = getDb();
   return createApiRoute({
     operation: "campaigns.validate",
     credentials,
@@ -25,7 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         return {
           data: await validateCampaignLaunch(
             { campaignId: id, orgId: principal.orgId, mailboxIds: parsed.data.mailboxIds },
-            createCampaignLaunchDeps(db)
+            createCampaignLaunchDeps(getDb())
           ),
         };
       } catch (error) {

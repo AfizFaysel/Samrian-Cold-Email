@@ -35,12 +35,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const credentials = await getMachineCredential();
-  const db = getDb();
   return createApiRoute({
     operation: "blocklist.add",
     credentials,
     idempotency: ({ principal, operation }) =>
-      new PostgresIdempotencyStore(db, {
+      new PostgresIdempotencyStore(getDb(), {
         orgId: principal.orgId,
         credentialId: principal.credentialId,
         operationId: operation.id,
@@ -49,7 +48,7 @@ export async function POST(request: Request) {
       const parsed = blocklistAddSchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success)
         throw new ApiRouteError("VALIDATION_FAILED", "Invalid blocklist entry", 400);
-      await new PostgresBlocklistRepo(db).add({ ...parsed.data, orgId: principal.orgId });
+      await new PostgresBlocklistRepo(getDb()).add({ ...parsed.data, orgId: principal.orgId });
       return { data: parsed.data };
     },
   })(request);

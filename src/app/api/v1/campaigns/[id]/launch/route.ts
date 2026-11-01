@@ -12,12 +12,11 @@ import { PostgresIdempotencyStore } from "@/server/repos";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const credentials = await getMachineCredential();
-  const db = getDb();
   return createApiRoute({
     operation: "campaigns.launch",
     credentials,
     idempotency: ({ principal, operation }) =>
-      new PostgresIdempotencyStore(db, {
+      new PostgresIdempotencyStore(getDb(), {
         orgId: principal.orgId,
         credentialId: principal.credentialId,
         operationId: operation.id,
@@ -29,11 +28,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       }
       const { id } = await context.params;
       try {
-        const data = await db.transaction((tx) =>
-          launchCampaign(
-            { campaignId: id, orgId: principal.orgId, mailboxIds: parsed.data.mailboxIds },
-            createCampaignLaunchDeps(tx)
-          )
+        const data = await launchCampaign(
+          { campaignId: id, orgId: principal.orgId, mailboxIds: parsed.data.mailboxIds },
+          createCampaignLaunchDeps(getDb())
         );
         return { data };
       } catch (error) {

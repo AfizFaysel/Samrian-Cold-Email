@@ -31,12 +31,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const credentials = await getMachineCredential();
-  const db = getDb();
   return createApiRoute({
     operation: "campaigns.create",
     credentials,
     idempotency: ({ principal, operation }) =>
-      new PostgresIdempotencyStore(db, {
+      new PostgresIdempotencyStore(getDb(), {
         orgId: principal.orgId,
         credentialId: principal.credentialId,
         operationId: operation.id,
@@ -44,15 +43,14 @@ export async function POST(request: Request) {
     handler: async ({ principal, request }) => {
       const parsed = campaignDraftSchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) throw new ApiRouteError("VALIDATION_FAILED", "Invalid campaign", 400);
-      const id = await db.transaction(async (tx) => {
-        return saveCampaignDraft(
-          { ...parsed.data, orgId: principal.orgId },
-          {
-            campaigns: new PostgresCampaignRepo(tx),
-            campaignMailboxes: new PostgresCampaignMailboxRepo(tx),
-          }
-        );
-      });
+      const db = getDb();
+      const id = await saveCampaignDraft(
+        { ...parsed.data, orgId: principal.orgId },
+        {
+          campaigns: new PostgresCampaignRepo(db),
+          campaignMailboxes: new PostgresCampaignMailboxRepo(db),
+        }
+      );
       return { data: { id } };
     },
   })(request);
