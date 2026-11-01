@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { requireActiveOrg } from "@/server/auth";
 import { validateOAuthState } from "../../../../../../lib/oauth-state";
 import {
+  accessRedirect,
+  authorizeOAuthMailbox,
   errorRedirect,
   exchangeCodeForTokens,
   saveOAuthMailbox,
@@ -63,6 +65,12 @@ async function callback(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "invalid_state";
     return errorRedirect(appUrl, message, "microsoft");
+  }
+
+  try {
+    await authorizeOAuthMailbox("microsoft", validatedState.mailboxId);
+  } catch (error) {
+    return accessRedirect(appUrl, error, "microsoft");
   }
 
   // Validate env

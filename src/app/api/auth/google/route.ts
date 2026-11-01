@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveOrg } from "@/server/auth";
 import { createOAuthState } from "../../../../../lib/oauth-state";
-import { getStateCookieName } from "../../../../../lib/oauth-helpers";
+import {
+  accessRedirect,
+  authorizeOAuthMailbox,
+  getStateCookieName,
+} from "../../../../../lib/oauth-helpers";
 import { withPublicLimit } from "@/server/limits/http";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -22,18 +25,18 @@ async function start(request: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!clientId || !appUrl) {
-    return NextResponse.redirect(`${appUrl}/settings/mailboxes?error=missing_google_config`);
-  }
-
-  let session;
-  try {
-    session = await requireActiveOrg();
-  } catch {
-    return NextResponse.redirect(`${appUrl}/sign-in?error=unauthenticated`);
+    return NextResponse.redirect(`${appUrl}/dashboard/mailboxes?error=missing_google_config`);
   }
 
   const { searchParams } = request.nextUrl;
   const mailboxId = searchParams.get("mailboxId") ?? undefined;
+
+  let session;
+  try {
+    session = await authorizeOAuthMailbox("google", mailboxId);
+  } catch (error) {
+    return accessRedirect(appUrl, error, "google");
+  }
 
   // Create signed, timestamped, org-bound state
   const state = createOAuthState(session.orgId, session.userId, mailboxId);

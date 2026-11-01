@@ -51,8 +51,14 @@ function getSigningSecret(): string {
   return secret;
 }
 
-function computeSignature(nonce: string, orgId: string, userId: string, ts: number): string {
-  const data = `${nonce}|${orgId}|${userId}|${ts}`;
+function computeSignature(
+  nonce: string,
+  orgId: string,
+  userId: string,
+  ts: number,
+  mailboxId = ""
+): string {
+  const data = `${nonce}|${orgId}|${userId}|${ts}|${mailboxId}`;
   return crypto.createHmac("sha256", getSigningSecret()).update(data).digest("hex");
 }
 
@@ -83,7 +89,7 @@ function base64urlDecode(input: string): string {
 export function createOAuthState(orgId: string, userId: string, mailboxId?: string): string {
   const nonce = crypto.randomBytes(16).toString("hex");
   const ts = Date.now();
-  const sig = computeSignature(nonce, orgId, userId, ts);
+  const sig = computeSignature(nonce, orgId, userId, ts, mailboxId);
 
   const payload: OAuthStatePayload = {
     n: nonce,
@@ -134,7 +140,7 @@ export function validateOAuthState(
   }
 
   // Verify HMAC signature (prevents forgery)
-  const expectedSig = computeSignature(payload.n, payload.o, payload.u, payload.t);
+  const expectedSig = computeSignature(payload.n, payload.o, payload.u, payload.t, payload.m);
   if (!crypto.timingSafeEqual(Buffer.from(payload.s, "hex"), Buffer.from(expectedSig, "hex"))) {
     throw new Error("Invalid OAuth state: signature mismatch");
   }

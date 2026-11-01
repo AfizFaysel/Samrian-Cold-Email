@@ -391,6 +391,38 @@ export class PostgresMailboxRepo {
       .where(and(eq(mailboxes.id, id), eq(mailboxes.orgId, orgId)));
   }
 
+  async reconnectOAuth(
+    id: MailboxId,
+    orgId: OrgId,
+    provider: MailboxProvider,
+    input: Pick<
+      ReconnectMailboxInput,
+      "encryptedRefreshToken" | "encryptedAccessToken" | "tokenExpiresAt" | "userEmail"
+    >
+  ): Promise<boolean> {
+    const rows = await this.db
+      .update(mailboxes)
+      .set({
+        ...input,
+        status: "active",
+        lastConnectionError: null,
+        lastTokenRefreshError: null,
+        providerLimitCode: null,
+        providerLimitResetAt: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(mailboxes.id, id),
+          eq(mailboxes.orgId, orgId),
+          eq(mailboxes.provider, provider),
+          isNull(mailboxes.archivedAt)
+        )
+      )
+      .returning();
+    return rows.length > 0;
+  }
+
   async recordConnectionSuccess(id: MailboxId, orgId: OrgId, at: number): Promise<void> {
     await this.db
       .update(mailboxes)

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveOrg } from "@/server/auth";
 import { createOAuthState } from "../../../../../lib/oauth-state";
-import { getStateCookieName } from "../../../../../lib/oauth-helpers";
+import {
+  accessRedirect,
+  authorizeOAuthMailbox,
+  getStateCookieName,
+} from "../../../../../lib/oauth-helpers";
 import { withPublicLimit } from "@/server/limits/http";
 
 // Support configurable tenant ID (default: common for multi-tenant)
@@ -20,18 +23,18 @@ async function start(request: NextRequest) {
   const clientId = process.env.MICROSOFT_CLIENT_ID;
 
   if (!clientId || !appUrl) {
-    return NextResponse.redirect(`${appUrl}/settings/mailboxes?error=missing_microsoft_config`);
-  }
-
-  let session;
-  try {
-    session = await requireActiveOrg();
-  } catch {
-    return NextResponse.redirect(`${appUrl}/sign-in?error=unauthenticated`);
+    return NextResponse.redirect(`${appUrl}/dashboard/mailboxes?error=missing_microsoft_config`);
   }
 
   const { searchParams } = request.nextUrl;
   const mailboxId = searchParams.get("mailboxId") ?? undefined;
+
+  let session;
+  try {
+    session = await authorizeOAuthMailbox("microsoft", mailboxId);
+  } catch (error) {
+    return accessRedirect(appUrl, error, "microsoft");
+  }
 
   // Create signed, timestamped, org-bound state
   const state = createOAuthState(session.orgId, session.userId, mailboxId);
