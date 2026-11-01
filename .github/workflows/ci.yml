@@ -41,4 +41,4 @@ jobs:
       - run: docker compose -f docker-compose.db.yml up -d --wait
       - run: docker compose -f docker-compose.worker.yml up -d --wait redis
       - run: bunx drizzle-kit migrate
-      - run: bun run test --project db --project repos --project queue
+      - run: bun run test:db

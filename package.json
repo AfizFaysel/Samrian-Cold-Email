@@ -22,7 +22,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:db": "vitest run --project db",
+    "test:db": "vitest run --project db --project repos --project queue --no-file-parallelism --maxWorkers=1",
     "test:security": "vitest run --project security",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
