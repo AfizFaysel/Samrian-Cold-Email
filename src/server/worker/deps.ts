@@ -82,15 +82,19 @@ export function createWorkerDeps(queue?: JobQueue) {
       dispatchDueSends({
         queue: getQueue(),
         limits: getLimitGuard(),
-        transaction: (operation) =>
-          withTenant(db, { orgId: "system", actorType: "system" }, (tx) => {
-            const deps = createDeps(tx);
-            return operation({
-              assignments: deps.repos.assignments,
-              campaignMailboxes: deps.campaignMailboxes,
-              blocklist: deps.repos.blocklist,
-            });
-          }),
+        transaction: (operation, orgId) =>
+          withTenant(
+            db,
+            orgId ? { orgId, actorType: "worker" } : { orgId: "system", actorType: "system" },
+            (tx) => {
+              const deps = createDeps(tx);
+              return operation({
+                assignments: deps.repos.assignments,
+                campaignMailboxes: deps.campaignMailboxes,
+                blocklist: deps.repos.blocklist,
+              });
+            }
+          ),
         now: Date.now,
       }),
     evaluateMailboxRamps: () =>

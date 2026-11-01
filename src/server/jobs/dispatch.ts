@@ -59,14 +59,20 @@ type DispatchBase = {
   limits?: LimitGuard;
 };
 
+// Without an orgId the operation spans tenants, which is only for finding due work.
+type DispatchTransaction = <T>(
+  operation: (repos: DispatchRepos) => Promise<T>,
+  orgId?: OrgId
+) => Promise<T>;
+
 export type DispatchDeps = DispatchBase & {
   repos: DispatchRepos;
-  transaction?: <T>(operation: (repos: DispatchRepos) => Promise<T>) => Promise<T>;
+  transaction?: DispatchTransaction;
 };
 
 type TransactionDispatchDeps = DispatchBase & {
   repos?: never;
-  transaction: <T>(operation: (repos: DispatchRepos) => Promise<T>) => Promise<T>;
+  transaction: DispatchTransaction;
 };
 
 export type DispatchResult = {
@@ -91,7 +97,7 @@ export async function dispatchDueSends(
     stale: 0,
     limit,
   };
-  const run =
+  const run: DispatchTransaction =
     deps.transaction ??
     ((operation) => {
       if (!deps.repos) throw new Error("Dispatch repositories are not configured");
@@ -100,12 +106,15 @@ export async function dispatchDueSends(
   const due = await run((repos) => repos.assignments.listDueForDispatch({ now, limit }));
 
   for (const item of due.slice(0, limit)) {
+    const tenant = <T>(operation: (repos: DispatchRepos) => Promise<T>) =>
+      run(operation, item.orgId);
+
     if (shouldSkip(item)) {
       result.skipped += 1;
       continue;
     }
 
-    if (await run((repos) => repos.blocklist.isBlocked(item.contactEmail, item.orgId))) {
+    if (await tenant((repos) => repos.blocklist.isBlocked(item.contactEmail, item.orgId))) {
       result.skipped += 1;
       continue;
     }
@@ -117,7 +126,7 @@ export async function dispatchDueSends(
         now,
       })
     ) {
-      await run((repos) =>
+      await tenant((repos) =>
         repos.assignments.deferUntil(
           item.assignmentId,
           item.orgId,
@@ -132,7 +141,7 @@ export async function dispatchDueSends(
       continue;
     }
 
-    const mailbox = await run(async (repos) =>
+    const mailbox = await tenant(async (repos) =>
       pickMailbox(
         await repos.campaignMailboxes.listDispatchMailboxes(item.campaignId, item.orgId),
         now
@@ -150,7 +159,7 @@ export async function dispatchDueSends(
         subject: item.orgId,
       });
       if (!backpressure.allowed) {
-        await run((repos) =>
+        await tenant((repos) =>
           repos.assignments.deferUntil(item.assignmentId, item.orgId, backpressure.resetAt)
         );
         result.deferred += 1;
@@ -158,7 +167,7 @@ export async function dispatchDueSends(
       }
     }
 
-    const available = await run((repos) =>
+    const available = await tenant((repos) =>
       repos.campaignMailboxes.reserveCapacity({
         mailboxId: mailbox.mailboxId,
         assignmentId: item.assignmentId,
@@ -189,7 +198,7 @@ export async function dispatchDueSends(
         }
       );
     } catch (error) {
-      await run((repos) =>
+      await tenant((repos) =>
         repos.campaignMailboxes.releaseCapacity({
           mailboxId: mailbox.mailboxId,
           assignmentId: item.assignmentId,
@@ -199,7 +208,7 @@ export async function dispatchDueSends(
       );
       throw error;
     }
-    await run(async (repos) => {
+    await tenant(async (repos) => {
       await repos.assignments.markEnqueued(item.assignmentId, item.orgId, now);
       await repos.campaignMailboxes.updateLastUsed(
         item.campaignId,
