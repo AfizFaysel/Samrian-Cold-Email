@@ -139,7 +139,9 @@ Current provider references:
    migration job.
 4. Set `JOB_PROVIDER=inngest`.
 5. Set `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, and `INNGEST_CONCURRENCY`. Use `5` for
-   Inngest Free so every Samrian function shares one account-scoped budget.
+   Inngest Free so every Samrian function shares one account-scoped budget. In production,
+   `/api/inngest` answers 503 unless `INNGEST_SIGNING_KEY` is a real `signkey-*` value, and it
+   answers 404 when `JOB_PROVIDER=bullmq`.
 6. Configure S3-compatible storage with AWS S3, Cloudflare R2, Backblaze B2, or another provider.
 7. Run migrations before release:
 
