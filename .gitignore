@@ -89,3 +89,15 @@ skills-lock.json
 # Security scan output
 /security/reports/*
 !/security/reports/.gitkeep
+
+# Internal planning and launch records
+/plan.md
+/docs/CHANGELOG_POLICY.md
+/docs/COMPLETED_MILESTONES.md
+/docs/HANDOFF.md
+/docs/LAUNCH_SECURITY_REPORT.md
+/docs/OBSERVABILITY_QUERIES.md
+/docs/OSS_RESEARCH.md
+/docs/PLAN_MILESTONES_12_19.md
+/docs/PRICING_AND_LIMITS.md
+/docs/SECURITY_AUDIT.md
