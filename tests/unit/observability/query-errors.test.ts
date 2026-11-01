@@ -82,7 +82,11 @@ describe("span telemetry", () => {
     const span = spanSpy();
     const tracer = createTracer({ logger: { debug: vi.fn(), error: vi.fn() } });
 
-    await tracer.span("mailbox.check", { smtpPassword: "hunter2", jobName: "check" }, async () => 1);
+    await tracer.span(
+      "mailbox.check",
+      { smtpPassword: "hunter2", jobName: "check" },
+      async () => 1
+    );
 
     expect(span.setAttribute).toHaveBeenCalledWith("smtpPassword", "[REDACTED]");
     expect(span.setAttribute).toHaveBeenCalledWith("jobName", "check");
