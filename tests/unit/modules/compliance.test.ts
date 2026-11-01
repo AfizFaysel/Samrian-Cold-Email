@@ -3,11 +3,41 @@ import { describe, expect, test } from "vitest";
 import {
   applyCompliance,
   buildComplianceHeaders,
-  validateComplianceForLaunch,
+  buildUnsubscribeUrl,
+  validateCompliance,
 } from "../../../src/server/modules/compliance";
 
+const rendered = { subject: "Hi", htmlBody: "<p>Hello</p>", textBody: "Hello" };
+const unsubscribeUrl = buildUnsubscribeUrl({
+  appUrl: "https://app.example.com",
+  contactId: "contact_1",
+  campaignId: "campaign_1",
+  token: "token",
+});
+const href = unsubscribeUrl.replaceAll("&", "&amp;");
+const link = `<a href="${href}">${href}</a>`;
+
 describe("compliance module", () => {
-  test("disabled mode sends no unsubscribe headers and requires no identity", () => {
+  test("requires a physical address whether or not List-Unsubscribe is on", () => {
+    const issue = "Physical mailing address is required";
+
+    expect(validateCompliance({ listUnsubscribeEnabled: false })).toEqual([issue]);
+    expect(validateCompliance({ listUnsubscribeEnabled: true, physicalAddress: " " })).toEqual([
+      issue,
+    ]);
+  });
+
+  test("accepts an address alone because the default footer has an opt-out", () => {
+    expect(validateCompliance({ physicalAddress: "1 Main St" })).toEqual([]);
+  });
+
+  test("rejects a custom footer that has no way to opt out", () => {
+    expect(
+      validateCompliance({ physicalAddress: "1 Main St", unsubscribeFooter: "Opt out" })
+    ).toEqual(["Unsubscribe footer must include {{unsubscribeUrl}}"]);
+  });
+
+  test("disabled mode sends no unsubscribe headers", () => {
     expect(
       buildComplianceHeaders({
         enabled: false,
@@ -17,21 +47,6 @@ describe("compliance module", () => {
         token: "token",
       })
     ).toEqual({});
-
-    expect(validateComplianceForLaunch({ listUnsubscribeEnabled: false })).toEqual([]);
-  });
-
-  test("enabled mode requires physical address and footer token", () => {
-    expect(
-      validateComplianceForLaunch({
-        listUnsubscribeEnabled: true,
-        physicalAddress: "",
-        unsubscribeFooter: "Opt out",
-      })
-    ).toEqual([
-      "Physical mailing address is required when List-Unsubscribe is enabled",
-      "Unsubscribe footer must include {{unsubscribeUrl}} when List-Unsubscribe is enabled",
-    ]);
   });
 
   test("enabled mode builds one-click headers with optional mailto", () => {
@@ -51,18 +66,46 @@ describe("compliance module", () => {
     });
   });
 
-  test("enabled mode appends footer to html and text", () => {
-    expect(
-      applyCompliance({
-        enabled: true,
-        rendered: { subject: "Hi", htmlBody: "<p>Hello</p>", textBody: "Hello" },
-        unsubscribeUrl: "https://app.example.com/u",
-        footer: "Mailing address: 1 Main St. Unsubscribe: {{unsubscribeUrl}}",
-      })
-    ).toMatchObject({
-      htmlBody:
-        '<p>Hello</p><p>Mailing address: 1 Main St. Unsubscribe: <a href="https://app.example.com/u">https://app.example.com/u</a></p>',
-      textBody: "Hello\n\nMailing address: 1 Main St. Unsubscribe: https://app.example.com/u",
+  test("links the real unsubscribe URL and adds the address to both bodies", () => {
+    const result = applyCompliance({
+      rendered,
+      unsubscribeUrl,
+      footer: "Stop these emails: {{unsubscribeUrl}}",
+      physicalAddress: "1 Main St",
     });
+
+    expect(result.htmlBody).toBe(`<p>Hello</p><p>Stop these emails: ${link}<br>1 Main St</p>`);
+    expect(result.textBody).toBe(`Hello\n\nStop these emails: ${unsubscribeUrl}\n1 Main St`);
+  });
+
+  test("uses a default footer when none is configured", () => {
+    const result = applyCompliance({ rendered, unsubscribeUrl, physicalAddress: "1 Main St" });
+
+    expect(result.htmlBody).toContain(link);
+    expect(result.textBody).toContain(unsubscribeUrl);
+  });
+
+  test("does not repeat an address the footer already includes", () => {
+    const result = applyCompliance({
+      rendered,
+      unsubscribeUrl,
+      footer: "1 Main St. Unsubscribe: {{unsubscribeUrl}}",
+      physicalAddress: "1 Main St",
+    });
+
+    expect(result.textBody).toBe(`Hello\n\n1 Main St. Unsubscribe: ${unsubscribeUrl}`);
+  });
+
+  test("escapes footer and address text and keeps address lines", () => {
+    const result = applyCompliance({
+      rendered,
+      unsubscribeUrl,
+      footer: "<b>Leave</b> {{unsubscribeUrl}}",
+      physicalAddress: "1 Main & Co\nSpringfield",
+    });
+
+    expect(result.htmlBody).toBe(
+      `<p>Hello</p><p>&lt;b&gt;Leave&lt;/b&gt; ${link}<br>1 Main &amp; Co<br>Springfield</p>`
+    );
   });
 });

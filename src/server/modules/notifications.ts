@@ -2,6 +2,8 @@ import type { NotificationRepo, OrgId } from "../ports";
 import { logger } from "../observability/runtime";
 import { shouldForwardReply, type NotificationPrefs } from "./notification-prefs";
 
+const HELD_NOTICE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 type NotifyDeps = NotificationRepo | undefined;
 
 export type NotificationForwarder = {
@@ -76,6 +78,39 @@ export async function notifyCampaignPaused(
     body: input.reason,
     data: { campaignId: input.campaignId, reason: input.reason },
   });
+}
+
+// Every queued send for the campaign lands here, so one notice a day is enough.
+export async function notifyCampaignHeld(
+  repo: NotifyDeps,
+  input: {
+    orgId: OrgId;
+    campaignId: string;
+    campaignName?: string;
+    reason: string;
+    now: number;
+  }
+) {
+  if (!repo) return;
+  try {
+    const recent = await repo.listLatest({ orgId: input.orgId, limit: 50 });
+    const notified = recent.some(
+      (item) =>
+        item.type === "campaign_held" &&
+        item.data?.campaignId === input.campaignId &&
+        item.createdAt > input.now - HELD_NOTICE_INTERVAL_MS
+    );
+    if (notified) return;
+    await repo.create({
+      orgId: input.orgId,
+      type: "campaign_held",
+      title: `Campaign waiting: ${input.campaignName ?? input.campaignId}`,
+      body: input.reason,
+      data: { campaignId: input.campaignId, reason: input.reason },
+    });
+  } catch (error) {
+    logger.warn("notification.write_failed", { orgId: input.orgId, error });
+  }
 }
 
 export async function notifySendFailed(

@@ -110,6 +110,8 @@ async function rewriteLinks(
   for (const match of matches) {
     const originalUrl = match[1];
     if (!originalUrl) continue;
+    // Opting out must not depend on the tracking redirect or its rate limits.
+    if (originalUrl.startsWith(`${input.appUrl}/api/unsubscribe`)) continue;
     try {
       validateTrackedUrl(originalUrl);
     } catch {

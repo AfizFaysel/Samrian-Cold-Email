@@ -12,7 +12,7 @@ import type { DbExecutor } from "../db/tx";
 import type { CampaignId, ContactId, ContactRecord, MailboxId, OrgId } from "../ports";
 import type { CampaignLaunchRecord } from "../repos/campaigns";
 import type { CreateCampaignInput } from "../repos/campaigns";
-import { validateComplianceForLaunch, type ComplianceSettings } from "./compliance";
+import { validateCompliance, type ComplianceSettings } from "./compliance";
 import { assessContact } from "./contacts";
 
 export type LaunchCampaignInput = {
@@ -212,7 +212,7 @@ async function prepareCampaignLaunch(input: LaunchCampaignInput, deps: LaunchCam
   const campaignIssues = validateCampaign(campaign);
   if (deps.compliance) {
     campaignIssues.push(
-      ...validateComplianceForLaunch(await deps.compliance.getSettings(input.orgId, campaign.id))
+      ...validateCompliance(await deps.compliance.getSettings(input.orgId, campaign.id))
     );
   }
   if (campaignIssues.length > 0) {

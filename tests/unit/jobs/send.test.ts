@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import { sendCampaign } from "../../../src/server/jobs/send";
-import { FakeRepos } from "../../fakes/fake-repos";
+import type { ComplianceSettings } from "../../../src/server/modules/compliance";
+import { FakeNotificationRepo, FakeRepos } from "../../fakes/fake-repos";
 import type { MailboxConnector } from "../../../src/server/jobs/types";
 
 function makeConnector(): MailboxConnector & { sent: unknown[] } {
@@ -17,6 +18,89 @@ function makeConnector(): MailboxConnector & { sent: unknown[] } {
     async close() {},
   };
 }
+
+describe("campaign email compliance", () => {
+  const payload = {
+    assignmentId: "assignment_1",
+    campaignId: "campaign_1",
+    contactId: "contact_1",
+    mailboxId: "mailbox_1",
+    orgId: "org_1",
+    stepNumber: 0,
+  };
+
+  function seed() {
+    return new FakeRepos({
+      campaigns: [
+        {
+          id: "campaign_1",
+          orgId: "org_1",
+          name: "Launch",
+          status: "active",
+          listUnsubscribeEnabled: false,
+          steps: [{ subject: "Hi", body: "Hello" }],
+        },
+      ],
+      contacts: [{ id: "contact_1", orgId: "org_1", email: "ada@example.com", customVars: {} }],
+      mailboxes: [{ id: "mailbox_1", orgId: "org_1", email: "sender@example.com" }],
+      assignments: [{ id: "assignment_1", orgId: "org_1", currentStep: 0, status: "active" }],
+    });
+  }
+
+  function deps(repos: unknown, connector: MailboxConnector, settings: ComplianceSettings) {
+    return {
+      repos: repos as never,
+      connectorForMailbox: async () => connector,
+      generateUnsubscribeToken: async () => "token",
+      appUrl: "https://app.example.com",
+      now: () => Date.parse("2026-07-06T14:00:00.000Z"),
+      getComplianceSettings: async () => settings,
+    };
+  }
+
+  test("adds the opt-out and address even with List-Unsubscribe off", async () => {
+    const connector = makeConnector();
+
+    await sendCampaign(payload, deps(seed(), connector, { physicalAddress: "1 Main St" }));
+
+    expect(connector.sent).toMatchObject([
+      {
+        html: expect.stringContaining('href="https://app.example.com/api/unsubscribe?'),
+        text: expect.stringContaining("1 Main St"),
+      },
+    ]);
+  });
+
+  test("holds sends without an address and notifies once", async () => {
+    const repos = seed();
+    const notifications = new FakeNotificationRepo();
+    const connector = makeConnector();
+    const held = deps({ ...repos, notifications }, connector, {});
+
+    await expect(sendCampaign(payload, held)).resolves.toMatchObject({ status: "deferred" });
+    await expect(sendCampaign(payload, held)).resolves.toMatchObject({ status: "deferred" });
+
+    expect(connector.sent).toEqual([]);
+    expect(repos.assignments.data[0].currentStep).toBe(0);
+    expect(notifications.data).toMatchObject([
+      {
+        type: "campaign_held",
+        data: { campaignId: "campaign_1" },
+        body: expect.stringContaining("Physical mailing address"),
+      },
+    ]);
+  });
+
+  test("resumes by itself once the address is set", async () => {
+    const repos = seed();
+    const connector = makeConnector();
+
+    await sendCampaign(payload, deps(repos, connector, {}));
+    await expect(
+      sendCampaign(payload, deps(repos, connector, { physicalAddress: "1 Main St" }))
+    ).resolves.toMatchObject({ status: "sent" });
+  });
+});
 
 describe("sendCampaign", () => {
   test("keeps provider send outside tenant transaction", async () => {
@@ -60,6 +144,7 @@ describe("sendCampaign", () => {
           }
         },
         connectorForMailbox: async () => connector,
+        getComplianceSettings: async () => ({ physicalAddress: "1 Main St" }),
         generateUnsubscribeToken: async () => "token",
         appUrl: "https://app.example.com",
         now: () => 123,
@@ -104,6 +189,7 @@ describe("sendCampaign", () => {
         {
           repos,
           connectorForMailbox: async () => connector,
+          getComplianceSettings: async () => ({ physicalAddress: "1 Main St" }),
           generateUnsubscribeToken: async () => "token",
           appUrl: "https://app.example.com",
           now: () => 123,
@@ -117,7 +203,7 @@ describe("sendCampaign", () => {
     expect(repos.threads.data[0]).toMatchObject({
       messageId: "message_1",
       subject: "Hi Ada",
-      textBody: "Hello Ada",
+      textBody: expect.stringContaining("Hello Ada"),
     });
     expect(repos.events.data).toContainEqual(
       expect.objectContaining({
@@ -151,6 +237,7 @@ describe("sendCampaign", () => {
         {
           repos,
           connectorForMailbox: async () => connector,
+          getComplianceSettings: async () => ({ physicalAddress: "1 Main St" }),
           generateUnsubscribeToken: async () => "token",
           appUrl: "https://app.example.com",
           now: () => 123,
@@ -187,6 +274,7 @@ describe("sendCampaign", () => {
         {
           repos,
           connectorForMailbox: async () => connector,
+          getComplianceSettings: async () => ({ physicalAddress: "1 Main St" }),
           generateUnsubscribeToken: async () => "token",
           appUrl: "https://app.example.com",
           now: () => 123,
@@ -225,6 +313,7 @@ describe("sendCampaign", () => {
       {
         repos,
         connectorForMailbox: async () => makeConnector(),
+        getComplianceSettings: async () => ({ physicalAddress: "1 Main St" }),
         generateUnsubscribeToken: async () => "token",
         appUrl: "https://app.example.com",
         now: () => 123,
@@ -269,6 +358,7 @@ describe("sendCampaign", () => {
       {
         repos,
         connectorForMailbox: async () => makeConnector(),
+        getComplianceSettings: async () => ({ physicalAddress: "1 Main St" }),
         generateUnsubscribeToken: async () => "token",
         appUrl: "https://app.example.com",
         now: () => 1000,

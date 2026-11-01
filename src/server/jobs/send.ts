@@ -9,7 +9,7 @@ import type {
 } from "./types";
 import { assessContact } from "../modules/contacts";
 import { classifyMailboxError, type MailboxFailureKind } from "../modules/mailboxes";
-import { notifySendFailed } from "../modules/notifications";
+import { notifyCampaignHeld, notifySendFailed } from "../modules/notifications";
 import { failedEvent, recordEvent, sentEvent } from "../modules/events";
 import { applyTracking } from "../modules/tracking";
 import { getStepDelayMs, isInSendWindow, nextWindowStart } from "./schedule";
@@ -18,6 +18,7 @@ import {
   buildComplianceHeaders,
   buildUnsubscribeUrl,
   resolveListUnsubscribeEnabled,
+  validateCompliance,
   type ComplianceSettings,
 } from "../modules/compliance";
 
@@ -25,6 +26,8 @@ type CampaignStep = {
   subject?: string;
   body?: string;
 };
+
+const COMPLIANCE_RETRY_MS = 60 * 60 * 1000;
 
 // These failures prove the provider refused the message. Anything else, such as a dropped
 // connection, may have delivered it, so sending again could reach the recipient twice.
@@ -45,7 +48,7 @@ export type SendCampaignDeps = {
   }): Promise<string>;
   appUrl: string;
   now(): number;
-  getComplianceSettings?(input: { orgId: string; campaignId: string }): Promise<ComplianceSettings>;
+  getComplianceSettings(input: { orgId: string; campaignId: string }): Promise<ComplianceSettings>;
   transaction?: JobTransaction;
 };
 
@@ -69,13 +72,17 @@ export async function sendCampaign(
       if (!deps.repos) throw new Error("Send campaign repositories are not configured");
       return operation(deps.repos);
     });
-  const claim = await run((repos) => claimDelivery(repos, payload, deps.now()));
+  const compliance = await deps.getComplianceSettings({
+    orgId: payload.orgId,
+    campaignId: payload.campaignId,
+  });
+  const claim = await run((repos) => claimDelivery(repos, payload, deps.now(), compliance));
   if (claim.result) return claim.result;
   const { campaign, contact, mailbox } = claim;
 
   let delivery: Awaited<ReturnType<typeof prepareDelivery>>;
   try {
-    delivery = await prepareDelivery(payload, campaign, contact, mailbox, deps, run);
+    delivery = await prepareDelivery(payload, campaign, contact, mailbox, compliance, deps, run);
   } catch (error) {
     await run((repos) => repos.mailboxes.unclaimSend(payload.mailboxId, payload.orgId, payload));
     throw error;
@@ -172,7 +179,12 @@ export async function sendCampaign(
 }
 
 // Holds the assignment row while it decides, so a reply committed first stops this send.
-async function claimDelivery(repos: JobRepos, payload: CampaignSendPayload, now: number) {
+async function claimDelivery(
+  repos: JobRepos,
+  payload: CampaignSendPayload,
+  now: number,
+  compliance: ComplianceSettings
+) {
   const assignment = await repos.assignments.lockForSend(payload.assignmentId, payload.orgId);
   const [campaign, contact, mailbox] = await Promise.all([
     repos.campaigns.getById(payload.campaignId, payload.orgId),
@@ -212,6 +224,20 @@ async function claimDelivery(repos: JobRepos, payload: CampaignSendPayload, now:
     return stop({ status: "deferred", until });
   }
 
+  const issues = validateCompliance(compliance);
+  if (issues.length > 0) {
+    const until = now + COMPLIANCE_RETRY_MS;
+    await repos.assignments.deferUntil(payload.assignmentId, payload.orgId, until);
+    await notifyCampaignHeld(repos.notifications, {
+      orgId: payload.orgId,
+      campaignId: payload.campaignId,
+      campaignName: campaign.name,
+      reason: issues.join(". "),
+      now,
+    });
+    return stop({ status: "deferred", until });
+  }
+
   const claimed = await repos.mailboxes.claimSend(payload.mailboxId, payload.orgId, payload, now);
   if (!claimed) return { result: { status: "in-progress" } as const };
   return { result: null, campaign, contact, mailbox };
@@ -230,6 +256,7 @@ async function prepareDelivery(
   campaign: { steps: readonly unknown[]; listUnsubscribeEnabled?: boolean | null },
   contact: ContactRecord,
   mailbox: MailboxRecord,
+  compliance: ComplianceSettings,
   deps: SendCampaignDeps,
   run: JobTransaction
 ) {
@@ -240,10 +267,6 @@ async function prepareDelivery(
     campaignId: payload.campaignId,
     orgId: payload.orgId,
   });
-  const compliance = await deps.getComplianceSettings?.({
-    orgId: payload.orgId,
-    campaignId: payload.campaignId,
-  });
   const unsubscribeUrl = buildUnsubscribeUrl({
     appUrl: deps.appUrl,
     contactId: payload.contactId,
@@ -251,21 +274,21 @@ async function prepareDelivery(
     token: unsubscribeToken,
   });
   const enabled = resolveListUnsubscribeEnabled({
-    orgEnabled: compliance?.listUnsubscribeEnabled,
+    orgEnabled: compliance.listUnsubscribeEnabled,
     campaignEnabled: campaign.listUnsubscribeEnabled,
   });
   const complianceRendered = applyCompliance({
-    enabled,
     rendered: renderedBase,
     unsubscribeUrl,
-    footer: compliance?.unsubscribeFooter,
+    footer: compliance.unsubscribeFooter,
+    physicalAddress: compliance.physicalAddress,
   });
   const rendered = await run((repos) =>
     applyTracking({
       rendered: complianceRendered,
       appUrl: deps.appUrl,
-      clickTrackingEnabled: compliance?.clickTrackingEnabled,
-      openTrackingEnabled: compliance?.openTrackingEnabled,
+      clickTrackingEnabled: compliance.clickTrackingEnabled,
+      openTrackingEnabled: compliance.openTrackingEnabled,
       context: {
         orgId: payload.orgId,
         campaignId: payload.campaignId,
@@ -282,7 +305,7 @@ async function prepareDelivery(
     contactId: payload.contactId,
     campaignId: payload.campaignId,
     token: unsubscribeToken,
-    mailto: compliance?.unsubscribeMailto,
+    mailto: compliance.unsubscribeMailto,
   });
   const from = getMailboxFromAddress(mailbox);
   const connector = await deps.connectorForMailbox(mailbox);

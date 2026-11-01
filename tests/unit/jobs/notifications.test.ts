@@ -109,6 +109,7 @@ describe("job notification writes", () => {
         },
         {
           repos: { ...repos, notifications },
+          getComplianceSettings: async () => ({ physicalAddress: "1 Main St" }),
           connectorForMailbox: async () => ({
             async send() {
               throw new Error("connector failed");

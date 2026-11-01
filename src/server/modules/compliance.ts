@@ -13,19 +13,23 @@ export type RenderedEmail = {
   textBody: string;
 };
 
-export function validateComplianceForLaunch(settings: ComplianceSettings): string[] {
-  if (!settings.listUnsubscribeEnabled) return [];
+const UNSUBSCRIBE_TOKEN = "{{unsubscribeUrl}}";
+const DEFAULT_FOOTER = `Unsubscribe: ${UNSUBSCRIBE_TOKEN}`;
 
+// List-Unsubscribe only controls the headers. Cold email needs an opt-out and an address regardless.
+export function validateCompliance(settings: ComplianceSettings): string[] {
   const issues: string[] = [];
   if (!settings.physicalAddress?.trim()) {
-    issues.push("Physical mailing address is required when List-Unsubscribe is enabled");
+    issues.push("Physical mailing address is required");
   }
-  if (!settings.unsubscribeFooter?.includes("{{unsubscribeUrl}}")) {
-    issues.push(
-      "Unsubscribe footer must include {{unsubscribeUrl}} when List-Unsubscribe is enabled"
-    );
+  if (!isUsableFooter(settings.unsubscribeFooter)) {
+    issues.push(`Unsubscribe footer must include ${UNSUBSCRIBE_TOKEN}`);
   }
   return issues;
+}
+
+export function isUsableFooter(footer?: string | null) {
+  return !footer?.trim() || footer.includes(UNSUBSCRIBE_TOKEN);
 }
 
 export function buildComplianceHeaders(input: {
@@ -58,21 +62,25 @@ export function buildUnsubscribeUrl(input: {
 }
 
 export function applyCompliance(input: {
-  enabled: boolean;
   rendered: RenderedEmail;
   unsubscribeUrl: string;
   footer?: string | null;
+  physicalAddress?: string | null;
 }): RenderedEmail {
-  if (!input.enabled || !input.footer) return input.rendered;
+  const template = input.footer?.trim() || DEFAULT_FOOTER;
+  const address = input.physicalAddress?.trim();
+  const footer = address && !template.includes(address) ? `${template}\n${address}` : template;
+  const url = escapeHtml(input.unsubscribeUrl);
+  const html = footer
+    .split(UNSUBSCRIBE_TOKEN)
+    .map(escapeHtml)
+    .join(`<a href="${url}">${url}</a>`)
+    .replace(/\r?\n/g, "<br>");
 
-  const footer = input.footer.replaceAll("{{unsubscribeUrl}}", input.unsubscribeUrl);
   return {
     subject: input.rendered.subject,
-    htmlBody: `${input.rendered.htmlBody}<p>${escapeHtml(footer).replaceAll(
-      input.unsubscribeUrl,
-      `<a href="${input.unsubscribeUrl}">${input.unsubscribeUrl}</a>`
-    )}</p>`,
-    textBody: `${input.rendered.textBody}\n\n${footer}`,
+    htmlBody: `${input.rendered.htmlBody}<p>${html}</p>`,
+    textBody: `${input.rendered.textBody}\n\n${footer.replaceAll(UNSUBSCRIBE_TOKEN, input.unsubscribeUrl)}`,
   };
 }
 

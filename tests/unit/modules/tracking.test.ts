@@ -30,6 +30,27 @@ describe("tracking module", () => {
     });
   });
 
+  test("never routes an opt-out through the click tracker", async () => {
+    const unsubscribe = "https://app.example.com/api/unsubscribe?contactId=c&amp;c=d&amp;t=e";
+    const result = await applyTracking({
+      rendered: {
+        subject: "Hi",
+        htmlBody: `<a href="https://example.com">Read</a><a href="${unsubscribe}">Leave</a>`,
+        textBody: "Read",
+      },
+      appUrl: "https://app.example.com",
+      clickTrackingEnabled: true,
+      context: { orgId: "org_1", campaignId: "campaign_1" },
+      events: {
+        record: async () => ({ accepted: true }),
+        createTrackedLink: async (input) => input,
+      },
+    });
+
+    expect(result.htmlBody).toContain(`href="${unsubscribe}"`);
+    expect(result.htmlBody).not.toContain('href="https://example.com"');
+  });
+
   test("rewrites safe links and appends pixel only when enabled", async () => {
     const links: unknown[] = [];
     const result = await applyTracking({

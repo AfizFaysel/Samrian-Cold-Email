@@ -179,7 +179,7 @@ describe("campaign launch module", () => {
     });
   });
 
-  test("does not require compliance identity when List-Unsubscribe is disabled", async () => {
+  test("requires a physical address even when List-Unsubscribe is disabled", async () => {
     const deps = createDeps({
       compliance: {
         listUnsubscribeEnabled: false,
@@ -188,10 +188,10 @@ describe("campaign launch module", () => {
 
     await expect(
       launchCampaign({ campaignId: "campaign_1", orgId: "org_1", mailboxIds: ["mailbox_1"] }, deps)
-    ).resolves.toMatchObject({ status: "launched" });
+    ).rejects.toMatchObject({ issues: ["Physical mailing address is required"] });
   });
 
-  test("requires compliance identity when List-Unsubscribe is enabled", async () => {
+  test("requires a usable opt-out and address when List-Unsubscribe is enabled", async () => {
     const deps = createDeps({
       compliance: {
         listUnsubscribeEnabled: true,
@@ -204,8 +204,8 @@ describe("campaign launch module", () => {
       launchCampaign({ campaignId: "campaign_1", orgId: "org_1", mailboxIds: ["mailbox_1"] }, deps)
     ).rejects.toMatchObject({
       issues: [
-        "Physical mailing address is required when List-Unsubscribe is enabled",
-        "Unsubscribe footer must include {{unsubscribeUrl}} when List-Unsubscribe is enabled",
+        "Physical mailing address is required",
+        "Unsubscribe footer must include {{unsubscribeUrl}}",
       ],
     });
   });
@@ -313,7 +313,7 @@ function createDeps(input?: {
     },
     compliance: {
       async getSettings() {
-        return input?.compliance ?? { listUnsubscribeEnabled: false };
+        return input?.compliance ?? { physicalAddress: "1 Main St" };
       },
     },
   };

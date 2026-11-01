@@ -113,8 +113,19 @@ describe.skipIf(!adminUrl || !workerUrl)("sending on the worker database role", 
       generateUnsubscribeToken: async () => "token",
       appUrl: "http://app.test",
       now: overrides.now ?? Date.now,
+      getComplianceSettings: async () => ({ physicalAddress: "1 Main St" }),
     };
   }
+
+  test("refuses to build an unsubscribe link for localhost in production", async () => {
+    const { payload } = await seed();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
+
+    await expect(async () => createWorkerDeps().sendCampaign(payload)).rejects.toThrow(
+      "NEXT_PUBLIC_APP_URL is required"
+    );
+  });
 
   const delivered = () => vi.fn(async () => ({ messageId: `<${crypto.randomUUID()}@test>` }));
   const assignment = async () => {

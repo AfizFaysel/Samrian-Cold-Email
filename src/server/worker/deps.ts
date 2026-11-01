@@ -40,7 +40,7 @@ export function createWorkerDeps(queue?: JobQueue) {
         transaction,
         connectorForMailbox,
         generateUnsubscribeToken: async (input) => createUnsubscribeToken(input),
-        appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        appUrl: publicAppUrl(),
         now: Date.now,
         getComplianceSettings: ({ orgId }) =>
           withTenant(db, { orgId, actorType: "worker" }, (tx) =>
@@ -171,4 +171,14 @@ async function listActiveMailboxes(db: ReturnType<typeof getWorkerDb>) {
   return withTenant(db, { orgId: "system", actorType: "system" }, (tx) =>
     createPostgresJobRepos(tx).mailboxes.listActive()
   );
+}
+
+// Unsubscribe links are built from this, so a wrong origin would send a dead opt-out.
+function publicAppUrl() {
+  const url = process.env.NEXT_PUBLIC_APP_URL;
+  if (url) return url;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("NEXT_PUBLIC_APP_URL is required to send campaign email");
+  }
+  return "http://localhost:3000";
 }
