@@ -1,4 +1,14 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 export const users = pgTable(
   "users",
@@ -17,7 +27,10 @@ export const users = pgTable(
     phoneNumber: text("phone_number"),
     phoneNumberVerified: boolean("phone_number_verified"),
   },
-  (table) => [index("users_email_idx").on(table.email)]
+  (table) => [
+    index("users_email_idx").on(table.email),
+    uniqueIndex("users_email_lower_uq").on(sql`lower(${table.email})`),
+  ]
 );
 
 export const sessions = pgTable(
@@ -34,7 +47,7 @@ export const sessions = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index("sessions_token_idx").on(table.token),
+    uniqueIndex("sessions_token_uq").on(table.token),
     index("sessions_user_id_idx").on(table.userId),
   ]
 );
@@ -57,7 +70,7 @@ export const accounts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index("accounts_account_provider_idx").on(table.accountId, table.providerId),
+    uniqueIndex("accounts_account_provider_uq").on(table.accountId, table.providerId),
     index("accounts_user_id_idx").on(table.userId),
   ]
 );

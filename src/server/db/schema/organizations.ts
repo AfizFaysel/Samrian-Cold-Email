@@ -10,7 +10,7 @@ export const organizations = pgTable(
     metadata: jsonb("metadata"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("organizations_slug_idx").on(table.slug)]
+  (table) => [uniqueIndex("organizations_slug_uq").on(table.slug)]
 );
 
 export const members = pgTable(
@@ -25,7 +25,7 @@ export const members = pgTable(
   (table) => [
     index("members_organization_id_idx").on(table.organizationId),
     index("members_user_id_idx").on(table.userId),
-    index("members_org_user_idx").on(table.organizationId, table.userId),
+    uniqueIndex("members_org_user_uq").on(table.organizationId, table.userId),
   ]
 );
 
