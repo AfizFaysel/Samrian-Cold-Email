@@ -1,7 +1,57 @@
 import { describe, expect, test } from "vitest";
 
-import { classifyBounce, parseBounce } from "../../../src/server/modules/bounces";
+import {
+  bounceNamesRecipient,
+  classifyBounce,
+  parseBounce,
+} from "../../../src/server/modules/bounces";
 import type { RawMessage } from "../../../src/server/jobs/types";
+
+describe("bounce recipient", () => {
+  const dsn = (input: Partial<RawMessage>): RawMessage => ({
+    messageId: "dsn_1",
+    from: "mailer-daemon@example.com",
+    to: ["sender@example.com"],
+    subject: "Undeliverable",
+    headers: {},
+    receivedAt: 1,
+    ...input,
+  });
+
+  test("matches a structured recipient", () => {
+    const message = dsn({ textBody: "Final-Recipient: rfc822; Lead@Example.com\nStatus: 5.1.1" });
+
+    expect(bounceNamesRecipient(message, "lead@example.com")).toBe(true);
+    expect(bounceNamesRecipient(message, "other@example.com")).toBe(false);
+  });
+
+  test("a structured recipient outranks an address merely mentioned", () => {
+    const message = dsn({
+      textBody: "Final-Recipient: rfc822; other@example.com\nReported to lead@example.com",
+    });
+
+    expect(bounceNamesRecipient(message, "lead@example.com")).toBe(false);
+  });
+
+  test("reads the failed-recipients header", () => {
+    const message = dsn({ headers: { "x-failed-recipients": "a@example.com, lead@example.com" } });
+
+    expect(bounceNamesRecipient(message, "lead@example.com")).toBe(true);
+  });
+
+  test("accepts a plain bounce that names the address", () => {
+    const message = dsn({ textBody: "<lead@example.com>: mailbox unavailable" });
+
+    expect(bounceNamesRecipient(message, "lead@example.com")).toBe(true);
+    expect(bounceNamesRecipient(message, "other@example.com")).toBe(false);
+  });
+
+  test("prefers the reported status over other numbers", () => {
+    const message = dsn({ textBody: "Build 4.3.2 relayed this\nStatus: 5.1.1" });
+
+    expect(parseBounce(message).dsnCode).toBe("5.1.1");
+  });
+});
 
 describe("bounce parsing", () => {
   test("classifies 5.x.x DSN as hard bounce", () => {

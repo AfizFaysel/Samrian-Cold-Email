@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { threadDirections } from "./constants";
@@ -46,6 +47,12 @@ export const threads = pgTable(
     index("threads_org_message_id_idx").on(table.orgId, table.messageId),
     uniqueIndex("threads_org_client_request_idx").on(table.orgId, table.clientRequestId),
     index("threads_org_provider_thread_idx").on(table.orgId, table.providerThreadId),
+    uniqueIndex("threads_org_received_message_idx")
+      .on(table.orgId, table.messageId)
+      .where(sql`${table.direction} = 'received'`),
+    index("threads_sent_lookup_idx")
+      .on(table.orgId, table.mailboxId, sql`lower(btrim(${table.messageId}, '<> '))`)
+      .where(sql`${table.direction} = 'sent'`),
     ...tenantPolicies("threads"),
   ]
 );

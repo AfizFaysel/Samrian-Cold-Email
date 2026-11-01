@@ -34,6 +34,7 @@ describe("poll jobs", () => {
           orgId: "org_1",
           messageId: "sent_1",
           direction: "sent",
+          to: ["ada@example.com"],
           campaignId: "campaign_1",
           contactId: "contact_1",
           mailboxId: "mailbox_1",
@@ -180,8 +181,139 @@ describe("poll jobs", () => {
     expect(acked).toEqual(["reply_1"]);
   });
 
+  describe("who can change a contact", () => {
+    const message = (input: Partial<RawMessage>): RawMessage => ({
+      messageId: "inbound_1",
+      inReplyTo: "sent_1",
+      from: "ada@example.com",
+      to: ["sender@example.com"],
+      subject: "Re: Hi",
+      headers: {},
+      receivedAt: 123,
+      ...input,
+    });
+
+    function seeded() {
+      const repos = basePollRepos();
+      repos.contacts.data.push({
+        id: "contact_1",
+        orgId: "org_1",
+        email: "ada@example.com",
+        customVars: {},
+      });
+      repos.campaigns.data.push({ id: "campaign_1", orgId: "org_1", name: "C", steps: [] });
+      return repos;
+    }
+
+    test("a stranger quoting the message id cannot unsubscribe the contact", async () => {
+      const repos = seeded();
+      const acked: string[] = [];
+
+      await expect(
+        pollMailbox(
+          { mailboxId: "mailbox_1", orgId: "org_1" },
+          deps(repos, acked, [
+            message({ from: "attacker@evil.example", textBody: "Please unsubscribe me" }),
+          ])
+        )
+      ).resolves.toMatchObject({ review: 1 });
+
+      expect(repos.blocklist.data).toEqual([]);
+      expect(repos.assignments.data[0].status).toBe("active");
+      expect(repos.threads.data.find((item) => item.messageId === "inbound_1")).toMatchObject({
+        classification: "review",
+      });
+      expect(repos.events.data).toEqual([]);
+      expect(acked).toEqual(["inbound_1"]);
+    });
+
+    test("a stranger's reply is kept for review and leaves the sequence running", async () => {
+      const repos = seeded();
+
+      await pollMailbox(
+        { mailboxId: "mailbox_1", orgId: "org_1" },
+        deps(repos, [], [message({ from: "colleague@example.org", textBody: "Thanks" })])
+      );
+
+      expect(repos.assignments.data[0].status).toBe("active");
+      expect(repos.threads.data.find((item) => item.messageId === "inbound_1")).toMatchObject({
+        classification: "review",
+      });
+    });
+
+    test("a display name and different case still count as the contact", async () => {
+      const repos = seeded();
+
+      await pollMailbox(
+        { mailboxId: "mailbox_1", orgId: "org_1" },
+        deps(repos, [], [message({ from: "Ada <ADA@example.com>", textBody: "Remove me" })])
+      );
+
+      expect(repos.assignments.data[0].status).toBe("unsubscribed");
+    });
+
+    test("a delivery report for someone else cannot hard-bounce the contact", async () => {
+      const repos = seeded();
+
+      await pollMailbox(
+        { mailboxId: "mailbox_1", orgId: "org_1" },
+        deps(
+          repos,
+          [],
+          [
+            message({
+              from: "mailer-daemon@evil.example",
+              textBody: "Final-Recipient: rfc822; other@example.com\nStatus: 5.1.1",
+              headers: { "content-type": "multipart/report; report-type=delivery-status" },
+            }),
+          ]
+        )
+      );
+
+      expect(repos.contacts.data[0].bounceStatus).toBeUndefined();
+      expect(repos.blocklist.data).toEqual([]);
+      expect(repos.assignments.data[0].status).toBe("active");
+      expect(repos.threads.data.find((item) => item.messageId === "inbound_1")).toMatchObject({
+        classification: "review",
+      });
+    });
+
+    test("a message citing another mailbox's send is not matched", async () => {
+      const repos = seeded();
+      repos.threads.data[0].mailboxId = "mailbox_2";
+
+      await expect(
+        pollMailbox(
+          { mailboxId: "mailbox_1", orgId: "org_1" },
+          deps(repos, [], [message({ textBody: "Please unsubscribe me" })])
+        )
+      ).resolves.toMatchObject({ ignored: 1, matched: 0 });
+
+      expect(repos.blocklist.data).toEqual([]);
+    });
+
+    test("a message another poll already stored causes no side effects", async () => {
+      const repos = seeded();
+      const insertReceived = repos.threads.insertReceived;
+      repos.threads.getByMessageId = async () => null;
+      repos.threads.insertReceived = async (input) => ({
+        ...(await insertReceived(input)),
+        created: false,
+      });
+
+      await pollMailbox(
+        { mailboxId: "mailbox_1", orgId: "org_1" },
+        deps(repos, [], [message({ textBody: "Please remove me" })])
+      );
+
+      expect(repos.blocklist.data).toEqual([]);
+      expect(repos.events.data).toEqual([]);
+    });
+  });
+
   test("classifies DSN as hard bounce and suppresses contact", async () => {
     const repos = basePollRepos();
+    repos.threads.data[0].to = ["bad@example.com"];
     repos.contacts.data.push({
       id: "contact_1",
       orgId: "org_1",
@@ -230,6 +362,7 @@ describe("poll jobs", () => {
 
   test("soft bounce does not add blocklist entry", async () => {
     const repos = basePollRepos();
+    repos.threads.data[0].to = ["soft@example.com"];
     repos.contacts.data.push({
       id: "contact_1",
       orgId: "org_1",
@@ -359,7 +492,35 @@ describe("poll jobs", () => {
     expect(acked).toEqual([]);
   });
 
-  test("acks and ignores rejected oversized inbound messages without storing them", async () => {
+  test("stores an oversized reply so its sender is not lost", async () => {
+    const repos = basePollRepos();
+
+    await expect(
+      pollMailbox(
+        { mailboxId: "mailbox_1", orgId: "org_1" },
+        deps(
+          repos,
+          [],
+          [
+            {
+              messageId: "oversized_1",
+              inReplyTo: "sent_1",
+              from: "ada@example.com",
+              to: ["sender@example.com"],
+              subject: "Re: Hi",
+              textBody: "x".repeat(256 * 1024 + 1),
+              headers: {},
+              receivedAt: 123,
+            },
+          ]
+        )
+      )
+    ).resolves.toMatchObject({ matched: 1 });
+
+    expect(repos.threads.data.some((thread) => thread.messageId === "oversized_1")).toBe(true);
+  });
+
+  test("acks and ignores malformed inbound messages without storing them", async () => {
     const repos = basePollRepos();
     const acked: string[] = [];
 
@@ -368,12 +529,12 @@ describe("poll jobs", () => {
         { mailboxId: "mailbox_1", orgId: "org_1" },
         deps(repos, acked, [
           {
-            messageId: "oversized_1",
+            messageId: "malformed_1",
             inReplyTo: "sent_1",
             from: "ada@example.com",
             to: ["sender@example.com"],
-            subject: "Re: Hi",
-            textBody: "x".repeat(256 * 1024 + 1),
+            subject: "x".repeat(999),
+            textBody: "Reply",
             headers: {},
             receivedAt: 123,
           },
@@ -381,8 +542,8 @@ describe("poll jobs", () => {
       )
     ).resolves.toMatchObject({ matched: 0, ignored: 1 });
 
-    expect(acked).toEqual(["oversized_1"]);
-    expect(repos.threads.data.some((thread) => thread.messageId === "oversized_1")).toBe(false);
+    expect(acked).toEqual(["malformed_1"]);
+    expect(repos.threads.data.some((thread) => thread.messageId === "malformed_1")).toBe(false);
   });
 
   test("stores normalized envelope text for valid inbound messages", async () => {
@@ -426,6 +587,7 @@ function basePollRepos() {
         orgId: "org_1",
         messageId: "sent_1",
         direction: "sent",
+        to: ["ada@example.com"],
         campaignId: "campaign_1",
         contactId: "contact_1",
         mailboxId: "mailbox_1",

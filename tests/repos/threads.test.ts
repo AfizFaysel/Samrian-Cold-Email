@@ -62,6 +62,7 @@ describe.skipIf(!testUrl)("postgres thread repo", () => {
     await expect(
       repo.findSentForInbound({
         orgId: "org_threads",
+        mailboxId: "mailbox_1",
         messageIds: ["missing", "sent_1"],
         providerThreadId: undefined,
       })
@@ -70,10 +71,76 @@ describe.skipIf(!testUrl)("postgres thread repo", () => {
     await expect(
       repo.findSentForInbound({
         orgId: "org_threads",
+        mailboxId: "mailbox_1",
         messageIds: [],
         providerThreadId: "provider_thread_1",
       })
     ).resolves.toMatchObject({ messageId: "sent_1" });
+  });
+
+  test("matches message ids however they were stored, within one mailbox", async () => {
+    await repo.insert({
+      orgId: "org_threads",
+      mailboxId: "mailbox_1",
+      messageId: "<Sent_2@Example.com>",
+      direction: "sent",
+      subject: "Hi",
+      sentAt: 100,
+    });
+
+    const find = (mailboxId: string) =>
+      repo.findSentForInbound({
+        orgId: "org_threads",
+        mailboxId,
+        messageIds: ["sent_2@example.com"],
+      });
+
+    await expect(find("mailbox_1")).resolves.toMatchObject({
+      messageId: "<Sent_2@Example.com>",
+    });
+    await expect(find("mailbox_2")).resolves.toBeNull();
+    await expect(
+      repo.findSentForInbound({ orgId: "org_threads", mailboxId: "mailbox_1", messageIds: [] })
+    ).resolves.toBeNull();
+  });
+
+  const received = (messageId: string, receivedAt: number) => ({
+    orgId: "org_threads",
+    mailboxId: "mailbox_1",
+    messageId,
+    direction: "received" as const,
+    from: "lead@example.com",
+    subject: "Re: Hi",
+    receivedAt,
+  });
+
+  test("stores a received message once however many polls race", async () => {
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => repo.insertReceived(received("reply_race", 100)))
+    );
+
+    expect(results.filter((result) => result.created)).toHaveLength(1);
+    expect(new Set(results.map((result) => result.id)).size).toBe(1);
+  });
+
+  test("lists the newest replies when there are more than the limit", async () => {
+    for (let index = 1; index <= 5; index += 1) {
+      await repo.insertReceived(received(`reply_${index}`, index * 1000));
+    }
+
+    const page = await repo.listInbox({ orgId: "org_threads", userId: "user_1", limit: 2 });
+
+    expect(page.map((thread) => thread.messageId)).toEqual(["reply_5", "reply_4"]);
+  });
+
+  test("counts unread replies beyond any page", async () => {
+    for (let index = 1; index <= 3; index += 1) {
+      await repo.insertReceived(received(`reply_${index}`, index));
+    }
+
+    await expect(repo.countUnreadInbox({ orgId: "org_threads", userId: "user_1" })).resolves.toBe(
+      3
+    );
   });
 
   test("preserves address fields and lists conversation oldest first", async () => {

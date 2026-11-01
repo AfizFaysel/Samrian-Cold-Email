@@ -15,6 +15,7 @@ describe("job notification writes", () => {
           orgId: "org_1",
           messageId: "sent_1",
           direction: "sent",
+          to: ["ada@example.com"],
           campaignId: "campaign_1",
           contactId: "contact_1",
           mailboxId: "mailbox_1",

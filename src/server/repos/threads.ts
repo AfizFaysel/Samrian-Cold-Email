@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, notExists, or, sql } from "drizzle-orm";
 
 import { threadReads, threads } from "../db/schema";
 import { normalizeMessageId } from "../modules/inbound";
@@ -69,10 +69,10 @@ export class PostgresThreadRepo {
       .select()
       .from(threads)
       .where(and(eq(threads.orgId, input.orgId), eq(threads.direction, "received")))
-      .orderBy(asc(threads.createdAt))
+      .orderBy(desc(sql`coalesce(${threads.receivedAt}, ${threads.createdAt})`), desc(threads.id))
       .limit(input.limit);
 
-    const records = rows.map(toThread).sort((a, b) => threadTime(b) - threadTime(a));
+    const records = rows.map(toThread);
     const readIds = await this.getReadIds(
       input.orgId,
       input.userId,
@@ -82,18 +82,28 @@ export class PostgresThreadRepo {
   }
 
   async countUnreadInbox(input: { orgId: OrgId; userId: string }): Promise<number> {
-    const inbound = await this.db
-      .select({ id: threads.id })
+    const [row] = await this.db
+      .select({ value: count() })
       .from(threads)
-      .where(and(eq(threads.orgId, input.orgId), eq(threads.direction, "received")));
-    if (inbound.length === 0) return 0;
-
-    const readIds = await this.getReadIds(
-      input.orgId,
-      input.userId,
-      inbound.map((row) => row.id)
-    );
-    return inbound.filter((row) => !readIds.has(row.id)).length;
+      .where(
+        and(
+          eq(threads.orgId, input.orgId),
+          eq(threads.direction, "received"),
+          notExists(
+            this.db
+              .select({ id: threadReads.id })
+              .from(threadReads)
+              .where(
+                and(
+                  eq(threadReads.orgId, threads.orgId),
+                  eq(threadReads.userId, input.userId),
+                  eq(threadReads.threadId, threads.id)
+                )
+              )
+          )
+        )
+      );
+    return row?.value ?? 0;
   }
 
   private async getReadIds(
@@ -147,22 +157,55 @@ export class PostgresThreadRepo {
 
   async findSentForInbound(input: {
     orgId: OrgId;
+    mailboxId: string;
     messageIds: string[];
     providerThreadId?: string;
   }): Promise<ThreadRecord | null> {
-    const rows = await this.db
+    const ids = [...new Set(input.messageIds.map(normalizeMessageId).filter(Boolean))];
+    const matches = [
+      ...(ids.length > 0 ? [inArray(sql`lower(btrim(${threads.messageId}, '<> '))`, ids)] : []),
+      ...(input.providerThreadId ? [eq(threads.providerThreadId, input.providerThreadId)] : []),
+    ];
+    if (matches.length === 0) return null;
+
+    const [row] = await this.db
       .select()
       .from(threads)
-      .where(and(eq(threads.orgId, input.orgId), eq(threads.direction, "sent")));
-    const ids = new Set(input.messageIds.map(normalizeMessageId).filter(Boolean));
-
-    const row = rows.find(
-      (item) =>
-        (ids.size > 0 && ids.has(normalizeMessageId(item.messageId))) ||
-        Boolean(input.providerThreadId && item.providerThreadId === input.providerThreadId)
-    );
+      .where(
+        and(
+          eq(threads.orgId, input.orgId),
+          eq(threads.mailboxId, input.mailboxId),
+          eq(threads.direction, "sent"),
+          or(...matches)
+        )
+      )
+      .orderBy(desc(threads.sentAt), desc(threads.id))
+      .limit(1);
 
     return row ? toThread(row) : null;
+  }
+
+  // The unique index decides between concurrent polls, so only one runs the side effects.
+  async insertReceived(input: InsertThreadInput): Promise<ThreadRecord & { created: boolean }> {
+    const [row] = await this.db
+      .insert(threads)
+      .values(toRow({ ...input, direction: "received" }))
+      .onConflictDoNothing()
+      .returning();
+    if (row) return { ...toThread(row), created: true };
+
+    const [existing] = await this.db
+      .select()
+      .from(threads)
+      .where(
+        and(
+          eq(threads.orgId, input.orgId),
+          eq(threads.messageId, input.messageId ?? ""),
+          eq(threads.direction, "received")
+        )
+      )
+      .limit(1);
+    return { ...toThread(existing), created: false };
   }
 
   async insert(input: InsertThreadInput): Promise<ThreadRecord> {
@@ -171,39 +214,40 @@ export class PostgresThreadRepo {
       if (existing) return existing;
     }
 
-    const [row] = await this.db
-      .insert(threads)
-      .values({
-        id: newId("thread"),
-        orgId: input.orgId,
-        campaignId: input.campaignId ?? "",
-        contactId: input.contactId ?? "",
-        mailboxId: input.mailboxId ?? "",
-        messageId: input.messageId ?? newId("message"),
-        providerMessageId: input.providerMessageId,
-        clientRequestId: input.clientRequestId,
-        inReplyTo: input.inReplyTo,
-        references: input.references,
-        providerThreadId: input.providerThreadId,
-        classification: input.classification,
-        processedAt: input.processedAt ? new Date(input.processedAt) : undefined,
-        rawHeaders: input.rawHeaders,
-        direction: input.direction ?? "sent",
-        from: input.from ?? "",
-        to: input.to ?? [],
-        subject: input.subject,
-        textBody: input.textBody,
-        htmlBody: input.htmlBody,
-        headers: input.headers ?? {},
-        attachments: input.attachments,
-        providerUrl: input.providerUrl,
-        sentAt: input.sentAt ? new Date(input.sentAt) : undefined,
-        receivedAt: input.receivedAt ? new Date(input.receivedAt) : undefined,
-      })
-      .returning();
+    const [row] = await this.db.insert(threads).values(toRow(input)).returning();
 
     return toThread(row);
   }
+}
+
+function toRow(input: InsertThreadInput) {
+  return {
+    id: newId("thread"),
+    orgId: input.orgId,
+    campaignId: input.campaignId ?? "",
+    contactId: input.contactId ?? "",
+    mailboxId: input.mailboxId ?? "",
+    messageId: input.messageId ?? newId("message"),
+    providerMessageId: input.providerMessageId,
+    clientRequestId: input.clientRequestId,
+    inReplyTo: input.inReplyTo,
+    references: input.references,
+    providerThreadId: input.providerThreadId,
+    classification: input.classification,
+    processedAt: input.processedAt ? new Date(input.processedAt) : undefined,
+    rawHeaders: input.rawHeaders,
+    direction: input.direction ?? "sent",
+    from: input.from ?? "",
+    to: input.to ?? [],
+    subject: input.subject,
+    textBody: input.textBody,
+    htmlBody: input.htmlBody,
+    headers: input.headers ?? {},
+    attachments: input.attachments,
+    providerUrl: input.providerUrl,
+    sentAt: input.sentAt ? new Date(input.sentAt) : undefined,
+    receivedAt: input.receivedAt ? new Date(input.receivedAt) : undefined,
+  };
 }
 
 function toThread(row: typeof threads.$inferSelect): ThreadRecord {

@@ -315,9 +315,11 @@ export interface ThreadRepo {
   markRead(input: { orgId: OrgId; userId: UserId; threadId: ThreadId; at?: number }): Promise<void>;
   findSentForInbound(input: {
     orgId: OrgId;
+    mailboxId: MailboxId;
     messageIds: string[];
     providerThreadId?: string;
   }): Promise<ThreadRecord | null>;
+  insertReceived(input: InsertThreadInput): Promise<ThreadRecord & { created: boolean }>;
   insert(input: InsertThreadInput): Promise<ThreadRecord>;
 }
 

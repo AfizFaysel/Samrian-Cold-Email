@@ -205,14 +205,25 @@ export class FakeRepos {
         threads.filter((thread) => thread.orgId === orgId && thread.direction === "received")
           .length,
       markRead: async () => {},
-      findSentForInbound: async ({ orgId, messageIds, providerThreadId }) =>
+      findSentForInbound: async ({ orgId, mailboxId, messageIds, providerThreadId }) =>
         threads.find(
           (thread) =>
             thread.orgId === orgId &&
+            thread.mailboxId === mailboxId &&
             thread.direction === "sent" &&
             ((thread.messageId && messageIds.includes(normalizeMessageId(thread.messageId))) ||
               Boolean(providerThreadId && thread.providerThreadId === providerThreadId))
         ) ?? null,
+      insertReceived: async (input) => {
+        const existing = threads.find(
+          (item) =>
+            item.messageId === input.messageId &&
+            item.orgId === input.orgId &&
+            item.direction === "received"
+        );
+        if (existing) return { ...existing, created: false };
+        return { ...(await this.threads.insert(input)), created: true };
+      },
       insert: async (input) => {
         const existing =
           input.messageId &&
@@ -272,7 +283,9 @@ export class FakeNotificationRepo implements NotificationRepo {
   async listLatest(input: ListNotificationsInput): Promise<NotificationRecord[]> {
     return this.data
       .filter(
-        (item) => item.orgId === input.orgId && (!input.userId || item.userId === input.userId)
+        (item) =>
+          item.orgId === input.orgId &&
+          (!input.userId || !item.userId || item.userId === input.userId)
       )
       .slice(0, input.limit);
   }
@@ -282,7 +295,7 @@ export class FakeNotificationRepo implements NotificationRepo {
       (item) =>
         item.orgId === input.orgId &&
         !item.readAt &&
-        (!input.userId || item.userId === input.userId)
+        (!input.userId || !item.userId || item.userId === input.userId)
     ).length;
   }
 
@@ -297,7 +310,7 @@ export class FakeNotificationRepo implements NotificationRepo {
       if (
         notification.orgId === input.orgId &&
         !notification.readAt &&
-        (!input.userId || notification.userId === input.userId)
+        (!input.userId || !notification.userId || notification.userId === input.userId)
       ) {
         notification.readAt = at.getTime();
         count += 1;

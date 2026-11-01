@@ -6,10 +6,13 @@ import type {
   PollDispatchDeps,
   RawMessage,
 } from "./types";
-import { parseBounce } from "../modules/bounces";
+import { bounceNamesRecipient, parseBounce } from "../modules/bounces";
+import { parseEmailSender } from "../modules/email-display";
 import { autoReplyEvent, recordEvent, replyEvent, unsubscribeEvent } from "../modules/events";
-import { classifyInbound, normalizeInboundMessage } from "../modules/inbound";
+import { classifyInbound, normalizeInboundMessage, type InboundKind } from "../modules/inbound";
 import { notifyReply } from "../modules/notifications";
+import { logger } from "../observability/runtime";
+import type { ThreadRecord } from "../ports";
 import { processBounce } from "./bounce";
 
 export async function dispatchMailboxPolls(deps: PollDispatchDeps) {
@@ -48,6 +51,7 @@ export async function pollMailbox(
     let bounced = 0;
     let unsubscribed = 0;
     let autoReplies = 0;
+    let review = 0;
 
     for (const message of messages) {
       const outcome = await run((repos) => processMessage(payload, message, repos, deps.now));
@@ -56,6 +60,7 @@ export async function pollMailbox(
       else if (outcome.kind === "bounce") bounced += 1;
       else if (outcome.kind === "unsubscribe") unsubscribed += 1;
       else if (outcome.kind === "auto-reply") autoReplies += 1;
+      else if (outcome.kind === "review") review += 1;
       else ignored += 1;
     }
 
@@ -71,6 +76,7 @@ export async function pollMailbox(
       bounced,
       unsubscribed,
       autoReplies,
+      review,
     });
   } finally {
     await connector.close();
@@ -82,9 +88,16 @@ async function processMessage(
   rawMessage: RawMessage,
   repos: JobRepos,
   now: () => number
-): Promise<{ kind: "reply" | "bounce" | "unsubscribe" | "auto-reply" | "ignored"; ack: boolean }> {
+): Promise<{ kind: InboundKind | "review"; ack: boolean }> {
   const normalized = normalizeInboundMessage(rawMessage);
-  if (!normalized.ok) return { kind: "ignored", ack: true };
+  if (!normalized.ok) {
+    logger.warn("inbound.rejected", {
+      orgId: payload.orgId,
+      mailboxId: payload.mailboxId,
+      reason: normalized.reason,
+    });
+    return { kind: "ignored", ack: true };
+  }
   const message = normalized.message;
 
   const existing = await repos.threads.getByMessageId(message.messageId, payload.orgId);
@@ -95,12 +108,14 @@ async function processMessage(
 
   const sentThread = await repos.threads.findSentForInbound({
     orgId: payload.orgId,
+    mailboxId: payload.mailboxId,
     messageIds: classification.matchMessageIds,
     providerThreadId: classification.providerThreadId,
   });
   if (!sentThread || sentThread.direction !== "sent") return { kind: "ignored", ack: false };
 
-  const receivedThread = await repos.threads.insert({
+  const kind = confirmedKind(classification.kind, message, sentThread);
+  const receivedThread = await repos.threads.insertReceived({
     orgId: payload.orgId,
     campaignId: sentThread.campaignId,
     contactId: sentThread.contactId,
@@ -110,7 +125,7 @@ async function processMessage(
     inReplyTo: message.inReplyTo,
     references: message.references,
     providerThreadId: message.threadId,
-    classification: classification.kind,
+    classification: kind,
     processedAt: now(),
     rawHeaders: message.headers,
     direction: "received",
@@ -125,7 +140,9 @@ async function processMessage(
     receivedAt: message.receivedAt,
   });
 
-  if (classification.kind === "reply") {
+  if (!receivedThread.created) return { kind: "ignored", ack: true };
+
+  if (kind === "reply" || kind === "review") {
     await notifyReply(repos.notifications, {
       orgId: payload.orgId,
       threadId: receivedThread.id,
@@ -134,6 +151,9 @@ async function processMessage(
       from: message.from,
       subject: message.subject,
     });
+  }
+
+  if (kind === "reply") {
     await updateMatchedAssignment(repos, sentThread, payload.orgId, "replied");
     await recordEvent(
       replyEvent({
@@ -147,7 +167,7 @@ async function processMessage(
       }),
       { events: repos.events }
     );
-  } else if (classification.kind === "unsubscribe") {
+  } else if (kind === "unsubscribe") {
     const contact = sentThread.contactId
       ? await repos.contacts.getById(sentThread.contactId, payload.orgId)
       : null;
@@ -169,7 +189,7 @@ async function processMessage(
       }),
       { events: repos.events }
     );
-  } else if (classification.kind === "bounce" && sentThread.campaignId && sentThread.contactId) {
+  } else if (kind === "bounce" && sentThread.campaignId && sentThread.contactId) {
     const parsed = parseBounce(message);
     await processBounce(
       {
@@ -183,7 +203,7 @@ async function processMessage(
       },
       { repos, bounceRateThreshold: 0.05 }
     );
-  } else if (classification.kind === "auto-reply") {
+  } else if (kind === "auto-reply") {
     await recordEvent(
       autoReplyEvent({
         orgId: payload.orgId,
@@ -198,7 +218,23 @@ async function processMessage(
     );
   }
 
-  return { kind: classification.kind, ack: true };
+  return { kind, ack: true };
+}
+
+// Anyone who has seen a message ID can cite it, so only the recipient of that send, or a delivery
+// report naming them, may change their state. DSNs are unsigned, so this narrows forgery only.
+function confirmedKind(kind: InboundKind, message: RawMessage, sent: ThreadRecord) {
+  if (kind === "auto-reply") return kind;
+
+  const recipients = (sent.to ?? []).map((address) => address.trim().toLowerCase());
+  if (kind === "bounce") {
+    return recipients.some((address) => bounceNamesRecipient(message, address)) ? kind : "review";
+  }
+
+  const sender = parseEmailSender(message.from);
+  return sender.address && !sender.suspicious && recipients.includes(sender.address)
+    ? kind
+    : "review";
 }
 
 async function updateMatchedAssignment(
@@ -227,6 +263,7 @@ function withOptionalCounts(input: {
   bounced: number;
   unsubscribed: number;
   autoReplies: number;
+  review: number;
 }) {
   return {
     status: input.status,
@@ -236,5 +273,6 @@ function withOptionalCounts(input: {
     ...(input.bounced > 0 ? { bounced: input.bounced } : {}),
     ...(input.unsubscribed > 0 ? { unsubscribed: input.unsubscribed } : {}),
     ...(input.autoReplies > 0 ? { autoReplies: input.autoReplies } : {}),
+    ...(input.review > 0 ? { review: input.review } : {}),
   };
 }

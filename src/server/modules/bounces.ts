@@ -64,7 +64,9 @@ export function parseBounce(message: RawMessage): BounceParseResult {
     .filter(Boolean)
     .join("\n");
 
-  const dsnCode = rawBody.match(/\b([45]\.\d+\.\d+)\b/)?.[1];
+  const dsnCode =
+    rawBody.match(/^\s*Status:\s*([45]\.\d+\.\d+)/im)?.[1] ??
+    rawBody.match(/\b([45]\.\d+\.\d+)\b/)?.[1];
   const email =
     getHeader(message.headers, "x-failed-recipients") ??
     rawBody.match(/Final-Recipient:\s*rfc822;\s*([^\s;]+)/i)?.[1] ??
@@ -76,6 +78,22 @@ export function parseBounce(message: RawMessage): BounceParseResult {
     email,
     rawBody,
   };
+}
+
+// Structured recipients are authoritative, so a bystander named in the text cannot be bounced.
+export function bounceNamesRecipient(message: RawMessage, recipient: string): boolean {
+  const address = recipient.trim().toLowerCase();
+  const body = [message.textBody, message.htmlBody].filter(Boolean).join("\n").toLowerCase();
+  const declared = [
+    ...(getHeader(message.headers, "x-failed-recipients")?.split(",") ?? []),
+    ...[...body.matchAll(/^\s*(?:final|original)-recipient:\s*rfc822;\s*<?([^\s;>]+)/gm)].map(
+      (match) => match[1]
+    ),
+  ]
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return declared.length > 0 ? declared.includes(address) : body.includes(address);
 }
 
 function getHeader(headers: Record<string, string>, name: string): string | undefined {
