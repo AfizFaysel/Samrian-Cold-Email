@@ -102,7 +102,10 @@ export function createSessionAction<Args extends unknown[], Result>(
         tenant: (operation) => runTenant(db, context, operation),
       },
       ...args
-    );
+    ).catch((error: unknown) => {
+      if (error instanceof AccessError) return accessErrorResponse(error) as Result;
+      throw error;
+    });
     if (result instanceof Response) {
       if (deps.penalizeStatuses?.includes(result.status)) {
         await (deps.limits ?? getLimitGuard()).checkSubject({

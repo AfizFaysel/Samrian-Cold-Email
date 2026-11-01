@@ -1,3 +1,5 @@
+import type { Scope } from "@samrian/contracts";
+
 import type { PermissionRequest } from "./types";
 
 export type SessionOperation =
@@ -77,4 +79,38 @@ export const sessionOperations = {
 
 export function getOperationPermissions(operation: SessionOperation) {
   return operation.access === "permission" ? operation.permissions : undefined;
+}
+
+// What a session must hold to grant each API key scope, so a key never exceeds its creator.
+const scopePermissions: Record<Scope, PermissionRequest> = {
+  "identity:read": {},
+  "contacts:read": { contact: ["read"] },
+  "contacts:write": { contact: ["create", "update", "import"] },
+  "blocklist:read": { blocklist: ["read"] },
+  "blocklist:write": { blocklist: ["create", "delete"] },
+  "groups:read": { group: ["read"] },
+  "groups:write": { group: ["create", "update"] },
+  "campaigns:read": { campaign: ["read"] },
+  "campaigns:write": { campaign: ["create", "update"] },
+  "campaigns:launch": { campaign: ["launch"] },
+  "mailboxes:read": { mailbox: ["read"] },
+  "mailboxes:check": { mailbox: ["update"] },
+  "inbox:read": { inbox: ["read"] },
+  "inbox:reply": { inbox: ["reply"] },
+  "analytics:read": { analytics: ["read"] },
+  "domains:read": { domain: ["read"] },
+  "domains:check": { domain: ["check"] },
+};
+
+export function getScopePermissions(scopes: readonly Scope[]): PermissionRequest {
+  const merged: Record<string, Set<string>> = {};
+  for (const scope of scopes) {
+    for (const [resource, actions] of Object.entries(scopePermissions[scope])) {
+      merged[resource] ??= new Set();
+      for (const action of actions) merged[resource].add(action);
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(merged).map(([resource, actions]) => [resource, [...actions]])
+  );
 }

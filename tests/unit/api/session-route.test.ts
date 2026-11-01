@@ -112,6 +112,27 @@ describe("session route", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  test("session action answers 403 when its handler refuses access", async () => {
+    const action = createSessionAction(
+      sessionOperations.credentialCreate,
+      async () => {
+        throw new AccessError("FORBIDDEN", "Cannot grant requested scopes");
+      },
+      {
+        db: { transaction: vi.fn() } as never,
+        requireAccess: vi.fn(async () => ({ userId: "user_a", orgId: "org_a", role: "member" })),
+        limits: {
+          checkSubject: vi.fn(async () => ({ allowed: true })),
+        } as never,
+      }
+    );
+
+    const response = (await action()) as unknown as Response;
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.not.toContain("scopes");
+  });
+
   test("unexpected authorization failures still surface as errors", async () => {
     const route = createSessionRoute(
       sessionOperations.contactsUpdate,
