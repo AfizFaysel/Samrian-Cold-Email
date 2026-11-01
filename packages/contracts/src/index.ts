@@ -558,12 +558,31 @@ export const contactUpdateSchema = z
 export const groupWriteSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
+    description: z.string().max(500).nullable().optional(),
     rules: z.unknown().default([]),
     logic: z.enum(["AND", "OR"]).default("AND"),
     isDynamic: z.boolean().default(false),
     contactIds: z.array(z.string()).max(10_000).optional(),
   })
   .strict();
+
+export const groupUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    description: z.string().max(500).nullable().optional(),
+    rules: z.unknown().optional(),
+    logic: z.enum(["AND", "OR"]).optional(),
+    isDynamic: z.boolean().optional(),
+    contactIds: z.array(z.string()).max(10_000).optional(),
+  })
+  .strict();
+
+export const campaignStepSchema = z.looseObject({
+  subject: z.string().max(998).optional(),
+  body: z.string().optional(),
+  delayDays: z.number().min(0).optional(),
+  delayHours: z.number().min(0).optional(),
+});
 
 export const campaignDraftSchema = z
   .object({
@@ -577,7 +596,7 @@ export const campaignDraftSchema = z
           ),
         "Invalid timezone"
       ),
-    steps: z.array(z.unknown()).min(1).max(100),
+    steps: z.array(campaignStepSchema).min(1).max(100),
     targetGroupId: z.string().optional(),
     targetContactIds: z.array(z.string()).max(10_000).optional(),
     mailboxIds: z.array(z.string()).max(100).optional(),

@@ -3,6 +3,7 @@ import {
   campaignLaunchSchema,
   contactImportSchema,
   contactUpdateSchema,
+  groupUpdateSchema,
   groupWriteSchema,
   operations,
   type Operation,
@@ -184,10 +185,10 @@ const definitions: ToolSpec[] = [
     name: "group_update",
     title: "Update group",
     operationId: "groups.update",
-    inputSchema: groupWriteSchema.extend({ id: z.string().min(1) }).strict(),
+    inputSchema: groupUpdateSchema.extend({ id: z.string().min(1) }).strict(),
     description: "Update a contact group by ID. Requires operator mode and groups:write.",
     run: (client, input) => {
-      const parsed = groupWriteSchema
+      const parsed = groupUpdateSchema
         .extend({ id: z.string().min(1) })
         .strict()
         .parse(input);

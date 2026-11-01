@@ -1,7 +1,13 @@
 import { and, eq } from "drizzle-orm";
 
 import { contactGroups } from "../db/schema";
-import { matchContactGroup, validateGroupRules, type GroupRule } from "../modules/groups";
+import {
+  GROUP_AUDIENCE_LIMIT,
+  GroupRulesError,
+  matchContactGroup,
+  validateGroupDefinition,
+  type GroupRule,
+} from "../modules/groups";
 import type { DbExecutor } from "../db/tx";
 import type { OrgId } from "../ports";
 import { PostgresContactRepo } from "./contacts";
@@ -19,7 +25,7 @@ export type ContactGroupRecord = {
 
 export type CreateContactGroupInput = Omit<ContactGroupRecord, "id"> & {
   createdBy: string;
-  description?: string;
+  description?: string | null;
 };
 
 export type UpdateContactGroupInput = {
@@ -31,7 +37,7 @@ export type UpdateContactGroupInput = {
   description?: string | null;
 };
 
-const GROUP_SCAN_LIMIT = 10000;
+const SCAN_PAGE_SIZE = 1000;
 
 export class PostgresGroupRepo {
   constructor(private readonly db: DbExecutor) {}
@@ -48,7 +54,7 @@ export class PostgresGroupRepo {
         rules: input.rules,
         logic: input.logic,
         isDynamic: input.isDynamic,
-        contactIds: input.contactIds,
+        contactIds: unique(input.contactIds),
         createdBy: input.createdBy,
       })
       .returning();
@@ -60,11 +66,14 @@ export class PostgresGroupRepo {
     orgId: OrgId,
     input: UpdateContactGroupInput
   ): Promise<ContactGroupRecord | null> {
+    const existing = await this.getById(id, orgId);
+    if (!existing) return null;
     validateGroupInput({
-      rules: input.rules ?? [],
-      logic: input.logic ?? "AND",
-      isDynamic: input.isDynamic ?? false,
+      rules: input.rules ?? existing.rules,
+      logic: input.logic ?? existing.logic,
+      isDynamic: input.isDynamic ?? existing.isDynamic,
     });
+    if (Object.keys(input).length === 0) return existing;
 
     const [row] = await this.db
       .update(contactGroups)
@@ -74,7 +83,7 @@ export class PostgresGroupRepo {
         ...(input.rules !== undefined ? { rules: input.rules } : {}),
         ...(input.logic !== undefined ? { logic: input.logic } : {}),
         ...(input.isDynamic !== undefined ? { isDynamic: input.isDynamic } : {}),
-        ...(input.contactIds !== undefined ? { contactIds: input.contactIds } : {}),
+        ...(input.contactIds !== undefined ? { contactIds: unique(input.contactIds) } : {}),
       })
       .where(and(eq(contactGroups.id, id), eq(contactGroups.orgId, orgId)))
       .returning();
@@ -100,7 +109,12 @@ export class PostgresGroupRepo {
   }
 
   async countContacts(id: string, orgId: OrgId): Promise<number> {
-    return (await this.resolveContactIds(id, orgId, GROUP_SCAN_LIMIT)).length;
+    const group = await this.getById(id, orgId);
+    if (!group) return 0;
+
+    let count = 0;
+    for await (const _id of this.memberIds(group)) count += 1;
+    return count;
   }
 
   async sampleContacts(id: string, orgId: OrgId, limit = 10) {
@@ -108,31 +122,52 @@ export class PostgresGroupRepo {
     return new PostgresContactRepo(this.db).listByIds(ids, orgId);
   }
 
-  async resolveContactIds(id: string, orgId: OrgId, limit = GROUP_SCAN_LIMIT): Promise<string[]> {
+  // One past the limit, so a caller can tell an audience is too big instead of cutting it short.
+  async resolveContactIds(
+    id: string,
+    orgId: OrgId,
+    limit = GROUP_AUDIENCE_LIMIT + 1
+  ): Promise<string[]> {
     const group = await this.getById(id, orgId);
     if (!group) return [];
-    if (!group.isDynamic) return (group.contactIds ?? []).slice(0, limit);
 
-    const contacts = await new PostgresContactRepo(this.db).list(orgId, GROUP_SCAN_LIMIT);
-    return matchContactGroup(
-      contacts,
-      {
-        logic: group.logic,
-        rules: toRules(group.rules),
-      },
-      { limit }
-    ).map((contact) => contact.id);
+    const ids: string[] = [];
+    for await (const contactId of this.memberIds(group)) {
+      ids.push(contactId);
+      if (ids.length >= limit) break;
+    }
+    return ids;
+  }
+
+  private async *memberIds(group: ContactGroupRecord): AsyncGenerator<string> {
+    const contacts = new PostgresContactRepo(this.db);
+    if (!group.isDynamic) {
+      const members = await contacts.listByIds(group.contactIds ?? [], group.orgId);
+      yield* members.map((contact) => contact.id);
+      return;
+    }
+
+    // A group saved before validation must reach nobody rather than everybody.
+    if (validateGroupDefinition(group).length > 0) return;
+    const definition = { logic: group.logic, rules: group.rules as GroupRule[] };
+
+    let afterId: string | undefined;
+    for (;;) {
+      const page = await contacts.listAfter(group.orgId, afterId, SCAN_PAGE_SIZE);
+      yield* matchContactGroup(page, definition).map((contact) => contact.id);
+      if (page.length < SCAN_PAGE_SIZE) return;
+      afterId = page.at(-1)?.id;
+    }
   }
 }
 
 function validateGroupInput(input: Pick<ContactGroupRecord, "isDynamic" | "rules" | "logic">) {
-  if (!input.isDynamic) return;
-  const errors = validateGroupRules(toRules(input.rules));
-  if (errors.length > 0) throw new Error(errors.join("; "));
+  const errors = validateGroupDefinition(input);
+  if (errors.length > 0) throw new GroupRulesError(errors);
 }
 
-function toRules(rules: unknown): GroupRule[] {
-  return Array.isArray(rules) ? (rules as GroupRule[]) : [];
+function unique(ids: string[] | undefined) {
+  return ids && Array.from(new Set(ids));
 }
 
 function toGroup(row: typeof contactGroups.$inferSelect): ContactGroupRecord {

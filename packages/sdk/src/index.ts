@@ -8,6 +8,7 @@ import {
   groupListSchema,
   groupPreviewSchema,
   groupSchema,
+  groupUpdateSchema,
   groupWriteSchema,
   campaignListSchema,
   campaignSchema,
@@ -195,7 +196,7 @@ export class Samrian {
     update: (id: string, input: unknown) =>
       this.validated(`/api/v1/groups/${encodeURIComponent(id)}`, groupSchema, {
         method: "PATCH",
-        body: groupWriteSchema.parse(input),
+        body: groupUpdateSchema.parse(input),
       }),
   };
 

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { matchContactGroup, validateGroupRules } from "../../../src/server/modules/groups";
+import {
+  matchContactGroup,
+  validateGroupDefinition,
+  validateGroupRules,
+} from "../../../src/server/modules/groups";
 import type { ContactRecord } from "../../../src/server/ports";
 
 const contacts: ContactRecord[] = [
@@ -23,6 +27,41 @@ const contacts: ContactRecord[] = [
     bounceStatus: "hard",
   },
 ];
+
+describe("group definitions", () => {
+  const dynamic = (rules: unknown, logic = "AND") =>
+    validateGroupDefinition({ isDynamic: true, logic, rules });
+
+  test.each([[[]], [{}], [null], ["domain"]])("a dynamic group cannot have rules %j", (rules) => {
+    expect(dynamic(rules)).toEqual(["Dynamic groups need at least one rule"]);
+  });
+
+  test.each([[[null]], [["domain"]]])("rejects the malformed rule list %j", (rules) => {
+    expect(dynamic(rules)).toEqual(["Group rules must be objects"]);
+  });
+
+  test("rejects unknown logic", () => {
+    expect(dynamic([{ field: "domain", operator: "exists" }], "XOR")).toEqual([
+      "Group logic must be AND or OR",
+    ]);
+  });
+
+  test.each([
+    [{ field: "domain", operator: "equals" }],
+    [{ field: "domain", operator: "notEquals", value: null }],
+    [{ field: "domain", operator: "in", value: "example.com" }],
+  ])("a rule needs a usable value: %j", (rule) => {
+    expect(dynamic([rule])).toHaveLength(1);
+  });
+
+  test("exists rules need no value", () => {
+    expect(dynamic([{ field: "domain", operator: "exists" }])).toEqual([]);
+  });
+
+  test("static groups do not use rules", () => {
+    expect(validateGroupDefinition({ isDynamic: false, logic: "AND", rules: {} })).toEqual([]);
+  });
+});
 
 describe("group matching module", () => {
   test("validates unknown field and operator", () => {

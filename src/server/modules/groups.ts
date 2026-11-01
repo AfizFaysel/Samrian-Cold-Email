@@ -13,6 +13,14 @@ export type GroupDefinition = {
   rules: GroupRule[];
 };
 
+export const GROUP_AUDIENCE_LIMIT = 10_000;
+
+export class GroupRulesError extends Error {
+  constructor(readonly issues: string[]) {
+    super(issues.join("; "));
+  }
+}
+
 const FIELDS = new Set(["email", "domain", "timezone", "bounceStatus", "verificationStatus"]);
 const OPERATORS = new Set<string>(groupOperators);
 
@@ -24,9 +32,34 @@ export function validateGroupRules(rules: GroupRule[]): string[] {
     }
     if (!OPERATORS.has(rule.operator)) {
       errors.push(`Unknown group rule operator: ${rule.operator}`);
+    } else if (!hasUsableValue(rule)) {
+      errors.push(`Group rule on ${rule.field} needs a value`);
     }
   }
   return errors;
+}
+
+// With no rules an AND group matches every contact, so an empty definition is never valid.
+export function validateGroupDefinition(input: {
+  isDynamic: boolean;
+  logic: string;
+  rules: unknown;
+}): string[] {
+  if (!input.isDynamic) return [];
+  if (input.logic !== "AND" && input.logic !== "OR") return ["Group logic must be AND or OR"];
+  if (!Array.isArray(input.rules) || input.rules.length === 0) {
+    return ["Dynamic groups need at least one rule"];
+  }
+  if (input.rules.some((rule) => typeof rule !== "object" || rule === null)) {
+    return ["Group rules must be objects"];
+  }
+  return validateGroupRules(input.rules as GroupRule[]);
+}
+
+function hasUsableValue(rule: GroupRule): boolean {
+  if (rule.operator === "exists" || rule.operator === "notExists") return true;
+  if (rule.operator === "in" || rule.operator === "notIn") return Array.isArray(rule.value);
+  return rule.value !== undefined && rule.value !== null;
 }
 
 export function matchContactGroup(

@@ -1,7 +1,9 @@
+import { groupWriteSchema } from "@samrian/contracts";
 import { NextResponse } from "next/server";
 
 import { createSessionRoute } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
+import { GroupRulesError } from "@/server/modules/groups";
 import { PostgresGroupRepo } from "@/server/repos";
 
 export const GET = createSessionRoute(sessionOperations.groupList, async ({ orgId, db }) => {
@@ -12,30 +14,23 @@ export const GET = createSessionRoute(sessionOperations.groupList, async ({ orgI
 export const POST = createSessionRoute(
   sessionOperations.groupCreate,
   async ({ orgId, userId, db }, request: Request) => {
-    const body = (await request.json()) as {
-      name?: string;
-      description?: string;
-      rules?: unknown;
-      logic?: "AND" | "OR";
-      isDynamic?: boolean;
-      contactIds?: string[];
-    };
-
-    if (!body.name?.trim()) {
-      return NextResponse.json({ error: "name is required" }, { status: 400 });
+    const parsed = groupWriteSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid group" }, { status: 400 });
     }
 
-    const group = await new PostgresGroupRepo(db).create({
-      orgId,
-      name: body.name.trim(),
-      description: body.description,
-      rules: body.rules ?? [],
-      logic: body.logic ?? "AND",
-      isDynamic: body.isDynamic ?? false,
-      contactIds: body.contactIds,
-      createdBy: userId,
-    });
-
-    return NextResponse.json({ group }, { status: 201 });
+    try {
+      const group = await new PostgresGroupRepo(db).create({
+        ...parsed.data,
+        orgId,
+        createdBy: userId,
+      });
+      return NextResponse.json({ group }, { status: 201 });
+    } catch (error) {
+      if (error instanceof GroupRulesError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
+    }
   }
 );

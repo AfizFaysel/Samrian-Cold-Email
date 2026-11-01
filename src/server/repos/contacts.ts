@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, lt, or } from "drizzle-orm";
 
 import { contacts } from "../db/schema";
 import { extractDomain, normalizeEmail, type ContactImportDeps } from "../modules/contacts";
@@ -89,6 +89,16 @@ export class PostgresContactRepo {
       .select()
       .from(contacts)
       .where(eq(contacts.orgId, orgId))
+      .limit(limit);
+    return rows.map(toContact);
+  }
+
+  async listAfter(orgId: OrgId, afterId: string | undefined, limit: number) {
+    const rows = await this.db
+      .select()
+      .from(contacts)
+      .where(and(eq(contacts.orgId, orgId), afterId ? gt(contacts.id, afterId) : undefined))
+      .orderBy(asc(contacts.id))
       .limit(limit);
     return rows.map(toContact);
   }
