@@ -18,4 +18,24 @@ describe("deployment artifacts", () => {
       expect(dockerignore).toContain(entry);
     }
   });
+
+  test("production compose never publishes object storage or ships its credentials", async () => {
+    const compose = await readFile("docker-compose.yml", "utf8");
+
+    expect(compose).not.toContain("minio-password");
+    expect(compose).not.toMatch(/MINIO_ROOT_(USER|PASSWORD):/);
+    expect(compose).not.toMatch(/"\d+:900[01]"/);
+  });
+
+  test.each([
+    "docker-compose.db.yml",
+    "docker-compose.inngest.yml",
+    "docker-compose.security.yml",
+    "docker-compose.storage.yml",
+    "docker-compose.worker.yml",
+  ])("%s publishes ports to this machine only", async (file) => {
+    const compose = await readFile(file, "utf8");
+
+    expect(compose.match(/^\s+- "\d+:\d+"$/gm) ?? []).toEqual([]);
+  });
 });

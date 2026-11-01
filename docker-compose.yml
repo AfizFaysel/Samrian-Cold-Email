@@ -95,12 +95,9 @@ services:
     container_name: samrian-minio
     profiles: ["minio"]
     command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio-password
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - samrian-minio-data:/data
 
