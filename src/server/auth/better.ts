@@ -118,10 +118,11 @@ export function createBetterAuthProvider(auth = createBetterAuth()): AuthProvide
       };
     },
     async hasPermission(permissions: PermissionRequest) {
-      return !!(await auth.api.hasPermission({
+      const result = await auth.api.hasPermission({
         body: { permissions },
         headers: await headers(),
-      }));
+      });
+      return result.success === true;
     },
   };
 }
