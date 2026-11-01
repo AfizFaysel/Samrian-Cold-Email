@@ -14,6 +14,12 @@ import {
 } from "../repos";
 import { recordEvent, unsubscribeEvent } from "./events";
 
+export class InvalidUnsubscribeToken extends Error {
+  constructor() {
+    super("Invalid unsubscribe token");
+  }
+}
+
 type TokenInput = {
   contactId: string;
   campaignId: string;
@@ -29,12 +35,12 @@ export function createUnsubscribeToken(input: TokenInput): string {
 export function verifyUnsubscribeToken(token: string, input: Omit<TokenInput, "orgId">) {
   const [payload, signature] = token.split(".");
   if (!payload || !signature || sign(payload) !== signature) {
-    throw new Error("Invalid unsubscribe token");
+    throw new InvalidUnsubscribeToken();
   }
 
   const [orgId, contactId, campaignId] = decode(payload).split(":");
   if (!orgId || contactId !== input.contactId || campaignId !== input.campaignId) {
-    throw new Error("Invalid unsubscribe token");
+    throw new InvalidUnsubscribeToken();
   }
 
   return { orgId, contactId, campaignId };
@@ -45,7 +51,15 @@ export async function unsubscribeContact(input: {
   campaignId: string;
   token: string;
 }) {
-  const verified = verifyUnsubscribeToken(input.token, input);
+  let verified: ReturnType<typeof verifyUnsubscribeToken>;
+  try {
+    verified = verifyUnsubscribeToken(input.token, input);
+  } catch (error) {
+    if (error instanceof InvalidUnsubscribeToken) {
+      return { success: false, message: "This unsubscribe link is not valid." };
+    }
+    throw error;
+  }
   const db = getDb();
   return withTenant(db, { orgId: verified.orgId, actorType: "request" }, async (tx) => {
     const contacts = new PostgresContactRepo(tx);
