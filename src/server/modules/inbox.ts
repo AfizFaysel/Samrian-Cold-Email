@@ -5,6 +5,7 @@ import { escapeHtml } from "./compliance";
 import { buildEmailDisplay, getSafeEmailLinks, parseEmailSender } from "./email-display";
 import { classifyMailboxError, provedNotDelivered } from "./mailboxes";
 import { getProviderPolicy } from "./providers";
+import { PublicError } from "./public-error";
 import { getMailboxCapacity } from "./ramp";
 
 export type SendReplyInput = {
@@ -54,7 +55,7 @@ export async function getThread(
   deps: { repos: NonNullable<SendReplyDeps["repos"]> }
 ) {
   const thread = await deps.repos.threads.getById(input.threadId, input.orgId);
-  if (!thread) throw new Error("Thread not found");
+  if (!thread) throw new PublicError("Thread not found", 404);
   const messages = await getConversation(thread, {
     repos: deps.repos,
   });
@@ -83,7 +84,7 @@ export async function sendReply(
   deps: SendReplyDeps
 ): Promise<SendReplyResult> {
   const body = input.body.trim();
-  if (!body) throw new Error("Reply body is required");
+  if (!body) throw new PublicError("Reply body is required");
   const run =
     deps.transaction ??
     ((operation) => {
@@ -102,11 +103,13 @@ export async function sendReply(
     if (existing) return { existing } as const;
 
     const thread = await repos.threads.getById(input.threadId, input.orgId);
-    if (!thread || thread.direction !== "received") throw new Error("Thread not found");
-    if (!thread.mailboxId) throw new Error("Thread mailbox not found");
+    if (!thread || thread.direction !== "received") {
+      throw new PublicError("Thread not found", 404);
+    }
+    if (!thread.mailboxId) throw new PublicError("Thread mailbox not found", 404);
 
     const mailbox = await repos.mailboxes.getById(thread.mailboxId, input.orgId);
-    if (!mailbox) throw new Error("Mailbox not found");
+    if (!mailbox) throw new PublicError("Mailbox not found", 404);
     const conversation = (await repos.threads.listConversation?.({
       orgId: thread.orgId,
       campaignId: thread.campaignId,
@@ -121,10 +124,10 @@ export async function sendReply(
       mailbox.status === "disconnected" ||
       mailbox.status === "limit_reached"
     ) {
-      throw new Error("Mailbox is not available");
+      throw new PublicError("Mailbox is not available", 409);
     }
     const recipient = getReplyRecipient(thread);
-    if (!recipient) throw new Error("Reply recipient not found");
+    if (!recipient) throw new PublicError("Reply recipient not found", 404);
 
     const dailyLimit = mailbox.dailySendLimit ?? Number.MAX_SAFE_INTEGER;
     const { effectiveLimit } = getMailboxCapacity({
@@ -138,7 +141,7 @@ export async function sendReply(
       reserved: mailbox.reservedSends,
     });
     if (!(await repos.mailboxes.claimReplySend(mailbox.id, input.orgId, effectiveLimit))) {
-      throw new Error("Mailbox daily capacity reached");
+      throw new PublicError("Mailbox daily capacity reached", 409);
     }
 
     const latest = conversation.at(-1) ?? thread;
@@ -179,7 +182,7 @@ export async function sendReply(
   });
   if (prepared.existing) {
     if (prepared.existing.classification === REPLY_UNKNOWN) {
-      throw new Error("Earlier delivery of this reply could not be confirmed");
+      throw new PublicError("Earlier delivery of this reply could not be confirmed", 409);
     }
     return {
       status: "duplicate",

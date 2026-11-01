@@ -2,6 +2,7 @@ import type { ConnectionTestResult } from "../../../lib/email-connectors/types";
 import type { MailboxConnector } from "../jobs/types";
 import type { MailboxId, MailboxRecord, NotificationRepo, OrgId, UserId } from "../ports";
 import { notifyMailboxDisconnected } from "./notifications";
+import { PublicError } from "./public-error";
 
 export type MailboxFailureKind = "auth" | "rate-limit" | "quota" | "network" | "config" | "unknown";
 
@@ -196,7 +197,10 @@ export async function removeMailbox(
     const activeLinks =
       (await repos.mailboxes.countActiveCampaignLinks?.(input.mailboxId, input.orgId)) ?? 0;
     if (activeLinks > 0 && !input.force) {
-      throw new Error("Mailbox is linked to active campaigns. Force delete to archive it.");
+      throw new PublicError(
+        "Mailbox is linked to active campaigns. Force delete to archive it.",
+        409
+      );
     }
     const disabledLinks =
       (await repos.mailboxes.disableCampaignLinks?.(input.mailboxId, input.orgId)) ?? 0;

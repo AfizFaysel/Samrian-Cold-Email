@@ -91,9 +91,8 @@ async function callback(request: NextRequest) {
       clientSecret,
       redirectUri,
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "token_exchange_failed";
-    return errorRedirect(appUrl, message, "microsoft");
+  } catch {
+    return errorRedirect(appUrl, "token_exchange_failed", "microsoft");
   }
 
   // Fetch user email from Microsoft Graph

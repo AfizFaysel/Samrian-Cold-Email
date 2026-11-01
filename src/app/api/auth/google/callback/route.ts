@@ -89,9 +89,8 @@ async function callback(request: NextRequest) {
       clientSecret,
       redirectUri,
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "token_exchange_failed";
-    return errorRedirect(appUrl, message, "google");
+  } catch {
+    return errorRedirect(appUrl, "token_exchange_failed", "google");
   }
 
   // Fetch user email from Google userinfo

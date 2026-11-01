@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { errorResponse } from "@/server/api/error-response";
 import { createSessionAction } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
 import { getAuthProvider } from "@/server/auth/provider";
@@ -51,16 +52,14 @@ export const PATCH = createSessionAction(
         memberId: member.id,
         memberUserId: member.userId,
         actorUserId: userId,
+        actorRole: members.find((item) => item.userId === userId)?.role ?? "",
         currentRole: member.role,
         role: parsed.data.role,
         ownerCount: members.filter((item) => item.role === "owner").length,
       });
       return Response.json({ updated: true });
     } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : "Member update failed" },
-        { status: 400 }
-      );
+      return errorResponse(error, "Member update failed", "/api/settings/members");
     }
   }
 );

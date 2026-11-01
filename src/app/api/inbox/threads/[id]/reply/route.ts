@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { errorResponse } from "@/server/api/error-response";
 import { createSessionAction } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
 import { getDb } from "@/server/db/db";
@@ -45,19 +46,8 @@ export const POST = createSessionAction(
 
       return NextResponse.json(result);
     } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Reply failed" },
-        { status: statusFor(error) }
-      );
+      return errorResponse(error, "Reply failed", "/api/inbox/threads/[id]/reply");
     }
   },
   { operationId: "inbox.reply", bodyLimitBytes: 128 * 1024 }
 );
-
-function statusFor(error: unknown): number {
-  const message = error instanceof Error ? error.message : "";
-  if (message.includes("required")) return 400;
-  if (message.includes("not found")) return 404;
-  if (message.includes("not available") || message.includes("not be confirmed")) return 409;
-  return 500;
-}

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { errorResponse } from "@/server/api/error-response";
 import { createSessionAction } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
 import { getAuthProvider } from "@/server/auth/provider";
@@ -69,8 +70,5 @@ export const DELETE = createSessionAction(
 );
 
 function roleError(error: unknown) {
-  return Response.json(
-    { error: error instanceof Error ? error.message : "Role operation failed" },
-    { status: 400 }
-  );
+  return errorResponse(error, "Role operation failed", "/api/settings/roles");
 }

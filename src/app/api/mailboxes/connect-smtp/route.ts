@@ -10,6 +10,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+
+import { errorResponse } from "@/server/api/error-response";
 import { encryptCredential as encrypt } from "@/server/crypto";
 import { createSessionRoute } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
@@ -119,8 +121,7 @@ export const POST = createSessionRoute(
 
       return NextResponse.json({ id: mailbox.id, success: true });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to save mailbox";
-      return NextResponse.json({ error: message }, { status: 500 });
+      return errorResponse(error, "Failed to save mailbox", "/api/mailboxes/connect-smtp");
     }
   }
 );

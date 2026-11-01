@@ -3,6 +3,7 @@ import type { RoleProvider } from "../auth/role-provider";
 import { getRoleProvider } from "../auth/role-provider-factory";
 import type { DbTransaction } from "../db/tx";
 import { PostgresAuditRepo } from "../repos/audit";
+import { PublicError } from "./public-error";
 
 const builtInRoles = new Set(["owner", "admin", "member"]);
 const knownPermissions = new Set(
@@ -38,7 +39,7 @@ export function createRoleModule(provider: RoleProvider, audit?: RoleAudit) {
       const slug = toSlug(name);
 
       if (builtInRoles.has(slug)) {
-        throw new Error("Built-in role names are reserved");
+        throw new PublicError("Built-in role names are reserved");
       }
 
       const role = await provider.createRole({ orgId: input.orgId, name, slug, permissions });
@@ -54,8 +55,8 @@ export function createRoleModule(provider: RoleProvider, audit?: RoleAudit) {
     }) {
       protectBuiltIn(input.id);
       const existing = (await provider.listRoles(input.orgId)).find((role) => role.id === input.id);
-      if (!existing) throw new Error("Role not found");
-      if (existing.builtIn) throw new Error("Built-in roles cannot be changed");
+      if (!existing) throw new PublicError("Role not found");
+      if (existing.builtIn) throw new PublicError("Built-in roles cannot be changed");
       const name = input.name === undefined ? undefined : validateName(input.name);
       const permissions =
         input.permissions === undefined
@@ -74,8 +75,8 @@ export function createRoleModule(provider: RoleProvider, audit?: RoleAudit) {
       protectBuiltIn(input.id);
       const roles = await provider.listRoles(input.orgId);
       const role = roles.find((item) => item.id === input.id);
-      if (!role) throw new Error("Role not found");
-      if (role.builtIn) throw new Error("Built-in roles cannot be changed");
+      if (!role) throw new PublicError("Role not found");
+      if (role.builtIn) throw new PublicError("Built-in roles cannot be changed");
       const members = await provider.listMembers(input.orgId);
       await Promise.all(
         members
@@ -96,15 +97,20 @@ export function createRoleModule(provider: RoleProvider, audit?: RoleAudit) {
       memberId: string;
       memberUserId: string;
       actorUserId: string;
+      actorRole: string;
       currentRole: string;
       role: string;
       ownerCount: number;
     }) {
       if (input.currentRole !== input.role && input.memberUserId === input.actorUserId) {
-        throw new Error("You cannot change your own role");
+        throw new PublicError("You cannot change your own role");
+      }
+      const touchesOwner = input.currentRole === "owner" || input.role === "owner";
+      if (touchesOwner && input.currentRole !== input.role && input.actorRole !== "owner") {
+        throw new PublicError("Only an owner can change an owner", 403);
       }
       if (input.currentRole === "owner" && input.role !== "owner" && input.ownerCount <= 1) {
-        throw new Error("Organization must keep at least one owner");
+        throw new PublicError("Organization must keep at least one owner");
       }
       await provider.updateMemberRole({
         orgId: input.orgId,
@@ -114,7 +120,7 @@ export function createRoleModule(provider: RoleProvider, audit?: RoleAudit) {
       await audit?.("member.role-updated", `Assigned member ${input.memberId} to ${input.role}`);
     },
     invite(input: { orgId: string; email: string; role: string; inviterUserId: string }) {
-      if (!input.email.trim()) throw new Error("Email is required");
+      if (!input.email.trim()) throw new PublicError("Email is required");
       const email = input.email.trim().toLowerCase();
       return provider
         .inviteMember({ ...input, email })
@@ -147,7 +153,7 @@ export async function createRequestRoleModule(input: {
 function validateName(value: string) {
   const name = value.trim();
   if (name.length < 2 || name.length > 50) {
-    throw new Error("Role name must be 2 to 50 characters");
+    throw new PublicError("Role name must be 2 to 50 characters");
   }
   return name;
 }
@@ -155,16 +161,16 @@ function validateName(value: string) {
 function validatePermissions(values: string[], grantable: string[]) {
   const permissions = [...new Set(values)].sort();
   const unknown = permissions.filter((permission) => !knownPermissions.has(permission));
-  if (unknown.length) throw new Error(`Unknown permissions: ${unknown.join(", ")}`);
+  if (unknown.length) throw new PublicError(`Unknown permissions: ${unknown.join(", ")}`);
 
   const allowed = new Set(grantable);
   const denied = permissions.filter((permission) => !allowed.has(permission));
-  if (denied.length) throw new Error(`Cannot grant permissions: ${denied.join(", ")}`);
+  if (denied.length) throw new PublicError(`Cannot grant permissions: ${denied.join(", ")}`);
   return permissions;
 }
 
 function protectBuiltIn(id: string) {
-  if (builtInRoles.has(id)) throw new Error("Built-in roles cannot be changed");
+  if (builtInRoles.has(id)) throw new PublicError("Built-in roles cannot be changed");
 }
 
 function toSlug(value: string) {

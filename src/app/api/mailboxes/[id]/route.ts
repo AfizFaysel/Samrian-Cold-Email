@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { errorResponse } from "@/server/api/error-response";
 import { createSessionAction } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
 import { removeMailbox } from "@/server/modules/mailboxes";
@@ -48,10 +49,7 @@ export const DELETE = createSessionAction(
       }
       return NextResponse.json(result);
     } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Failed to delete mailbox" },
-        { status: 409 }
-      );
+      return errorResponse(error, "Failed to delete mailbox", "/api/mailboxes/[id]");
     }
   }
 );

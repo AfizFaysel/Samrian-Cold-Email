@@ -128,6 +128,50 @@ describe("role module", () => {
     expect(provider.deleteRole).toHaveBeenCalledWith({ orgId: "org_1", id: "role_1" });
   });
 
+  describe("owner protection", () => {
+    const change = (actorRole: string, currentRole: string, role: string) => {
+      const provider = createProvider();
+      return {
+        provider,
+        result: createRoleModule(provider).assign({
+          orgId: "org_1",
+          memberId: "member_2",
+          memberUserId: "user_2",
+          actorUserId: "user_1",
+          actorRole,
+          currentRole,
+          role,
+          ownerCount: 2,
+        }),
+      };
+    };
+
+    it("stops a lower role from demoting an owner", async () => {
+      const { provider, result } = change("admin", "owner", "member");
+
+      await expect(result).rejects.toMatchObject({
+        message: "Only an owner can change an owner",
+        status: 403,
+      });
+      expect(provider.updateMemberRole).not.toHaveBeenCalled();
+    });
+
+    it("stops a lower role from creating an owner", async () => {
+      const { result } = change("admin", "member", "owner");
+
+      await expect(result).rejects.toMatchObject({ status: 403 });
+    });
+
+    it("lets an owner do both", async () => {
+      await expect(change("owner", "owner", "member").result).resolves.toBeUndefined();
+      await expect(change("owner", "member", "owner").result).resolves.toBeUndefined();
+    });
+
+    it("leaves other role changes alone", async () => {
+      await expect(change("admin", "member", "admin").result).resolves.toBeUndefined();
+    });
+  });
+
   it("prevents self-demotion and final-owner removal", async () => {
     const roles = createRoleModule(createProvider());
 
@@ -137,6 +181,7 @@ describe("role module", () => {
         memberId: "member_1",
         memberUserId: "user_1",
         actorUserId: "user_1",
+        actorRole: "owner",
         currentRole: "owner",
         role: "member",
         ownerCount: 2,
@@ -149,6 +194,7 @@ describe("role module", () => {
         memberId: "member_1",
         memberUserId: "user_2",
         actorUserId: "user_1",
+        actorRole: "owner",
         currentRole: "owner",
         role: "member",
         ownerCount: 1,

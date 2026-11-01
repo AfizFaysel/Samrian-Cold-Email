@@ -3,6 +3,7 @@ import { replySchema } from "@samrian/contracts";
 import { ApiRouteError, createApiRoute } from "@/server/api/route";
 import { getMachineCredential } from "@/server/auth/machine-provider";
 import { getDb } from "@/server/db/db";
+import { PublicError } from "@/server/modules/public-error";
 import { sendReply } from "@/server/modules/inbox";
 import {
   createPostgresJobRepos,
@@ -51,9 +52,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         );
         return { data };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Reply failed";
-        if (message.includes("not found")) throw new ApiRouteError("NOT_FOUND", message, 404);
-        if (message.includes("not available")) throw new ApiRouteError("CONFLICT", message, 409);
+        if (error instanceof PublicError) {
+          const code = { 404: "NOT_FOUND", 409: "CONFLICT" }[error.status] as
+            "NOT_FOUND" | "CONFLICT" | undefined;
+          throw new ApiRouteError(code ?? "VALIDATION_FAILED", error.message, error.status);
+        }
         throw error;
       }
     },
