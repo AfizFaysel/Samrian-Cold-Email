@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { encryptCredential as encrypt } from "@/server/crypto";
 import { createSessionRoute } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
@@ -41,35 +42,24 @@ const PROVIDER_DEFAULTS: Record<
 export const POST = createSessionRoute(
   sessionOperations.mailboxConnect,
   async ({ orgId, db }, request: NextRequest) => {
-    let body: {
-      name: string;
-      provider: string;
-      username: string;
-      password: string;
-      dailySendLimit: number;
-      smtpHost?: string;
-      smtpPort?: number;
-      imapHost?: string;
-      imapPort?: number;
-    };
+    const parsed = z
+      .object({
+        name: z.string().trim().min(1).max(120),
+        provider: z.enum(["puzzle", "mailpool", "smtp"]),
+        username: z.string().trim().min(3).max(254),
+        password: z.string().min(1).max(1024),
+        dailySendLimit: z.number().int().positive().max(10_000).optional(),
+        smtpHost: z.string().max(253).optional(),
+        smtpPort: z.number().int().min(1).max(65_535).optional(),
+        imapHost: z.string().max(253).optional(),
+        imapPort: z.number().int().min(1).max(65_535).optional(),
+      })
+      .safeParse(await request.json().catch(() => null));
 
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid mailbox details" }, { status: 400 });
     }
-
-    // Validate required fields
-    if (!body.name || !body.provider || !body.username || !body.password) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    if (!["puzzle", "mailpool", "smtp"].includes(body.provider)) {
-      return NextResponse.json(
-        { error: "Use OAuth for Google/Microsoft providers" },
-        { status: 400 }
-      );
-    }
+    const body = parsed.data;
 
     // Apply provider defaults if not specified
     const defaults = PROVIDER_DEFAULTS[body.provider] || {};
@@ -93,7 +83,7 @@ export const POST = createSessionRoute(
       encryptedPassword = encrypt(body.password, {
         orgId,
         mailboxId,
-        provider: body.provider as "smtp" | "puzzle" | "mailpool",
+        provider: body.provider,
         purpose: "password",
       });
     } catch {

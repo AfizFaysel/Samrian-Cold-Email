@@ -3,169 +3,62 @@
 import * as React from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import {
-  TimePeriodSelector,
-  getPeriodLabel,
-  type TimePeriod,
-} from "@/components/time-period-selector";
-import { Send, Mail, Reply, TrendingUp, TrendingDown, AlertTriangle, WifiOff } from "lucide-react";
+import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
+import { Send, Mail, Reply, AlertTriangle } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 
 function MetricCard({
   label,
   value,
-  trend,
-  trendValue,
   icon: Icon,
-  sparklineData,
 }: {
   label: string;
   value: string;
-  trend?: "up" | "down" | "neutral";
-  trendValue?: string;
   icon: React.ComponentType<{ className?: string }>;
-  sparklineData?: Array<{ date: string; value: number }>;
 }) {
-  // Generate SVG path from sparkline data - only use real data
-  const generateSparklinePath = () => {
-    if (!sparklineData || sparklineData.length === 0) {
-      // Return flat line at bottom when no data
-      return "M0 30 L100 30";
-    }
-
-    const maxValue = Math.max(...sparklineData.map((d) => d.value), 1);
-
-    // If all values are 0, show flat line
-    if (maxValue === 0) {
-      return "M0 30 L100 30";
-    }
-
-    const points = sparklineData.map((d, i) => {
-      const x = (i / (sparklineData.length - 1)) * 100;
-      const y = 30 - (d.value / maxValue) * 25; // Scale to fit in 30px height
-      return `${x} ${y}`;
-    });
-
-    return `M${points.join(" L")}`;
-  };
-
-  const sparklinePath = generateSparklinePath();
-  const hasData = sparklineData && sparklineData.length > 0;
-
   return (
-    <div className="group cursor-default rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-indigo-200 hover:shadow-md">
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-[family-name:var(--font-plus-jakarta)] text-sm font-semibold text-slate-900">
           {label}
         </h3>
         <Icon className="h-5 w-5 text-slate-400" />
       </div>
-      <div className="mb-4 flex items-end gap-3">
-        <span className="font-[family-name:var(--font-plus-jakarta)] text-3xl font-bold leading-none text-slate-900">
-          {value}
-        </span>
-        {trend && trendValue && (
-          <span
-            className={`mb-0.5 flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium ${
-              trend === "up"
-                ? "bg-emerald-50 text-emerald-600"
-                : trend === "down"
-                  ? "bg-red-50 text-red-600"
-                  : "bg-amber-50 text-amber-600"
-            }`}
-          >
-            {trend === "up" ? (
-              <TrendingUp className="mr-0.5 h-3.5 w-3.5" />
-            ) : trend === "down" ? (
-              <TrendingDown className="mr-0.5 h-3.5 w-3.5" />
-            ) : (
-              <svg
-                className="mr-0.5 h-3.5 w-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
-              </svg>
-            )}
-            {trendValue}
-          </span>
-        )}
-      </div>
-      {/* Sparkline */}
-      <div className="mt-auto h-10 w-full">
-        {!hasData ? (
-          // Loading skeleton
-          <div className="h-full w-full animate-pulse rounded bg-slate-100" />
-        ) : (
-          <svg
-            className="h-full w-full overflow-visible"
-            preserveAspectRatio="none"
-            viewBox="0 0 100 30"
-          >
-            <path
-              d={sparklinePath}
-              fill="none"
-              stroke="#4F46E5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-            />
-            <path
-              d={`${sparklinePath} L100 30 L0 30 Z`}
-              fill="url(#gradient-primary)"
-              opacity="0.1"
-            />
-            <defs>
-              <linearGradient id="gradient-primary" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#4F46E5" />
-                <stop offset="100%" stopColor="#4F46E5" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-          </svg>
-        )}
-      </div>
+      <span className="font-[family-name:var(--font-plus-jakarta)] text-3xl font-bold leading-none text-slate-900">
+        {value}
+      </span>
     </div>
   );
 }
 
 export default function DashboardPage() {
   const [timePeriod, setTimePeriod] = React.useState<TimePeriod>("30");
-  const days = parseInt(timePeriod);
 
   const { data: orgStats } = useApi<{
     totalSent: number;
     estimatedOpenRate: number | null;
     openTrackingEnabled: boolean;
     replyRate: number;
-  }>("/api/analytics/org");
-  const { data: campaignData } = useApi<{ campaigns: any[] }>("/api/campaigns");
-  const { data: mailboxData } = useApi<{ mailboxes: any[] }>("/api/mailboxes");
+  }>(`/api/analytics/org?days=${timePeriod}`);
+  const { data: campaignData } = useApi<{
+    campaigns: Array<{
+      _id: string;
+      name: string;
+      status: string;
+      emailsSent: number;
+      replyRate: number;
+    }>;
+  }>("/api/campaigns");
+  const { data: mailboxData } = useApi<{
+    mailboxes: Array<{ status: string }>;
+  }>("/api/mailboxes");
   const recentActivity =
-    campaignData?.campaigns
-      ?.filter((campaign) => campaign.status === "active")
-      .slice(0, 4)
-      .map((campaign) => ({ ...campaign, emailsSent: 0, replyRate: 0 })) ?? [];
+    campaignData?.campaigns?.filter((campaign) => campaign.status === "active").slice(0, 4) ?? [];
   const mailboxes = mailboxData?.mailboxes ?? [];
 
-  const sentTrend = makeFlatTrend(days);
-  const opensTrend = makeFlatTrend(days);
-  const repliesTrend = makeFlatTrend(days);
-
-  const sentComparison = { trend: "neutral" as const, percentChange: 0 };
-  const estimatedOpenRateComparison = { trend: "neutral" as const, percentChange: 0 };
-  const replyRateComparison = { trend: "neutral" as const, percentChange: 0 };
-
-  const mailboxCount = mailboxes?.length ?? 0;
+  const activeMailboxCount = mailboxes.filter((mailbox) => mailbox.status === "active").length;
+  const mailboxCount = mailboxes.length;
   const isLoading = orgStats === undefined || campaignData === undefined;
-
-  // Helper to format trend text
-  const formatTrendText = (comparison: typeof sentComparison): string => {
-    if (!comparison || comparison.trend === "neutral") {
-      return `Steady this ${getPeriodLabel(days)}`;
-    }
-    return `${comparison.percentChange.toFixed(1)}% from last ${getPeriodLabel(days)}`;
-  };
 
   return (
     <div className="flex h-full flex-col font-[family-name:var(--font-ibm-plex)]">
@@ -177,7 +70,7 @@ export default function DashboardPage() {
 
       <div className="mx-auto w-full max-w-[1200px] px-6 py-8">
         {/* Metric Cards Grid */}
-        {isLoading || !sentTrend || !opensTrend || !repliesTrend ? (
+        {isLoading ? (
           <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
             {[1, 2, 3].map((i) => (
               <div
@@ -191,10 +84,7 @@ export default function DashboardPage() {
             <MetricCard
               label="Total Sent"
               value={orgStats?.totalSent.toLocaleString() ?? "0"}
-              trend={sentComparison?.trend ?? "neutral"}
-              trendValue={formatTrendText(sentComparison)}
               icon={Send}
-              sparklineData={sentTrend}
             />
             <MetricCard
               label="Open Rate"
@@ -203,22 +93,12 @@ export default function DashboardPage() {
                   ? "Not tracked"
                   : `${orgStats.estimatedOpenRate.toFixed(1)}%`
               }
-              trend={estimatedOpenRateComparison?.trend ?? "neutral"}
-              trendValue={
-                orgStats?.openTrackingEnabled
-                  ? formatTrendText(estimatedOpenRateComparison)
-                  : "Tracking off"
-              }
               icon={Mail}
-              sparklineData={opensTrend}
             />
             <MetricCard
               label="Reply Rate"
               value={`${orgStats?.replyRate.toFixed(1) ?? "0"}%`}
-              trend={replyRateComparison?.trend ?? "neutral"}
-              trendValue={formatTrendText(replyRateComparison)}
               icon={Reply}
-              sparklineData={repliesTrend}
             />
           </div>
         )}
@@ -277,7 +157,7 @@ export default function DashboardPage() {
                       </td>
                     </tr>
                   ) : (
-                    recentActivity.map((campaign: any) => (
+                    recentActivity.map((campaign) => (
                       <tr
                         key={campaign._id}
                         className="group cursor-pointer transition-colors hover:bg-slate-50"
@@ -326,7 +206,7 @@ export default function DashboardPage() {
               </svg>
             </div>
             <div className="flex flex-col gap-4 p-5">
-              {mailboxCount === 0 ? (
+              {activeMailboxCount === 0 ? (
                 <div className="flex gap-3 items-start rounded-md border border-amber-200 bg-amber-50 p-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
                   <div>
@@ -352,7 +232,7 @@ export default function DashboardPage() {
                         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                       </span>
                       <span className="text-sm font-medium text-slate-600">
-                        {mailboxCount}/{mailboxCount} Mailboxes Active
+                        {activeMailboxCount}/{mailboxCount} Mailboxes Active
                       </span>
                     </div>
                     <Link
@@ -370,11 +250,4 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
-
-function makeFlatTrend(days: number) {
-  return Array.from({ length: Math.max(days, 1) }, (_, index) => ({
-    date: `${index + 1}`,
-    value: 0,
-  }));
 }

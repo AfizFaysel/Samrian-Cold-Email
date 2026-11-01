@@ -245,7 +245,7 @@ export type EventRecordResult = {
 export interface CampaignRepo {
   getById(id: CampaignId, orgId: OrgId): Promise<CampaignRecord | null>;
   updateStatus(id: CampaignId, orgId: OrgId, status: string): Promise<void>;
-  getStats(id: CampaignId): Promise<CampaignStats | null>;
+  getStats(campaignId: CampaignId, orgId: OrgId): Promise<CampaignStats | null>;
 }
 
 export interface ContactRepo {

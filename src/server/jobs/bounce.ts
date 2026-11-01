@@ -54,7 +54,7 @@ export async function processBounce(
     { events: deps.repos.events }
   );
 
-  const stats = await deps.repos.campaigns.getStats(payload.campaignId);
+  const stats = await deps.repos.campaigns.getStats(payload.campaignId, payload.orgId);
   const campaign = await deps.repos.campaigns.getById(payload.campaignId, payload.orgId);
   const health = stats
     ? await evaluateCampaignHealth(

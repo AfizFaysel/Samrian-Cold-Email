@@ -85,7 +85,7 @@ export async function unsubscribeContact(input: {
     );
 
     const [stats, campaign, compliance] = await Promise.all([
-      campaigns.getStats(verified.campaignId),
+      campaigns.getStats(verified.campaignId, verified.orgId),
       campaigns.getById(verified.campaignId, verified.orgId),
       settings.getCompliance(verified.orgId),
     ]);

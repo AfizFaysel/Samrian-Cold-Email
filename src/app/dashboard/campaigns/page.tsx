@@ -3,8 +3,20 @@
 import * as React from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { Plus, Search, X, MoreHorizontal, BarChart3, RefreshCw, FileText } from "lucide-react";
+import { Plus, Search, X, BarChart3, FileText } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
+import { StatusBadge } from "@/components/status-badge";
+
+type CampaignItem = {
+  _id: string;
+  name: string;
+  status: string;
+  _creationTime: number;
+  mailboxIds?: string[];
+  emailsSent: number;
+  replyRate: number;
+  bounceRate: number;
+};
 
 type CampaignStatus = "all" | "active" | "draft" | "completed" | "paused";
 
@@ -12,7 +24,7 @@ export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<CampaignStatus>("all");
 
-  const { data: campaignData } = useApi<{ campaigns: any[] }>("/api/campaigns");
+  const { data: campaignData } = useApi<{ campaigns: CampaignItem[] }>("/api/campaigns");
   const { data: orgStats } = useApi<{
     totalSent: number;
     estimatedOpenRate: number | null;
@@ -30,13 +42,13 @@ export default function CampaignsPage() {
 
     // Apply status filter
     if (statusFilter !== "all") {
-      filtered = filtered.filter((c: any) => c.status === statusFilter);
+      filtered = filtered.filter((c) => c.status === statusFilter);
     }
 
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((c: any) => c.name.toLowerCase().includes(query));
+      filtered = filtered.filter((c) => c.name.toLowerCase().includes(query));
     }
 
     return filtered;
@@ -47,7 +59,7 @@ export default function CampaignsPage() {
     totalSent: orgStats?.totalSent ?? 0,
     avgOpenRate: orgStats?.estimatedOpenRate,
     avgReplyRate: orgStats?.replyRate ?? 0,
-    activeCampaigns: campaigns?.filter((c: any) => c.status === "active").length ?? 0,
+    activeCampaigns: campaigns?.filter((c) => c.status === "active").length ?? 0,
   };
 
   // Count campaigns by status
@@ -56,10 +68,10 @@ export default function CampaignsPage() {
 
     return {
       all: campaigns.length,
-      active: campaigns.filter((c: any) => c.status === "active").length,
-      draft: campaigns.filter((c: any) => c.status === "draft").length,
-      completed: campaigns.filter((c: any) => c.status === "completed").length,
-      paused: campaigns.filter((c: any) => c.status === "paused").length,
+      active: campaigns.filter((c) => c.status === "active").length,
+      draft: campaigns.filter((c) => c.status === "draft").length,
+      completed: campaigns.filter((c) => c.status === "completed").length,
+      paused: campaigns.filter((c) => c.status === "paused").length,
     };
   }, [campaigns]);
 
@@ -194,7 +206,7 @@ export default function CampaignsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            {filteredCampaigns.map((campaign: any) => (
+            {filteredCampaigns.map((campaign) => (
               <CampaignCard key={campaign._id} campaign={campaign} />
             ))}
 
@@ -256,24 +268,10 @@ function StatCard({ label, value, showSteady }: StatCardProps) {
 }
 
 interface CampaignCardProps {
-  campaign: {
-    _id: string;
-    name: string;
-    status: string;
-    _creationTime: number;
-  };
+  campaign: CampaignItem;
 }
 
 function CampaignCard({ campaign }: CampaignCardProps) {
-  const statusConfig = getStatusConfig(campaign.status);
-
-  // TODO: Fetch real metrics from backend
-  const metrics = {
-    sent: 0,
-    estimatedOpenRate: null as number | null,
-    replyRate: 0,
-  };
-
   const lastUpdated = getRelativeTime(campaign._creationTime);
 
   return (
@@ -289,103 +287,55 @@ function CampaignCard({ campaign }: CampaignCardProps) {
               Last updated: {lastUpdated}
             </span>
           </div>
-          <StatusBadge status={campaign.status} config={statusConfig} />
+          <StatusBadge status={campaign.status} />
         </div>
 
         {/* Metrics */}
         <div className="mb-6 grid grid-cols-3 gap-4 border-y border-slate-100 py-6">
-          <MetricItem label="Sent" value={metrics.sent > 0 ? metrics.sent.toLocaleString() : "—"} />
           <MetricItem
-            label="Open Rate"
-            value={
-              metrics.estimatedOpenRate == null
-                ? "Not tracked"
-                : `${metrics.estimatedOpenRate.toFixed(1)}%`
-            }
-            bordered
+            label="Sent"
+            value={campaign.emailsSent > 0 ? campaign.emailsSent.toLocaleString() : "—"}
           />
           <MetricItem
             label="Reply Rate"
-            value={metrics.replyRate > 0 ? `${metrics.replyRate.toFixed(1)}%` : "—"}
+            value={campaign.replyRate > 0 ? `${campaign.replyRate.toFixed(1)}%` : "—"}
+            bordered
+          />
+          <MetricItem
+            label="Bounce Rate"
+            value={campaign.bounceRate > 0 ? `${campaign.bounceRate.toFixed(1)}%` : "—"}
             bordered
           />
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex -space-x-2">
-            {/* TODO: Show team avatars */}
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-bold text-slate-500">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button className="rounded-lg p-2 text-slate-400 transition-colors hover:text-indigo-600">
-              <MoreHorizontal className="h-5 w-5" />
-            </button>
-            {campaign.status === "draft" ? (
-              <Link
-                href={`/dashboard/campaigns/${campaign._id}/edit`}
-                className="flex items-center gap-1 rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90"
-              >
-                Resume Setup
-              </Link>
-            ) : campaign.status === "completed" ? (
-              <div className="flex gap-2">
-                <button className="flex items-center gap-1 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Duplicate
-                </button>
-                <Link
-                  href={`/dashboard/campaigns/${campaign._id}`}
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  Full Report
-                </Link>
-              </div>
-            ) : (
-              <Link
-                href={`/dashboard/campaigns/${campaign._id}`}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-              >
-                View Analytics
-              </Link>
-            )}
-          </div>
+        <div className="flex items-center justify-end">
+          {campaign.status === "draft" ? (
+            <Link
+              href={`/dashboard/campaigns/${campaign._id}/edit`}
+              className="flex items-center gap-1 rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90"
+            >
+              Resume Setup
+            </Link>
+          ) : campaign.status === "completed" ? (
+            <Link
+              href={`/dashboard/campaigns/${campaign._id}`}
+              className="flex items-center gap-1 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Full Report
+            </Link>
+          ) : (
+            <Link
+              href={`/dashboard/campaigns/${campaign._id}`}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              View Analytics
+            </Link>
+          )}
         </div>
       </div>
-
-      {/* Progress Bar (only for active campaigns) */}
-      {campaign.status === "active" && (
-        <div className="h-1 w-full overflow-hidden bg-slate-50">
-          <div className="h-full w-3/4 bg-indigo-600" />
-        </div>
-      )}
     </div>
-  );
-}
-
-interface StatusBadgeProps {
-  status: string;
-  config: ReturnType<typeof getStatusConfig>;
-}
-
-function StatusBadge({ status, config }: StatusBadgeProps) {
-  return (
-    <span
-      className={`flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider ${config.className}`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${config.dotClassName}`} />
-      {status}
-    </span>
   );
 }
 
@@ -406,33 +356,6 @@ function MetricItem({ label, value, bordered }: MetricItemProps) {
       </span>
     </div>
   );
-}
-
-// ============================================================
-// UTILITY FUNCTIONS
-// ============================================================
-
-function getStatusConfig(status: string) {
-  const configs = {
-    active: {
-      className: "bg-emerald-50 text-emerald-600",
-      dotClassName: "bg-emerald-500 animate-pulse",
-    },
-    draft: {
-      className: "bg-slate-100 text-slate-500",
-      dotClassName: "bg-slate-400",
-    },
-    completed: {
-      className: "bg-indigo-50 text-indigo-600",
-      dotClassName: "bg-indigo-500",
-    },
-    paused: {
-      className: "bg-amber-50 text-amber-600",
-      dotClassName: "bg-amber-500",
-    },
-  };
-
-  return configs[status as keyof typeof configs] || configs.draft;
 }
 
 function getRelativeTime(timestamp: number): string {

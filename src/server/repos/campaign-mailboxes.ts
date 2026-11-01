@@ -81,6 +81,30 @@ export class PostgresCampaignMailboxRepo {
     return rows.map((row) => row.mailboxId);
   }
 
+  async mapForCampaigns(
+    campaignIds: CampaignId[],
+    orgId: OrgId
+  ): Promise<Map<CampaignId, MailboxId[]>> {
+    const map = new Map<CampaignId, MailboxId[]>();
+    for (const id of campaignIds) map.set(id, []);
+    if (campaignIds.length === 0) return map;
+    const rows = await this.db
+      .select({
+        campaignId: campaignMailboxes.campaignId,
+        mailboxId: campaignMailboxes.mailboxId,
+      })
+      .from(campaignMailboxes)
+      .where(
+        and(
+          inArray(campaignMailboxes.campaignId, campaignIds),
+          eq(campaignMailboxes.orgId, orgId),
+          eq(campaignMailboxes.status, "enabled")
+        )
+      );
+    for (const row of rows) map.get(row.campaignId)?.push(row.mailboxId);
+    return map;
+  }
+
   async disable(campaignId: CampaignId, mailboxId: MailboxId, orgId: OrgId): Promise<boolean> {
     const rows = await this.db
       .update(campaignMailboxes)

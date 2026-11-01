@@ -230,6 +230,22 @@ export class PostgresStatsRepo {
       );
     return countsFromRow(row);
   }
+
+  async sumByCampaign(orgId: OrgId, range?: DateRange): Promise<Map<string, StatsCounts>> {
+    const rows = await this.db
+      .select({ campaignId: campaignStatsDaily.campaignId, ...sumColumns(campaignStatsDaily) })
+      .from(campaignStatsDaily)
+      .where(
+        and(eq(campaignStatsDaily.orgId, orgId), ...dayRangeFilters(campaignStatsDaily.day, range))
+      )
+      .groupBy(campaignStatsDaily.campaignId);
+    const map = new Map<string, StatsCounts>();
+    for (const row of rows) {
+      const { campaignId, ...counts } = row;
+      map.set(campaignId, countsFromRow(counts));
+    }
+    return map;
+  }
 }
 
 function getDelta(input: EmailEventInput): StatsCounts {

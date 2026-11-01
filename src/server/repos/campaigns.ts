@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { campaigns, contactAssignments } from "../db/schema";
 import type { DbExecutor } from "../db/tx";
@@ -94,11 +94,6 @@ export class PostgresCampaignRepo {
     return row ? toCampaignLaunch(row) : null;
   }
 
-  async list(orgId: OrgId): Promise<CampaignRecord[]> {
-    const rows = await this.db.select().from(campaigns).where(eq(campaigns.orgId, orgId));
-    return rows.map(toCampaign);
-  }
-
   async listItems(orgId: OrgId, limit = 50): Promise<CampaignListItem[]> {
     const rows = await this.db
       .select()
@@ -124,19 +119,24 @@ export class PostgresCampaignRepo {
     return rows.length > 0;
   }
 
-  async getStats(id: CampaignId): Promise<CampaignStats | null> {
+  async getStats(campaignId: CampaignId, orgId: OrgId): Promise<CampaignStats | null> {
     const rows = await this.db
-      .select()
+      .select({ status: contactAssignments.status, count: sql<number>`count(*)::int` })
       .from(contactAssignments)
-      .where(eq(contactAssignments.campaignId, id));
+      .where(
+        and(eq(contactAssignments.campaignId, campaignId), eq(contactAssignments.orgId, orgId))
+      )
+      .groupBy(contactAssignments.status);
 
-    if (rows.length === 0) return { campaignId: id, total: 0, bounced: 0 };
+    const counts = new Map(rows.map((row) => [row.status, row.count]));
+    if (counts.size === 0) return { campaignId, total: 0, bounced: 0 };
 
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
     return {
-      campaignId: id,
-      total: rows.length,
-      bounced: rows.filter((row) => row.status === "bounced").length,
-      unsubscribed: rows.filter((row) => row.status === "unsubscribed").length,
+      campaignId,
+      total,
+      bounced: counts.get("bounced") ?? 0,
+      unsubscribed: counts.get("unsubscribed") ?? 0,
     };
   }
 }
