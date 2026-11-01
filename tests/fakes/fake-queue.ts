@@ -83,6 +83,10 @@ export class FakeJobQueue implements JobQueue {
     return { jobId: id };
   }
 
+  async scheduleMailboxPolls(_options: ScheduledJobOptions): Promise<QueueResult> {
+    return { jobId: "fake-mailbox-polls" };
+  }
+
   async scheduleMailboxChecks(options: ScheduledJobOptions): Promise<QueueResult> {
     const id = this.nextId();
     this.jobs.push({ id, name: "mailbox.check", options });

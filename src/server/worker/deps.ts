@@ -152,10 +152,7 @@ export function createWorkerDeps(queue?: JobQueue) {
       );
       return { enqueued: mailboxes.length };
     },
-  } satisfies WorkerDeps & {
-    dispatchMailboxPolls(): Promise<unknown>;
-    dispatchMailboxChecks(): Promise<{ enqueued: number }>;
-  };
+  } satisfies WorkerDeps;
 }
 
 function createDeps(db: DbExecutor) {

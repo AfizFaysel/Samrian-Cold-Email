@@ -31,6 +31,7 @@ jobs:
       TEST_APP_DATABASE_URL: postgres://samrian_app_runtime:samrian-app-local@localhost:5432/samrian_test
       TEST_AUTH_DATABASE_URL: postgres://samrian_auth_runtime:samrian-auth-local@localhost:5432/samrian_test
       TEST_WORKER_DATABASE_URL: postgres://samrian_worker_runtime:samrian-worker-local@localhost:5432/samrian_test
+      TEST_REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -38,5 +39,6 @@ jobs:
           bun-version: 1.4.0
       - run: bun install --frozen-lockfile
       - run: docker compose -f docker-compose.db.yml up -d --wait
+      - run: docker compose -f docker-compose.worker.yml up -d --wait redis
       - run: bunx drizzle-kit migrate
-      - run: bun run test --project db --project repos
+      - run: bun run test --project db --project repos --project queue

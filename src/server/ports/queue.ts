@@ -56,6 +56,7 @@ export interface JobQueue {
   enqueueBounceProcess(payload: BounceJob, options?: JobOptions): Promise<QueueResult>;
   scheduleDailyCounterReset(options: ScheduledJobOptions): Promise<QueueResult>;
   scheduleCampaignDispatch(options: ScheduledJobOptions): Promise<QueueResult>;
+  scheduleMailboxPolls(options: ScheduledJobOptions): Promise<QueueResult>;
   scheduleMailboxChecks(options: ScheduledJobOptions): Promise<QueueResult>;
   scheduleMailboxRamp(options: ScheduledJobOptions): Promise<QueueResult>;
 }

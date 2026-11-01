@@ -31,7 +31,9 @@ export class BullMqQueue implements JobQueue {
       [JOB_NAMES.campaignSend]: this.createQueue(JOB_NAMES.campaignSend, config.prefix),
       [JOB_NAMES.campaignDispatch]: this.createQueue(JOB_NAMES.campaignDispatch, config.prefix),
       [JOB_NAMES.mailboxPoll]: this.createQueue(JOB_NAMES.mailboxPoll, config.prefix),
+      [JOB_NAMES.mailboxPollAll]: this.createQueue(JOB_NAMES.mailboxPollAll, config.prefix),
       [JOB_NAMES.mailboxCheck]: this.createQueue(JOB_NAMES.mailboxCheck, config.prefix),
+      [JOB_NAMES.mailboxCheckAll]: this.createQueue(JOB_NAMES.mailboxCheckAll, config.prefix),
       [JOB_NAMES.mailboxRamp]: this.createQueue(JOB_NAMES.mailboxRamp, config.prefix),
       [JOB_NAMES.emailBounce]: this.createQueue(JOB_NAMES.emailBounce, config.prefix),
       [JOB_NAMES.resetCounters]: this.createQueue(JOB_NAMES.resetCounters, config.prefix),
@@ -84,19 +86,34 @@ export class BullMqQueue implements JobQueue {
     return { jobId: job.id ?? JOB_NAMES.campaignDispatch };
   }
 
-  async scheduleMailboxChecks(options: ScheduledJobOptions): Promise<QueueResult> {
-    const job = await this.queues[JOB_NAMES.mailboxCheck].add(
-      JOB_NAMES.mailboxCheck,
+  async scheduleMailboxPolls(options: ScheduledJobOptions): Promise<QueueResult> {
+    const job = await this.queues[JOB_NAMES.mailboxPollAll].add(
+      JOB_NAMES.mailboxPollAll,
       {},
       {
-        jobId: JOB_NAMES.mailboxCheck,
+        jobId: JOB_NAMES.mailboxPollAll,
         repeat: {
           pattern: options.cron,
           tz: options.timezone,
         },
       }
     );
-    return { jobId: job.id ?? JOB_NAMES.mailboxCheck };
+    return { jobId: job.id ?? JOB_NAMES.mailboxPollAll };
+  }
+
+  async scheduleMailboxChecks(options: ScheduledJobOptions): Promise<QueueResult> {
+    const job = await this.queues[JOB_NAMES.mailboxCheckAll].add(
+      JOB_NAMES.mailboxCheckAll,
+      {},
+      {
+        jobId: JOB_NAMES.mailboxCheckAll,
+        repeat: {
+          pattern: options.cron,
+          tz: options.timezone,
+        },
+      }
+    );
+    return { jobId: job.id ?? JOB_NAMES.mailboxCheckAll };
   }
 
   async scheduleMailboxRamp(options: ScheduledJobOptions): Promise<QueueResult> {

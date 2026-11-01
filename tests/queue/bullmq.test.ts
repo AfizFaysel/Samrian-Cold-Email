@@ -51,6 +51,9 @@ describe.skipIf(!testRedisUrl)("BullMqQueue", () => {
         "campaign.send",
         "campaign.dispatch",
         "mailbox.poll",
+        "mailbox.poll-all",
+        "mailbox.check",
+        "mailbox.check-all",
         "email.bounce",
         "maintenance.reset-counters",
       ].map(async (name) => {
@@ -109,6 +112,16 @@ describe.skipIf(!testRedisUrl)("BullMqQueue", () => {
     await queue.enqueueCampaignSend(payload, { idempotencyKey: "assignment_1:1" });
 
     await expect(queue.getJobs("campaign.send")).resolves.toHaveLength(2);
+  });
+
+  test("schedules mailbox fan-out separately from per-mailbox jobs", async () => {
+    await queue.scheduleMailboxPolls({ cron: "*/5 * * * *", timezone: "UTC" });
+    await queue.scheduleMailboxChecks({ cron: "0 * * * *", timezone: "UTC" });
+
+    await expect(queue.getRepeatableJobs("mailbox.poll-all")).resolves.toHaveLength(1);
+    await expect(queue.getRepeatableJobs("mailbox.check-all")).resolves.toHaveLength(1);
+    await expect(queue.getRepeatableJobs("mailbox.check")).resolves.toHaveLength(0);
+    await expect(queue.getRepeatableJobs("mailbox.poll")).resolves.toHaveLength(0);
   });
 
   test("enqueues mailbox poll, bounce, and daily reset jobs", async () => {

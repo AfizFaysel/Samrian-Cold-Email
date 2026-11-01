@@ -33,8 +33,20 @@ describe("BullMQ worker processors", () => {
     await processors["maintenance.reset-counters"](undefined);
     await processors["campaign.dispatch"](undefined);
     await processors["mailbox.ramp"](undefined);
+    await processors["mailbox.poll-all"](undefined);
+    await processors["mailbox.check-all"](undefined);
 
-    expect(calls).toEqual(["send", "poll", "check", "bounce", "reset", "dispatch", "ramp"]);
+    expect(calls).toEqual([
+      "send",
+      "poll",
+      "check",
+      "bounce",
+      "reset",
+      "dispatch",
+      "ramp",
+      "poll-all",
+      "check-all",
+    ]);
   });
 
   test("preserves handler failures for BullMQ retries", async () => {
@@ -60,6 +72,7 @@ describe("BullMQ worker processors", () => {
   test("registers recurring worker schedules", async () => {
     const queue = {
       scheduleCampaignDispatch: vi.fn(async () => ({ jobId: "dispatch" })),
+      scheduleMailboxPolls: vi.fn(async () => ({ jobId: "polls" })),
       scheduleMailboxChecks: vi.fn(async () => ({ jobId: "checks" })),
       scheduleMailboxRamp: vi.fn(async () => ({ jobId: "ramp" })),
       scheduleDailyCounterReset: vi.fn(async () => ({ jobId: "reset" })),
@@ -69,6 +82,14 @@ describe("BullMQ worker processors", () => {
 
     expect(queue.scheduleCampaignDispatch).toHaveBeenCalledWith({
       cron: "*/5 * * * *",
+      timezone: "UTC",
+    });
+    expect(queue.scheduleMailboxPolls).toHaveBeenCalledWith({
+      cron: "*/5 * * * *",
+      timezone: "UTC",
+    });
+    expect(queue.scheduleMailboxChecks).toHaveBeenCalledWith({
+      cron: "0 * * * *",
       timezone: "UTC",
     });
     expect(queue.scheduleMailboxRamp).toHaveBeenCalledWith({
@@ -116,6 +137,14 @@ function createDeps(calls: string[]): WorkerDeps {
         stale: 0,
         limit: 100,
       } as const;
+    }),
+    dispatchMailboxPolls: vi.fn(async () => {
+      calls.push("poll-all");
+      return { status: "dispatched", count: 1 } as const;
+    }),
+    dispatchMailboxChecks: vi.fn(async () => {
+      calls.push("check-all");
+      return { enqueued: 1 };
     }),
     evaluateMailboxRamps: vi.fn(async () => {
       calls.push("ramp");

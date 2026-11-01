@@ -24,6 +24,7 @@ export function startWorker(queue?: JobQueue) {
 export async function scheduleWorkerJobs(queue: JobQueue) {
   await Promise.all([
     queue.scheduleCampaignDispatch({ cron: "*/5 * * * *", timezone: "UTC" }),
+    queue.scheduleMailboxPolls({ cron: "*/5 * * * *", timezone: "UTC" }),
     queue.scheduleMailboxChecks({ cron: "0 * * * *", timezone: "UTC" }),
     queue.scheduleMailboxRamp({ cron: "15 0 * * *", timezone: "UTC" }),
     queue.scheduleDailyCounterReset({ cron: "0 0 * * *", timezone: "UTC" }),
