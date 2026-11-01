@@ -1,5 +1,5 @@
 import type { Logger, LogFields } from "./logs";
-import { redact } from "./redact";
+import { redact, redactError } from "./redact";
 
 export interface ErrorReporter {
   capture(error: unknown, fields?: LogFields): void;
@@ -21,16 +21,11 @@ export function createNoopErrorReporter(): ErrorReporter {
 }
 
 export function normalizeError(error: unknown) {
-  if (error instanceof Error) {
-    return redact({
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-    });
-  }
+  if (error instanceof Error) return redactError(error);
 
   return redact({
     name: "NonError",
     message: String(error),
+    stack: undefined as string | undefined,
   });
 }

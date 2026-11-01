@@ -2,6 +2,7 @@ import { trace, SpanStatusCode } from "@opentelemetry/api";
 
 import { normalizeError } from "./errors";
 import type { Logger, LogFields } from "./logs";
+import { redact } from "./redact";
 
 export interface Tracer {
   span<T>(name: string, fields: LogFields, fn: () => Promise<T> | T): Promise<T>;
@@ -18,7 +19,7 @@ export function createTracer(options: {
     async span(name, fields, fn) {
       const start = now();
       return await otelTracer.startActiveSpan(name, async (span) => {
-        for (const [key, value] of Object.entries(fields)) {
+        for (const [key, value] of Object.entries(redact(fields))) {
           if (isAttributeValue(value)) span.setAttribute(key, value);
         }
 
@@ -35,7 +36,7 @@ export function createTracer(options: {
           return result;
         } catch (error) {
           const durationMs = now() - start;
-          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          span.recordException(normalizeError(error));
           span.setStatus({ code: SpanStatusCode.ERROR });
           options.logger.error("trace.span_failed", {
             ...fields,

@@ -57,11 +57,25 @@ function redactValue(value: unknown, key: string | undefined): unknown {
   return value;
 }
 
-function redactError(error: Error) {
+export function redactError(error: Error) {
+  const { name, message, stack } = withoutQueryParams(error);
+  return {
+    name,
+    message: redactValue(message, undefined) as string,
+    stack: redactValue(stack, undefined) as string | undefined,
+  };
+}
+
+// Drizzle writes bound values into failed query messages, where key matching cannot see them.
+function withoutQueryParams(error: Error) {
+  const { query } = error as Error & { query?: unknown };
+  if (typeof query !== "string" || !("params" in error)) return error;
+
+  const message = `Failed query: ${query}`;
   return {
     name: error.name,
-    message: redactValue(error.message, undefined),
-    stack: redactValue(error.stack, undefined),
+    message,
+    stack: error.stack?.replace(error.message, () => message),
   };
 }
 
