@@ -20,6 +20,8 @@ const statement = {
   domain: ["read", "check"],
   notification: ["read", "update"],
   settings: ["read", "update"],
+  // Better Auth's API key plugin checks its own resource. Samrian grants access through credential.
+  apiKey: ["create", "read", "update", "delete"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -30,6 +32,7 @@ export const owner = ac.newRole({
   campaign: ["create", "read", "update", "delete", "launch", "pause"],
   contact: ["create", "read", "update", "delete", "import"],
   credential: ["create", "read", "delete"],
+  apiKey: ["create", "read", "update", "delete"],
   group: ["create", "read", "update", "delete"],
   blocklist: ["create", "read", "delete"],
   inbox: ["read", "update", "reply"],
@@ -45,6 +48,7 @@ export const admin = ac.newRole({
   campaign: ["create", "read", "update", "delete", "launch", "pause"],
   contact: ["create", "read", "update", "delete", "import"],
   credential: ["create", "read", "delete"],
+  apiKey: ["create", "read", "update", "delete"],
   group: ["create", "read", "update", "delete"],
   blocklist: ["create", "read", "delete"],
   inbox: ["read", "update", "reply"],
@@ -68,4 +72,5 @@ export const member = ac.newRole({
   settings: ["read"],
 });
 
-export const permissionCatalog = statement;
+const { apiKey: _apiKey, ...grantable } = statement;
+export const permissionCatalog = grantable;
