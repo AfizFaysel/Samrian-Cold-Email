@@ -20,6 +20,11 @@ Set these in every production environment:
 
 Better Auth mode also requires `BETTER_AUTH_SECRET`, `AUTH_DATABASE_URL`, and Better Auth auth
 tables in Postgres. `AUTH_DATABASE_URL` must use a login inheriting only `samrian_auth`.
+Better Auth invitations need `SYSTEM_SMTP_URL` (for example `smtps://user:password@mail.example.com`)
+and `SYSTEM_EMAIL_FROM`. Without them inviting is refused, because an invitation can only be
+accepted from a verified address and verification is sent by email. Google sign-in addresses count
+as verified. Use a transactional sender, not a mailbox connected for campaigns.
+
 Mailbox OAuth signs its state with `OAUTH_STATE_SECRET`, falling back to `BETTER_AUTH_SECRET`, so
 WorkOS deployments connecting Google or Microsoft mailboxes must set `OAUTH_STATE_SECRET`.
 WorkOS mode requires `WORKOS_API_KEY`, `WORKOS_CLIENT_ID`, `WORKOS_COOKIE_PASSWORD`, and `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; it does not require Better Auth auth tables for runtime auth.

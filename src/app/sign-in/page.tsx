@@ -13,6 +13,7 @@ import { HostedAuth } from "@/components/hosted-auth";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { safeRedirectPath } from "@/lib/redirect";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function SignInPage() {
       if (result.error) {
         toast.error(result.error.message || "Sign-in failed");
       } else {
-        router.push("/dashboard");
+        router.push(safeRedirectPath(window.location.search));
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Sign-in failed");

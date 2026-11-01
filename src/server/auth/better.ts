@@ -7,8 +7,10 @@ import { headers } from "next/headers";
 
 import { ac, admin, member, owner } from "../../../lib/permissions";
 import { getAuthDb } from "../db/db";
+import { isSystemMailConfigured, sendSystemEmail } from "../mail/system";
 import * as schema from "../db/schema";
 import { getGoogleAuthConfig } from "./config";
+import { logger } from "../observability/runtime";
 import type { AuthProvider } from "./port";
 import type { PermissionRequest, SessionData } from "./types";
 
@@ -32,6 +34,7 @@ const DISABLED_PATHS = [
 
 export function createAuthOptions(params?: { database?: BetterAuthOptions["database"] }) {
   const google = getGoogleAuthConfig();
+  const appUrl = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL;
 
   return {
     appName: "ColdEmail MVP",
@@ -50,6 +53,21 @@ export function createAuthOptions(params?: { database?: BetterAuthOptions["datab
       enabled: true,
       requireEmailVerification: false,
     },
+    ...(isSystemMailConfigured()
+      ? {
+          emailVerification: {
+            sendOnSignUp: true,
+            // A mail outage must not stop sign-up, and only invitations need a verified address.
+            async sendVerificationEmail({ user, url }) {
+              await sendSystemEmail({
+                to: user.email,
+                subject: "Verify your email for Samrian",
+                text: `Confirm this address by opening the link below.\n\n${url}\n`,
+              }).catch(() => logger.warn("auth.verification_email_failed", {}));
+            },
+          } satisfies BetterAuthOptions["emailVerification"],
+        }
+      : {}),
     ...(google.enabled
       ? {
           socialProviders: {
@@ -81,16 +99,19 @@ export function createAuthOptions(params?: { database?: BetterAuthOptions["datab
         creatorRole: "owner",
         membershipLimit: 100,
         invitationExpiresIn: 60 * 60 * 24 * 7,
+        // Sign-up does not prove ownership, so otherwise anyone could register an invited address.
+        requireEmailVerificationOnInvitation: true,
         dynamicAccessControl: {
           enabled: true,
           maximumRolesPerOrganization: 20,
         },
         async sendInvitationEmail(data) {
-          console.log("Invitation email:", {
+          await sendSystemEmail({
             to: data.email,
-            inviter: data.inviter.user.email,
-            organization: data.organization.name,
-            invitationId: data.id,
+            subject: `Join ${data.organization.name} on Samrian`,
+            text:
+              `${data.inviter.user.email} invited you to ${data.organization.name} on Samrian.\n\n` +
+              `Accept the invitation: ${appUrl}/accept-invitation/${data.id}\n`,
           });
         },
       }),

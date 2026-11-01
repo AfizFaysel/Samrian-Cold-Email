@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { errorResponse } from "@/server/api/error-response";
 import { createSessionAction } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
 import { getAuthProvider } from "@/server/auth/provider";
@@ -28,11 +29,15 @@ export const POST = createSessionAction(
     if (!(await getAuthProvider().hasPermission(permissionRequestFor(role.permissions)))) {
       return Response.json({ error: "Cannot assign this role" }, { status: 403 });
     }
-    await roles.invite({
-      orgId,
-      inviterUserId: userId,
-      ...parsed.data,
-    });
-    return Response.json({ invited: true }, { status: 201 });
+    try {
+      await roles.invite({
+        orgId,
+        inviterUserId: userId,
+        ...parsed.data,
+      });
+      return Response.json({ invited: true }, { status: 201 });
+    } catch (error) {
+      return errorResponse(error, "Invitation failed", "/api/settings/invitations");
+    }
   }
 );

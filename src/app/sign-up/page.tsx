@@ -15,6 +15,7 @@ import { HostedAuth } from "@/components/hosted-auth";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { safeRedirectPath } from "@/lib/redirect";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -75,7 +76,7 @@ export default function SignUpPage() {
       }
 
       toast.success("Account created successfully!");
-      router.push("/dashboard");
+      router.push(safeRedirectPath(window.location.search));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Sign-up failed");
     } finally {

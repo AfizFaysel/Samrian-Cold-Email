@@ -9,6 +9,7 @@ const workosProxy = authkitProxy({
       "/",
       "/sign-in",
       "/sign-up",
+      "/accept-invitation/:path*",
       "/api/auth/:path*",
       "/api/health",
       "/api/inngest",

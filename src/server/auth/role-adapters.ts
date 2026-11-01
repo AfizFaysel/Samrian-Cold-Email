@@ -1,3 +1,5 @@
+import { isSystemMailConfigured } from "../mail/system";
+import { PublicError } from "../modules/public-error";
 import { admin, member, owner } from "../../../lib/permissions";
 import type { AppMember, AppRole, RoleProvider } from "./role-provider";
 
@@ -137,12 +139,16 @@ export function createBetterRoleProvider(api: BetterRoleApi, headers: Headers): 
       });
     },
     async inviteMember(input) {
+      if (!isSystemMailConfigured()) {
+        throw new PublicError("Set SYSTEM_SMTP_URL and SYSTEM_EMAIL_FROM to send invitations", 503);
+      }
       await api.createInvitation({
         ...request,
         body: {
           organizationId: input.orgId,
           email: input.email,
           role: input.role,
+          resend: true,
         },
       });
     },
