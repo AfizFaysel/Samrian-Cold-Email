@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull, or } from "drizzle-orm";
 
 import { notifications } from "../db/schema";
 import type { DbExecutor } from "../db/tx";
@@ -42,7 +42,7 @@ export class PostgresNotificationRepo {
 
   async listLatest(input: ListNotificationsInput): Promise<NotificationRecord[]> {
     const filters = [eq(notifications.orgId, input.orgId)];
-    if (input.userId) filters.push(eq(notifications.userId, input.userId));
+    if (input.userId) filters.push(visibleTo(input.userId));
 
     const rows = await this.db
       .select()
@@ -56,7 +56,7 @@ export class PostgresNotificationRepo {
 
   async countUnread(input: CountUnreadNotificationsInput): Promise<number> {
     const filters = [eq(notifications.orgId, input.orgId), isNull(notifications.readAt)];
-    if (input.userId) filters.push(eq(notifications.userId, input.userId));
+    if (input.userId) filters.push(visibleTo(input.userId));
 
     const [row] = await this.db
       .select({ value: count() })
@@ -74,7 +74,7 @@ export class PostgresNotificationRepo {
 
   async markAllRead(input: CountUnreadNotificationsInput, at = new Date()): Promise<number> {
     const filters = [eq(notifications.orgId, input.orgId), isNull(notifications.readAt)];
-    if (input.userId) filters.push(eq(notifications.userId, input.userId));
+    if (input.userId) filters.push(visibleTo(input.userId));
 
     const rows = await this.db
       .update(notifications)
@@ -84,6 +84,11 @@ export class PostgresNotificationRepo {
 
     return rows.length;
   }
+}
+
+// Jobs have no acting user, so their notices carry none and belong to the whole organization.
+function visibleTo(userId: string) {
+  return or(eq(notifications.userId, userId), isNull(notifications.userId))!;
 }
 
 function toNotification(row: typeof notifications.$inferSelect): NotificationRecord {

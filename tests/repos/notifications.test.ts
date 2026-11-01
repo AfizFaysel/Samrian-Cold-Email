@@ -16,6 +16,18 @@ describe.skipIf(!testUrl)("postgres notification repo", () => {
     await db.delete(notifications).where(eq(notifications.orgId, "org_other"));
   });
 
+  test("organization-wide notices reach every member, unlike personal ones", async () => {
+    await repo.create({ orgId: "org_repo", type: "reply", title: "For everyone" });
+    await repo.create({ orgId: "org_repo", userId: "user_2", type: "reply", title: "Personal" });
+
+    const seen = await repo.listLatest({ orgId: "org_repo", userId: "user_1", limit: 10 });
+
+    expect(seen.map((item) => item.title)).toEqual(["For everyone"]);
+    await expect(repo.countUnread({ orgId: "org_repo", userId: "user_1" })).resolves.toBe(1);
+    await expect(repo.markAllRead({ orgId: "org_repo", userId: "user_1" })).resolves.toBe(1);
+    await expect(repo.countUnread({ orgId: "org_repo", userId: "user_2" })).resolves.toBe(1);
+  });
+
   test("creates, lists latest, counts unread, and marks read per org", async () => {
     const first = await repo.create({
       orgId: "org_repo",
