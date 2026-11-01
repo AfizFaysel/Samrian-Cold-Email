@@ -12,6 +12,24 @@ import { getGoogleAuthConfig } from "./config";
 import type { AuthProvider } from "./port";
 import type { PermissionRequest, SessionData } from "./types";
 
+// Samrian routes apply grantability, self-change, and audit rules to these actions. Direct HTTP
+// calls would skip them. This only closes the HTTP routes, so auth.api calls still work.
+const DISABLED_PATHS = [
+  "/organization/update-member-role",
+  "/organization/invite-member",
+  "/organization/remove-member",
+  "/organization/create-role",
+  "/organization/update-role",
+  "/organization/delete-role",
+  "/organization/update",
+  "/organization/delete",
+  "/api-key/create",
+  "/api-key/get",
+  "/api-key/list",
+  "/api-key/update",
+  "/api-key/delete",
+];
+
 export function createAuthOptions(params?: { database?: BetterAuthOptions["database"] }) {
   const google = getGoogleAuthConfig();
 
@@ -20,6 +38,7 @@ export function createAuthOptions(params?: { database?: BetterAuthOptions["datab
     baseURL: process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins: [process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"],
+    disabledPaths: DISABLED_PATHS,
     database:
       params?.database ??
       drizzleAdapter(getAuthDb(), {
