@@ -206,6 +206,8 @@ export type CountUnreadNotificationsInput = {
   userId?: string;
 };
 
+export type CampaignStatus = "draft" | "active" | "paused" | "completed";
+
 export type CampaignStats = {
   campaignId: CampaignId;
   total: number;
@@ -246,7 +248,12 @@ export type EventRecordResult = {
 
 export interface CampaignRepo {
   getById(id: CampaignId, orgId: OrgId): Promise<CampaignRecord | null>;
-  updateStatus(id: CampaignId, orgId: OrgId, status: string): Promise<void>;
+  transitionStatus(
+    id: CampaignId,
+    orgId: OrgId,
+    from: CampaignStatus[],
+    to: CampaignStatus
+  ): Promise<boolean>;
   getStats(campaignId: CampaignId, orgId: OrgId): Promise<CampaignStats | null>;
 }
 

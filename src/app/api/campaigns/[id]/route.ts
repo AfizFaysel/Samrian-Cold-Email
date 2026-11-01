@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createSessionRoute } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
+import { CampaignStatusError, changeCampaignStatus } from "@/server/modules/campaigns";
 import { PostgresCampaignMailboxRepo, PostgresCampaignRepo } from "@/server/repos";
 
 export const GET = createSessionRoute(
@@ -17,6 +18,8 @@ export const GET = createSessionRoute(
     return NextResponse.json({ campaign: { ...campaign, mailboxIds } });
   }
 );
+
+const STATUS_ERRORS = { "not-found": 404, conflict: 409, unsupported: 400 } as const;
 
 export const PATCH = createSessionRoute(
   sessionOperations.campaignUpdate,
@@ -35,7 +38,17 @@ export const PATCH = createSessionRoute(
       );
     }
 
-    await new PostgresCampaignRepo(db).updateStatus(id, orgId, body.status);
-    return NextResponse.json({ success: true });
+    try {
+      await changeCampaignStatus(
+        { campaignId: id, orgId, status: body.status },
+        { campaigns: new PostgresCampaignRepo(db) }
+      );
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      if (error instanceof CampaignStatusError) {
+        return NextResponse.json({ error: error.message }, { status: STATUS_ERRORS[error.code] });
+      }
+      throw error;
+    }
   }
 );

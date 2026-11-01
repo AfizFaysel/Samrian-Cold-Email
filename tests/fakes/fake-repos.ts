@@ -53,9 +53,11 @@ export class FakeRepos {
       data: campaigns,
       getById: async (id, orgId) =>
         campaigns.find((campaign) => campaign.id === id && campaign.orgId === orgId) ?? null,
-      updateStatus: async (id, orgId, status) => {
+      transitionStatus: async (id, orgId, from, status) => {
         const campaign = campaigns.find((item) => item.id === id && item.orgId === orgId);
-        if (campaign) campaign.status = status;
+        if (!campaign || !from.includes((campaign.status ?? "active") as never)) return false;
+        campaign.status = status;
+        return true;
       },
       getStats: async (id) => campaignStats.find((stats) => stats.campaignId === id) ?? null,
     };

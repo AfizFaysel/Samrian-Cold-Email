@@ -19,8 +19,9 @@ describe("campaign health module", () => {
         },
         {
           campaigns: {
-            updateStatus: async (_id, _orgId, status) => {
+            transitionStatus: async (_id, _orgId, _from, status) => {
               updated.push(status);
+              return true;
             },
           },
           notifications,
@@ -46,8 +47,9 @@ describe("campaign health module", () => {
         },
         {
           campaigns: {
-            updateStatus: async (_id, _orgId, status) => {
+            transitionStatus: async (_id, _orgId, _from, status) => {
               updated.push(status);
+              return true;
             },
           },
           notifications,

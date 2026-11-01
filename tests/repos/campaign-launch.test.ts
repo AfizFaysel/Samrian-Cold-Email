@@ -48,6 +48,50 @@ describe.skipIf(!testUrl)("postgres campaign launch repos", () => {
     await expect(campaignsRepo.activateDraft(campaign.id, "org_launch")).resolves.toBe(false);
   });
 
+  test("saves a draft only while it is still a draft", async () => {
+    const campaign = await campaignsRepo.create({
+      orgId: "org_launch",
+      name: "Original",
+      schedule: {},
+      steps: [{ subject: "Hello", body: "Hi" }],
+      status: "draft",
+    });
+    const save = (name: string) =>
+      campaignsRepo.saveDraft({
+        id: campaign.id,
+        orgId: "org_launch",
+        name,
+        schedule: {},
+        steps: [],
+      });
+
+    await expect(save("Edited")).resolves.toBe(campaign.id);
+    await campaignsRepo.activateDraft(campaign.id, "org_launch");
+    await expect(save("Too late")).resolves.toBeNull();
+
+    await expect(campaignsRepo.getById(campaign.id, "org_launch")).resolves.toMatchObject({
+      name: "Edited",
+      status: "active",
+    });
+  });
+
+  test("moves status only from an expected state", async () => {
+    const campaign = await campaignsRepo.create({
+      orgId: "org_launch",
+      name: "Moves",
+      schedule: {},
+      steps: [],
+      status: "active",
+    });
+    const move = (from: Array<"active" | "paused">, to: "paused" | "completed") =>
+      campaignsRepo.transitionStatus(campaign.id, "org_launch", from, to);
+
+    await expect(move(["active"], "paused")).resolves.toBe(true);
+    await expect(move(["active"], "paused")).resolves.toBe(false);
+    await expect(move(["active", "paused"], "completed")).resolves.toBe(true);
+    await expect(move(["active"], "paused")).resolves.toBe(false);
+  });
+
   test("replaces campaign mailbox links idempotently and rejects inactive mailboxes", async () => {
     const campaign = await campaignsRepo.create({
       orgId: "org_launch",

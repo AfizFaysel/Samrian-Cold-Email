@@ -1,12 +1,114 @@
 import { describe, expect, test, vi } from "vitest";
 
 import {
+  changeCampaignStatus,
   launchCampaign,
   resumeCampaign,
   saveCampaignDraft,
   validateCampaignLaunch,
 } from "../../../src/server/modules/campaigns";
 import type { ContactRecord } from "../../../src/server/ports";
+
+describe("campaign status changes", () => {
+  const change = (
+    status: string,
+    campaigns: Parameters<typeof changeCampaignStatus>[1]["campaigns"]
+  ) => changeCampaignStatus({ campaignId: "campaign_1", orgId: "org_1", status }, { campaigns });
+  const repo = (moved: boolean, existing: object | null = { status: "active" }) => ({
+    transitionStatus: vi.fn(async () => moved),
+    getLaunch: vi.fn(async () => existing as never),
+  });
+
+  test.each([
+    ["paused", ["active"]],
+    ["completed", ["active", "paused"]],
+  ])("allows %s only from %j", async (status, from) => {
+    const campaigns = repo(true);
+
+    await change(status, campaigns);
+
+    expect(campaigns.transitionStatus).toHaveBeenCalledWith("campaign_1", "org_1", from, status);
+  });
+
+  test.each(["draft", "active", "archived"])("refuses to set %s here", async (status) => {
+    const campaigns = repo(true);
+
+    await expect(change(status, campaigns)).rejects.toMatchObject({ code: "unsupported" });
+    expect(campaigns.transitionStatus).not.toHaveBeenCalled();
+  });
+
+  test("reports a conflict when the campaign is in the wrong state", async () => {
+    await expect(change("paused", repo(false))).rejects.toMatchObject({ code: "conflict" });
+  });
+
+  test("reports a missing campaign", async () => {
+    await expect(change("paused", repo(false, null))).rejects.toMatchObject({
+      code: "not-found",
+    });
+  });
+});
+
+describe("what a campaign may send", () => {
+  const launch = (input: Parameters<typeof createDeps>[0]) =>
+    launchCampaign(
+      { campaignId: "campaign_1", orgId: "org_1", mailboxIds: ["mailbox_1"] },
+      createDeps(input)
+    );
+  const schedule = { daysAllowed: ["monday"], startTime: "09:00", endTime: "17:00" };
+
+  test.each([
+    [[null], "Step 1 is invalid"],
+    [[{}], "Step 1 needs a subject"],
+    [[{ subject: "  ", body: "Hi" }], "Step 1 needs a subject"],
+    [[{ subject: "Hi", body: " " }], "Step 1 needs a body"],
+    [[{ subject: "Hi", body: "Yo" }, { subject: "Next" }], "Step 2 needs a body"],
+    [[{ subject: "Hi", body: "Yo", delayDays: -1 }], "Step 1 is invalid"],
+    [[{ subject: "Hi", body: "Yo", delayHours: "soon" }], "Step 1 is invalid"],
+  ])("rejects steps %j", async (steps, issue) => {
+    await expect(launch({ steps: steps as never })).rejects.toMatchObject({
+      issues: expect.arrayContaining([issue]),
+    });
+  });
+
+  test.each([
+    [{ ...schedule, startTime: "25:00", endTime: "26:00" }],
+    [{ ...schedule, startTime: "09:60" }],
+    [{ ...schedule, daysAllowed: ["someday"] }],
+    [{ ...schedule, daysAllowed: "monday" }],
+    [{ ...schedule, startTime: "17:00", endTime: "09:00" }],
+  ])("rejects the schedule %j", async (input) => {
+    await expect(launch({ schedule: input })).rejects.toMatchObject({
+      issues: ["Campaign schedule must include send days and a valid time window"],
+    });
+  });
+
+  test.each(["timezone", "defaultTimezone"])("rejects an invalid %s", async (field) => {
+    await expect(launch({ schedule: { ...schedule, [field]: "Mars/Base" } })).rejects.toMatchObject(
+      { issues: ["Campaign timezone is invalid"] }
+    );
+  });
+
+  test("accepts capitalized days, which dispatch treats the same", async () => {
+    await expect(
+      launch({ schedule: { ...schedule, daysAllowed: ["Monday"] } })
+    ).resolves.toMatchObject({ status: "launched" });
+  });
+
+  test("refuses an audience over the limit instead of quietly cutting it", async () => {
+    const contacts = Array.from({ length: 10_001 }, (_, index) => ({
+      id: `contact_${index}`,
+      orgId: "org_1",
+      email: `c${index}@example.com`,
+      customVars: {},
+    }));
+
+    await expect(
+      launch({ targetContactIds: null, targetGroupId: "group_1", dynamicGroup: true, contacts })
+    ).rejects.toMatchObject({
+      issues: ["Campaign audience is over the limit of 10000 contacts"],
+    });
+  });
+});
 
 describe("campaign resume", () => {
   const input = { campaignId: "campaign_1", orgId: "org_1" };
@@ -194,16 +296,59 @@ describe("campaign launch module", () => {
     });
   });
 
-  test("returns already-active without duplicating assignments", async () => {
+  test("launching an active campaign reports it and changes nothing", async () => {
     const deps = createDeps({ status: "active", existingAssignments: 2 });
+    const replace = vi.spyOn(deps.campaignMailboxes, "replaceForCampaign");
+    const assign = vi.spyOn(deps.assignments, "createManyForCampaign");
+
+    await expect(
+      launchCampaign({ campaignId: "campaign_1", orgId: "org_1", mailboxIds: ["mailbox_2"] }, deps)
+    ).resolves.toMatchObject({
+      status: "already-active",
+      assignmentCount: 2,
+      createdAssignments: 0,
+      existingAssignments: 2,
+      linkedMailboxCount: 1,
+    });
+
+    expect(replace).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  test("losing a launch race changes nothing", async () => {
+    const deps = createDeps({ status: "draft" });
+    deps.campaigns.activateDraft = async () => false;
+    const replace = vi.spyOn(deps.campaignMailboxes, "replaceForCampaign");
 
     await expect(
       launchCampaign({ campaignId: "campaign_1", orgId: "org_1", mailboxIds: ["mailbox_1"] }, deps)
-    ).resolves.toMatchObject({
-      status: "already-active",
-      createdAssignments: 0,
-      existingAssignments: 2,
-    });
+    ).resolves.toMatchObject({ status: "already-active" });
+
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  test("a draft save that loses to a launch is a conflict", async () => {
+    const campaigns = {
+      getLaunch: vi.fn().mockResolvedValue({ status: "draft" }),
+      saveDraft: vi.fn().mockResolvedValue(null),
+    };
+    const campaignMailboxes = { replaceForCampaign: vi.fn() };
+
+    await expect(
+      saveCampaignDraft(
+        {
+          id: "campaign_1",
+          orgId: "org_1",
+          name: "Outbound",
+          schedule: {},
+          steps: [],
+          mailboxIds: ["mailbox_1"],
+        },
+        { campaigns, campaignMailboxes }
+      )
+    ).rejects.toMatchObject({ code: "conflict" });
+
+    expect(campaignMailboxes.replaceForCampaign).not.toHaveBeenCalled();
   });
 
   test("launches a dynamic group by resolving matching contacts", async () => {
@@ -314,6 +459,13 @@ function createDeps(input?: {
         if (this.status !== "draft") return false;
         this.status = "active";
         return true;
+      },
+      async getStats() {
+        return {
+          campaignId: "campaign_1",
+          total: input?.existingAssignments ?? 0,
+          bounced: 0,
+        };
       },
       async resumePaused() {
         if (this.status !== "paused") return false;

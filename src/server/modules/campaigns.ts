@@ -9,11 +9,22 @@ import {
   PostgresSettingsRepo,
 } from "../repos";
 import type { DbExecutor } from "../db/tx";
-import type { CampaignId, ContactId, ContactRecord, MailboxId, OrgId } from "../ports";
+import type {
+  CampaignId,
+  CampaignStats,
+  CampaignStatus,
+  ContactId,
+  ContactRecord,
+  MailboxId,
+  OrgId,
+} from "../ports";
 import type { CampaignLaunchRecord } from "../repos/campaigns";
 import type { CreateCampaignInput } from "../repos/campaigns";
+import { campaignStepSchema, isTimezone } from "@samrian/contracts";
+
 import { validateCompliance, type ComplianceSettings } from "./compliance";
 import { assessContact } from "./contacts";
+import { GROUP_AUDIENCE_LIMIT } from "./groups";
 
 export type LaunchCampaignInput = {
   campaignId: CampaignId;
@@ -34,7 +45,7 @@ export async function saveCampaignDraft(
   deps: {
     campaigns: {
       getLaunch(id: CampaignId, orgId: OrgId): Promise<CampaignLaunchRecord | null>;
-      saveDraft(input: CreateCampaignInput): Promise<CampaignId>;
+      saveDraft(input: CreateCampaignInput): Promise<CampaignId | null>;
     };
     campaignMailboxes: {
       replaceForCampaign(input: {
@@ -53,6 +64,7 @@ export async function saveCampaignDraft(
 
   const { mailboxIds, ...draft } = input;
   const campaignId = await deps.campaigns.saveDraft(draft);
+  if (!campaignId) throw new CampaignDraftError("conflict");
   if (mailboxIds) {
     await deps.campaignMailboxes.replaceForCampaign({ campaignId, orgId: input.orgId, mailboxIds });
   }
@@ -86,6 +98,63 @@ export type CampaignLaunchValidation = {
 };
 
 const NOT_PAUSED = "Only paused campaigns can be resumed";
+const WEEK_DAYS = new Set([
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+]);
+const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Activating and resuming have their own checks, so neither is reachable from a status change.
+const STATUS_SOURCES: Partial<Record<string, CampaignStatus[]>> = {
+  paused: ["active"],
+  completed: ["active", "paused"],
+};
+
+export class CampaignStatusError extends Error {
+  constructor(readonly code: "not-found" | "conflict" | "unsupported") {
+    super(
+      code === "not-found"
+        ? "Campaign not found"
+        : code === "conflict"
+          ? "Campaign cannot change to that status from its current status"
+          : "Unsupported campaign status"
+    );
+  }
+}
+
+export async function changeCampaignStatus(
+  input: { campaignId: CampaignId; orgId: OrgId; status: string },
+  deps: {
+    campaigns: {
+      getLaunch(id: CampaignId, orgId: OrgId): Promise<CampaignLaunchRecord | null>;
+      transitionStatus(
+        id: CampaignId,
+        orgId: OrgId,
+        from: CampaignStatus[],
+        to: CampaignStatus
+      ): Promise<boolean>;
+    };
+  }
+) {
+  const from = Object.hasOwn(STATUS_SOURCES, input.status) && STATUS_SOURCES[input.status];
+  if (!from) throw new CampaignStatusError("unsupported");
+
+  const moved = await deps.campaigns.transitionStatus(
+    input.campaignId,
+    input.orgId,
+    from,
+    input.status as CampaignStatus
+  );
+  if (moved) return;
+
+  const exists = await deps.campaigns.getLaunch(input.campaignId, input.orgId);
+  throw new CampaignStatusError(exists ? "conflict" : "not-found");
+}
 
 export class CampaignLaunchError extends Error {
   constructor(
@@ -101,6 +170,7 @@ export type LaunchCampaignDeps = {
     getLaunch(id: CampaignId, orgId: OrgId): Promise<CampaignLaunchRecord | null>;
     activateDraft(id: CampaignId, orgId: OrgId): Promise<boolean>;
     resumePaused(id: CampaignId, orgId: OrgId): Promise<boolean>;
+    getStats(id: CampaignId, orgId: OrgId): Promise<CampaignStats | null>;
   };
   campaignMailboxes: {
     replaceForCampaign(input: {
@@ -159,8 +229,17 @@ export async function launchCampaign(
   input: LaunchCampaignInput,
   deps: LaunchCampaignDeps
 ): Promise<LaunchCampaignResult> {
+  const current = await deps.campaigns.getLaunch(input.campaignId, input.orgId);
+  if (current?.status === "active") return alreadyActive(input, deps);
+
   const prepared = await prepareCampaignLaunch(input, deps);
   const { campaign, mailboxIds, eligibleContactIds, skippedContacts } = prepared;
+
+  // Activating first means only the winner of a race touches the audience and mailboxes.
+  if (!(await deps.campaigns.activateDraft(campaign.id, input.orgId))) {
+    return alreadyActive(input, deps);
+  }
+
   const linked = await deps.campaignMailboxes.replaceForCampaign({
     campaignId: campaign.id,
     orgId: input.orgId,
@@ -171,19 +250,35 @@ export async function launchCampaign(
     orgId: input.orgId,
     contactIds: eligibleContactIds,
   });
-  const activated =
-    campaign.status === "draft"
-      ? await deps.campaigns.activateDraft(campaign.id, input.orgId)
-      : false;
 
   return {
-    status: activated ? "launched" : "already-active",
+    status: "launched",
     campaignId: campaign.id,
     assignmentCount: eligibleContactIds.length,
     createdAssignments: assignments.created,
     existingAssignments: assignments.existing,
     linkedMailboxCount: linked.linked,
     skippedContacts,
+    warnings: [],
+  };
+}
+
+async function alreadyActive(
+  input: LaunchCampaignInput,
+  deps: LaunchCampaignDeps
+): Promise<LaunchCampaignResult> {
+  const [stats, linked] = await Promise.all([
+    deps.campaigns.getStats(input.campaignId, input.orgId),
+    deps.campaignMailboxes.listForCampaign(input.campaignId, input.orgId),
+  ]);
+  return {
+    status: "already-active",
+    campaignId: input.campaignId,
+    assignmentCount: stats?.total ?? 0,
+    createdAssignments: 0,
+    existingAssignments: stats?.total ?? 0,
+    linkedMailboxCount: linked.length,
+    skippedContacts: emptySkipped(),
     warnings: [],
   };
 }
@@ -291,7 +386,13 @@ async function resolveTargetContactIds(
     if (!deps.groups.resolveContactIds) {
       throw new CampaignLaunchError(["Dynamic group launch is not supported yet"]);
     }
-    return Array.from(new Set(await deps.groups.resolveContactIds(group.id, orgId)));
+    const contactIds = await deps.groups.resolveContactIds(group.id, orgId);
+    if (contactIds.length > GROUP_AUDIENCE_LIMIT) {
+      throw new CampaignLaunchError([
+        `Campaign audience is over the limit of ${GROUP_AUDIENCE_LIMIT} contacts`,
+      ]);
+    }
+    return Array.from(new Set(contactIds));
   }
   return Array.from(new Set(group.contactIds ?? []));
 }
@@ -337,9 +438,11 @@ function validateCampaign(campaign: CampaignLaunchRecord): string[] {
   const issues: string[] = [];
   if (!campaign.name.trim()) issues.push("Campaign name is required");
   if (campaign.steps.length === 0) issues.push("Add at least one email step");
+  issues.push(...validateSteps(campaign.steps));
   if (!hasUsableSchedule(campaign.schedule)) {
     issues.push("Campaign schedule must include send days and a valid time window");
   }
+  if (!hasValidTimezones(campaign.schedule)) issues.push("Campaign timezone is invalid");
   if (
     !campaign.targetGroupId &&
     (!campaign.targetContactIds || campaign.targetContactIds.length === 0)
@@ -349,6 +452,24 @@ function validateCampaign(campaign: CampaignLaunchRecord): string[] {
   return issues;
 }
 
+function validateSteps(steps: readonly unknown[]): string[] {
+  return steps.flatMap((step, index) => {
+    const label = `Step ${index + 1}`;
+    const parsed = campaignStepSchema.safeParse(step);
+    if (!parsed.success) return [`${label} is invalid`];
+    return [
+      ...(parsed.data.subject?.trim() ? [] : [`${label} needs a subject`]),
+      ...(parsed.data.body?.trim() ? [] : [`${label} needs a body`]),
+    ];
+  });
+}
+
+function hasValidTimezones(schedule: Record<string, unknown>): boolean {
+  return [schedule.timezone, schedule.defaultTimezone].every(
+    (value) => value == null || (typeof value === "string" && isTimezone(value))
+  );
+}
+
 function hasUsableSchedule(schedule: Record<string, unknown>): boolean {
   const daysAllowed = schedule.daysAllowed;
   const startTime = schedule.startTime;
@@ -356,10 +477,11 @@ function hasUsableSchedule(schedule: Record<string, unknown>): boolean {
   return (
     Array.isArray(daysAllowed) &&
     daysAllowed.length > 0 &&
+    daysAllowed.every((day) => WEEK_DAYS.has(String(day).toLowerCase())) &&
     typeof startTime === "string" &&
-    /^\d{2}:\d{2}$/.test(startTime) &&
+    CLOCK_TIME.test(startTime) &&
     typeof endTime === "string" &&
-    /^\d{2}:\d{2}$/.test(endTime) &&
+    CLOCK_TIME.test(endTime) &&
     startTime < endTime
   );
 }

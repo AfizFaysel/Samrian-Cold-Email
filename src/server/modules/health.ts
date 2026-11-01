@@ -1,5 +1,5 @@
 import { notifyCampaignPaused } from "./notifications";
-import type { CampaignId, NotificationRepo, OrgId } from "../ports";
+import type { CampaignId, CampaignStatus, NotificationRepo, OrgId } from "../ports";
 
 export const MIN_HEALTH_SAMPLE = 20;
 
@@ -21,7 +21,12 @@ export type CampaignHealthInput = {
 
 export type CampaignHealthDeps = {
   campaigns: {
-    updateStatus(id: CampaignId, orgId: OrgId, status: string): Promise<void>;
+    transitionStatus(
+      id: CampaignId,
+      orgId: OrgId,
+      from: CampaignStatus[],
+      to: CampaignStatus
+    ): Promise<boolean>;
   };
   notifications?: NotificationRepo;
 };
@@ -32,7 +37,14 @@ export async function evaluateCampaignHealth(input: CampaignHealthInput, deps: C
   const reason = getPauseReason(input);
   if (!reason) return { paused: false as const };
 
-  await deps.campaigns.updateStatus(input.campaignId, input.orgId, "paused");
+  const paused = await deps.campaigns.transitionStatus(
+    input.campaignId,
+    input.orgId,
+    ["active"],
+    "paused"
+  );
+  if (!paused) return { paused: false as const };
+
   await notifyCampaignPaused(deps.notifications, {
     orgId: input.orgId,
     campaignId: input.campaignId,

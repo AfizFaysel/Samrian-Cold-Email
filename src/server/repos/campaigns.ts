@@ -1,8 +1,8 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { campaigns, contactAssignments } from "../db/schema";
 import type { DbExecutor } from "../db/tx";
-import type { CampaignId, CampaignRecord, CampaignStats, OrgId } from "../ports";
+import type { CampaignId, CampaignRecord, CampaignStats, CampaignStatus, OrgId } from "../ports";
 import { newId } from "./ids";
 
 export type CreateCampaignInput = {
@@ -53,13 +53,14 @@ export class PostgresCampaignRepo {
     return toCampaign(row);
   }
 
-  async saveDraft(input: CreateCampaignInput): Promise<CampaignId> {
+  // Null means a launch got there first, so the save must not overwrite it.
+  async saveDraft(input: CreateCampaignInput): Promise<CampaignId | null> {
     if (!input.id) {
       const created = await this.create({ ...input, status: "draft" });
       return created.id;
     }
 
-    await this.db
+    const rows = await this.db
       .update(campaigns)
       .set({
         name: input.name,
@@ -68,12 +69,18 @@ export class PostgresCampaignRepo {
         targetGroupId: input.targetGroupId,
         targetContactIds: input.targetContactIds,
         listUnsubscribeEnabled: input.listUnsubscribeEnabled,
-        status: "draft",
         updatedAt: new Date(),
       })
-      .where(and(eq(campaigns.id, input.id), eq(campaigns.orgId, input.orgId)));
+      .where(
+        and(
+          eq(campaigns.id, input.id),
+          eq(campaigns.orgId, input.orgId),
+          eq(campaigns.status, "draft")
+        )
+      )
+      .returning();
 
-    return input.id;
+    return rows.length > 0 ? input.id : null;
   }
 
   async getById(id: CampaignId, orgId: OrgId): Promise<CampaignRecord | null> {
@@ -103,11 +110,18 @@ export class PostgresCampaignRepo {
     return rows.map(toCampaignItem);
   }
 
-  async updateStatus(id: CampaignId, orgId: OrgId, status: string): Promise<void> {
-    await this.db
+  async transitionStatus(
+    id: CampaignId,
+    orgId: OrgId,
+    from: CampaignStatus[],
+    to: CampaignStatus
+  ): Promise<boolean> {
+    const rows = await this.db
       .update(campaigns)
-      .set({ status: toCampaignStatus(status), updatedAt: new Date() })
-      .where(and(eq(campaigns.id, id), eq(campaigns.orgId, orgId)));
+      .set({ status: to, updatedAt: new Date() })
+      .where(and(eq(campaigns.id, id), eq(campaigns.orgId, orgId), inArray(campaigns.status, from)))
+      .returning();
+    return rows.length > 0;
   }
 
   async activateDraft(id: CampaignId, orgId: OrgId): Promise<boolean> {
@@ -195,11 +209,4 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-function toCampaignStatus(status: string): "draft" | "active" | "paused" | "completed" {
-  if (status === "draft" || status === "active" || status === "paused" || status === "completed") {
-    return status;
-  }
-  throw new Error(`Invalid campaign status: ${status}`);
 }
