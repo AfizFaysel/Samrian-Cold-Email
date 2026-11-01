@@ -54,7 +54,7 @@ bun run test:db
 bun run build
 ```
 
-Docker-backed tests may require local Postgres, Redis, or MinIO.
+Docker-backed tests may require local Postgres or Redis.
 
 Test enduring behavior, security invariants, and public contracts. Keep each invariant at the
 cheapest seam that gives confidence; repeat it at another layer only when integration risk requires

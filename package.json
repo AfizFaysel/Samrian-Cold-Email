@@ -31,7 +31,6 @@
     "crypto:rotate": "bun scripts/crypto/rotate.ts",
     "data:audit": "bun scripts/data/audit.ts",
     "db:test:up": "docker compose -f docker-compose.db.yml up -d",
-    "storage:test:up": "docker compose -f docker-compose.storage.yml up -d",
     "queue:test:up": "docker compose -f docker-compose.worker.yml up -d redis",
     "worker": "bun src/server/worker/run.ts",
     "inngest:dev": "docker compose -f docker-compose.yml -f docker-compose.inngest.yml up -d dev-app inngest",

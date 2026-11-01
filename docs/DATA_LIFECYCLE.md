@@ -126,7 +126,7 @@ Before launch and quarterly:
 Required operator evidence:
 
 - Postgres disk, replica, snapshot, PITR, and export encryption.
-- S3/R2/MinIO default encryption, private access, lifecycle, and version expiry.
+- S3/R2 default encryption, private access, lifecycle, and version expiry.
 - Redis persistence decision, volume encryption, ACL, network isolation, and backup behavior.
 - Better Stack retention and access policy.
 - Secret-manager key history and rotation record.

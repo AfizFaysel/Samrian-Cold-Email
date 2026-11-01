@@ -24,7 +24,11 @@ after its first public release.
 - Rebuilt backend architecture around app-owned modules, ports, repos, and provider adapters.
 - Standardized product identity as Samrian.
 - Replaced npm lock policy with Bun workspaces and `bun.lock`.
+- Object storage is now optional, and `/api/health` reports it as disabled when unconfigured.
 
 ### Removed
 
 - Convex runtime, generated files, dependencies, scripts, and active documentation.
+- Bundled MinIO service, the `minio` compose profile, `docker-compose.storage.yml`, and
+  `storage:test:up`. MinIO's community images are no longer publicly available, and no feature
+  stores objects yet.

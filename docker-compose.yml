@@ -13,11 +13,6 @@ services:
       APP_DATABASE_URL: postgres://samrian_app_runtime:${SAMRIAN_APP_DB_PASSWORD:-samrian-app-local}@postgres:5432/samrian
       REDIS_URL: redis://redis:6379
       JOB_PROVIDER: bullmq
-      STORAGE_PROVIDER: s3
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_BUCKET: samrian
-      S3_FORCE_PATH_STYLE: "true"
     ports:
       - "3000:3000"
     depends_on:
@@ -48,11 +43,6 @@ services:
       WORKER_DATABASE_URL: postgres://samrian_worker_runtime:${SAMRIAN_WORKER_DB_PASSWORD:-samrian-worker-local}@postgres:5432/samrian
       REDIS_URL: redis://redis:6379
       JOB_PROVIDER: bullmq
-      STORAGE_PROVIDER: s3
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_BUCKET: samrian
-      S3_FORCE_PATH_STYLE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,18 +80,6 @@ services:
       timeout: 3s
       retries: 20
 
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: samrian-minio
-    profiles: ["minio"]
-    command: server /data --console-address ":9001"
-    env_file:
-      - path: .env
-        required: false
-    volumes:
-      - samrian-minio-data:/data
-
 volumes:
   samrian-postgres-data:
   samrian-redis-data:
-  samrian-minio-data:

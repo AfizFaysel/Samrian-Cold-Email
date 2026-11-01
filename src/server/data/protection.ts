@@ -1,6 +1,6 @@
 type DataProtectionEnv = Record<string, string | undefined>;
 
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "postgres", "redis", "minio"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "postgres", "redis"]);
 
 export function auditDataProtection(env: DataProtectionEnv) {
   const issues: string[] = [];

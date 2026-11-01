@@ -22,7 +22,7 @@ Better Auth mode also requires `BETTER_AUTH_SECRET`, `AUTH_DATABASE_URL`, and Be
 tables in Postgres. `AUTH_DATABASE_URL` must use a login inheriting only `samrian_auth`.
 WorkOS mode requires `WORKOS_API_KEY`, `WORKOS_CLIENT_ID`, `WORKOS_COOKIE_PASSWORD`, and `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; it does not require Better Auth auth tables for runtime auth.
 
-Storage uses the S3-compatible env names from `.env.example`. Jobs use `JOB_PROVIDER=inngest` or `JOB_PROVIDER=bullmq`.
+Object storage is optional and no feature requires it yet. When configured, it uses the S3-compatible env names from `.env.example`. Jobs use `JOB_PROVIDER=inngest` or `JOB_PROVIDER=bullmq`.
 
 Hosted deployments must expose corresponding source through `NEXT_PUBLIC_SOURCE_URL`. Modified
 forks should link their deployed revision to their own source repository or archive, not an
@@ -30,7 +30,7 @@ unrelated upstream revision. Docker images include `LICENSE`, `LICENSING.md`, an
 
 `MASTER_ENCRYPTION_KEY` is legacy decrypt-only migration input. New deployments use the versioned
 credential keyring. See `docs/DATA_LIFECYCLE.md` for generation, rotation, restore, and retirement.
-Set explicit S3 server-side encryption; `aws:kms` also requires `S3_KMS_KEY_ID`.
+If you configure object storage, set explicit S3 server-side encryption; `aws:kms` also requires `S3_KMS_KEY_ID`.
 
 Enforced production rate limits require `TRUSTED_PROXY_MODE=single`. Configure Vercel or the
 deployment reverse proxy to overwrite `X-Forwarded-For`; never trust a client-appended chain.
@@ -43,7 +43,7 @@ Observability is optional for local OSS mode with `OBSERVABILITY_PROVIDER=none`.
 
 ## Docker/VPS
 
-Docker/VPS mode runs Next.js, PostgreSQL, Redis, BullMQ worker, and optional MinIO/S3-compatible storage.
+Docker/VPS mode runs Next.js, PostgreSQL, Redis, and a BullMQ worker.
 
 1. Copy `.env.example` to `.env`.
 2. Fill required secrets.
@@ -54,7 +54,7 @@ Docker/VPS mode runs Next.js, PostgreSQL, Redis, BullMQ worker, and optional Min
 6. Start infrastructure and app:
 
 ```powershell
-docker compose --profile minio up -d --build
+docker compose up -d --build
 ```
 
 Run migrations:
@@ -142,7 +142,8 @@ Current provider references:
    Inngest Free so every Samrian function shares one account-scoped budget. In production,
    `/api/inngest` answers 503 unless `INNGEST_SIGNING_KEY` is a real `signkey-*` value, and it
    answers 404 when `JOB_PROVIDER=bullmq`.
-6. Configure S3-compatible storage with AWS S3, Cloudflare R2, Backblaze B2, or another provider.
+6. Optionally configure S3-compatible storage with AWS S3, Cloudflare R2, Backblaze B2, or another
+   provider. No feature requires it yet.
 7. Run migrations before release:
 
 ```powershell

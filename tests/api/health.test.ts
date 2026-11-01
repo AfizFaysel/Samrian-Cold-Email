@@ -41,6 +41,24 @@ describe("health status", () => {
     expect(JSON.stringify(health)).not.toContain("postgres://");
   });
 
+  test("reports unconfigured object storage as disabled, not degraded", async () => {
+    const health = await buildHealth({
+      env: {
+        DATABASE_DRIVER: "postgres-js",
+        DATABASE_URL: "postgres://user:secret@localhost:5432/samrian",
+        JOB_PROVIDER: "bullmq",
+        REDIS_URL: "redis://localhost:6379",
+      },
+      checkDb: async () => true,
+    });
+
+    expect(health.status).toBe("ok");
+    expect(health.storage).toMatchObject({ provider: "none" });
+    expect(health.components).toContainEqual(
+      expect.objectContaining({ name: "storage", status: "ok", detail: "disabled" })
+    );
+  });
+
   test("returns degraded when db check fails", async () => {
     const health = await buildHealth({
       env: {

@@ -14,7 +14,7 @@ Primary runtime:
 - PostgreSQL row-level security for tenant isolation.
 - Inngest or BullMQ/Redis workers.
 - Gmail, Microsoft Graph, or SMTP/IMAP mailbox connectors.
-- S3-compatible object storage.
+- Optional S3-compatible object storage.
 - CLI and local stdio MCP clients through the automation API.
 - Better Stack-compatible OpenTelemetry logs and traces.
 

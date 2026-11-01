@@ -9,7 +9,7 @@ Self-hostable cold email platform for campaigns, contacts, mailboxes, inbox repl
 - Better Auth with organizations
 - Inngest for managed/serverless jobs
 - BullMQ + Redis for Docker/VPS jobs
-- S3-compatible object storage for AWS S3, Cloudflare R2, Backblaze B2, or MinIO
+- Optional S3-compatible object storage adapter. No feature requires it yet.
 
 ## Local Setup
 
@@ -30,7 +30,6 @@ Start local infrastructure:
 ```powershell
 bun run db:test:up
 bun run queue:test:up
-bun run storage:test:up
 ```
 
 Run migrations:
@@ -97,15 +96,15 @@ drizzle/          generated migrations
 
 ## Deployment
 
-Docker/VPS mode runs app, Postgres, Redis, worker, and optional MinIO:
+Docker/VPS mode runs app, Postgres, Redis, and worker:
 
 ```powershell
-docker compose --profile minio up -d --build
+docker compose up -d --build
 bun run db:migrate
 bun run smoke
 ```
 
-Managed/serverless mode uses Vercel, managed Postgres, Inngest, and S3/R2-compatible storage. See `docs/DEPLOYMENT.md`.
+Managed/serverless mode uses Vercel, managed Postgres, and Inngest. See `docs/DEPLOYMENT.md`.
 
 ## Quality Bar
 

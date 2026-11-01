@@ -31,7 +31,7 @@ describe("storage config", () => {
     ).toThrow("S3_SECRET_ACCESS_KEY is required");
   });
 
-  test("supports MinIO path-style mode", () => {
+  test("supports path-style mode", () => {
     expect(
       readStorageConfig({
         STORAGE_PROVIDER: "s3",

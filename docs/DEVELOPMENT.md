@@ -9,7 +9,6 @@ bun install
 Copy-Item .env.example .env.local
 bun run db:test:up
 bun run queue:test:up
-bun run storage:test:up
 bun run db:migrate
 bun run dev
 ```

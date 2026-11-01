@@ -168,6 +168,19 @@ function readJobHealth(env: HealthEnv) {
 }
 
 function readStorageHealth(env: HealthEnv) {
+  // /api/health answers 503 on any degraded component, and no feature needs storage yet.
+  if (!env.STORAGE_PROVIDER && !env.S3_BUCKET) {
+    return {
+      provider: "none",
+      component: {
+        name: "storage",
+        status: "ok",
+        critical: false,
+        detail: "disabled",
+      } satisfies HealthComponent,
+    };
+  }
+
   try {
     const config = readStorageConfig(env);
     return {

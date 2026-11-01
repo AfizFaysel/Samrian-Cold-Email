@@ -79,8 +79,8 @@ bun run build
 docker compose config --quiet
 ```
 
-Docker integration tests need the documented `TEST_*` environment values and local Postgres,
-Redis, or MinIO services.
+Docker integration tests need the documented `TEST_*` environment values and local Postgres or
+Redis services.
 
 ## Git
 
