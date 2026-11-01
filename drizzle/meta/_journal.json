@@ -36,6 +36,13 @@
       "when": 1793527950321,
       "tag": "0004_send_reservation_claim",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793529783024,
+      "tag": "0005_mailbox_counters_day",
+      "breakpoints": true
     }
   ]
 }

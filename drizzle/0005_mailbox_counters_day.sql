@@ -1,0 +1,1 @@
+ALTER TABLE "mailboxes" ADD COLUMN "counters_day" date;

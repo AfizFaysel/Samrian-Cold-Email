@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   index,
   integer,
   pgEnum,
@@ -36,6 +37,7 @@ export const mailboxes = pgTable(
     dailySendLimit: integer("daily_send_limit").notNull(),
     emailsSentToday: integer("emails_sent_today").notNull().default(0),
     reservedSends: integer("reserved_sends").notNull().default(0),
+    countersDay: date("counters_day"),
     status: mailboxStatus("status").notNull().default("active"),
     lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
     lastSuccessfulSendAt: timestamp("last_successful_send_at", { withTimezone: true }),

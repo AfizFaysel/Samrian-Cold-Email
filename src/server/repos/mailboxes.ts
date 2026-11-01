@@ -574,10 +574,22 @@ export class PostgresMailboxRepo {
       .where(and(eq(mailboxes.id, id), eq(mailboxes.orgId, orgId)));
   }
 
+  // Every reservation row is released exactly once later, even past midnight, so all rows stay counted.
   async resetDailyCounters(): Promise<number> {
+    const today = sql`(now() at time zone 'utc')::date`;
     const rows = await this.db
       .update(mailboxes)
-      .set({ emailsSentToday: 0, reservedSends: 0, updatedAt: new Date() })
+      .set({
+        emailsSentToday: 0,
+        reservedSends: sql`(
+          select count(*)::int from ${sendReservations}
+          where ${sendReservations.orgId} = ${mailboxes.orgId}
+            and ${sendReservations.mailboxId} = ${mailboxes.id}
+        )`,
+        countersDay: today,
+        updatedAt: new Date(),
+      })
+      .where(sql`${mailboxes.countersDay} is distinct from ${today}`)
       .returning();
     return rows.length;
   }
