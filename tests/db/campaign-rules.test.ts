@@ -105,6 +105,32 @@ describe.skipIf(!adminUrl || !appUrl)("launch rules on the app role", () => {
     expect(await linked()).toEqual([first.id]);
   });
 
+  test("a failure part way through leaves the campaign exactly as it was", async () => {
+    const campaign = await seedDraft();
+    const mailbox = await sender("first");
+
+    await expect(
+      withTenant(app, { orgId, actorType: "request" }, (tx) =>
+        launchCampaign(
+          { campaignId: campaign.id, orgId, mailboxIds: [mailbox.id] },
+          {
+            ...createCampaignLaunchDeps(tx),
+            assignments: {
+              createManyForCampaign: async () => {
+                throw new Error("write failed after mailboxes were linked");
+              },
+            },
+          }
+        )
+      )
+    ).rejects.toThrow("write failed");
+
+    const [row] = await admin.select().from(campaigns).where(eq(campaigns.id, campaign.id));
+    expect(row.status).toBe("draft");
+    expect(await linked()).toEqual([]);
+    await expect(launch(campaign.id, mailbox.id)).resolves.toMatchObject({ status: "launched" });
+  });
+
   test("two racing launches leave one set of mailboxes and one audience", async () => {
     const campaign = await seedDraft();
     const first = await sender("first");
