@@ -52,22 +52,16 @@ Observability is optional for local OSS mode with `OBSERVABILITY_PROVIDER=none`.
 
 Docker/VPS mode runs Next.js, PostgreSQL, Redis, and a BullMQ worker.
 
-1. Copy `.env.example` to `.env`.
-2. Fill required secrets.
-3. Use `JOB_PROVIDER=bullmq`.
-4. Use `REDIS_URL=redis://redis:6379`.
-5. Set distinct `SAMRIAN_APP_DB_PASSWORD`, `SAMRIAN_AUTH_DB_PASSWORD`, and
-   `SAMRIAN_WORKER_DB_PASSWORD` values before first database initialization.
-6. Start infrastructure and app:
+1. Run `bun run env:init`. It writes `.env` with generated secrets, separate database passwords,
+   `JOB_PROVIDER=bullmq`, and enforced Redis rate limits. It refuses to replace an existing `.env`.
+2. Set `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_SITE_URL` to your public address. They are built into
+   the image, so rebuild after changing them.
+3. Put a reverse proxy in front that overwrites `X-Forwarded-For`, because `TRUSTED_PROXY_MODE=single`
+   trusts that header. Keep port 3000 private.
+4. Start everything. Migrations run first, and the app and worker wait for them:
 
 ```powershell
 docker compose up -d --build
-```
-
-Run migrations:
-
-```powershell
-bun run db:migrate
 ```
 
 Run worker outside compose only when needed:

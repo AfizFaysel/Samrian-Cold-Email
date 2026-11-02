@@ -1,8 +1,29 @@
+x-app-build: &app-build
+  context: .
+  target: runner
+  args:
+    NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+    NEXT_PUBLIC_SOURCE_URL: ${NEXT_PUBLIC_SOURCE_URL:-}
+    NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-better-auth}
+    NEXT_PUBLIC_GOOGLE_AUTH_ENABLED: ${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED:-false}
+
 services:
+  migrate:
+    build: *app-build
+    container_name: samrian-migrate
+    command: bun run db:migrate
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/samrian
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
-    build:
-      context: .
-      target: runner
+    build: *app-build
     container_name: samrian-app
     command: bun run start
     env_file:
@@ -16,8 +37,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -31,9 +52,7 @@ services:
       retries: 5
 
   worker:
-    build:
-      context: .
-      target: runner
+    build: *app-build
     container_name: samrian-worker
     command: bun run worker
     env_file:
@@ -44,8 +63,8 @@ services:
       REDIS_URL: redis://redis:6379
       JOB_PROVIDER: bullmq
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 

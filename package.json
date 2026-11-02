@@ -29,6 +29,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "crypto:rotate": "bun scripts/crypto/rotate.ts",
+    "env:init": "bun scripts/env-init.ts",
     "data:audit": "bun scripts/data/audit.ts",
     "data:purge-org": "bun scripts/data/purge-org.ts",
     "db:test:up": "docker compose -f docker-compose.db.yml up -d",

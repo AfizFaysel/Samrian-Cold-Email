@@ -99,10 +99,13 @@ drizzle/          generated migrations
 Docker/VPS mode runs app, Postgres, Redis, and worker:
 
 ```powershell
+bun run env:init
 docker compose up -d --build
-bun run db:migrate
 bun run smoke
 ```
+
+`env:init` writes `.env` with generated secrets, and migrations run before the app starts. Set
+`NEXT_PUBLIC_APP_URL` to your public address before building for a server.
 
 Managed/serverless mode uses Vercel, managed Postgres, and Inngest. See `docs/DEPLOYMENT.md`.
 

@@ -18,7 +18,7 @@ type FakeJob =
     }
   | {
       id: string;
-      name: "maintenance.reset-counters";
+      name: "maintenance.reset-counters" | "maintenance.purge-expired";
       options: ScheduledJobOptions;
     }
   | {
