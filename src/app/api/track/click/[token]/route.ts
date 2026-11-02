@@ -6,13 +6,13 @@ import { recordEvent } from "@/server/modules/events";
 import { errorReporter } from "@/server/observability/runtime";
 import { clickEvent } from "@/server/modules/tracking";
 import { PostgresEventRepo } from "@/server/repos";
-import { withPublicLimit } from "@/server/limits/http";
+import { withTrackingLimit } from "@/server/limits/http";
 
 export async function GET(request: Request, context: { params: Promise<{ token: string }> }) {
-  return withPublicLimit(request, "tracking.click", () => track(context));
+  return withTrackingLimit(request, "tracking.click", (record) => track(context, record));
 }
 
-async function track({ params }: { params: Promise<{ token: string }> }) {
+async function track({ params }: { params: Promise<{ token: string }> }, record: boolean) {
   const { token } = await params;
   const db = getDb();
   const link = await withTrackingToken(db, token, (tx) =>
@@ -20,6 +20,7 @@ async function track({ params }: { params: Promise<{ token: string }> }) {
   );
 
   if (!link) return new NextResponse("Tracking link not found", { status: 404 });
+  if (!record) return NextResponse.redirect(link.originalUrl);
 
   try {
     await withTenant(db, { orgId: link.orgId, actorType: "request" }, (tx) =>

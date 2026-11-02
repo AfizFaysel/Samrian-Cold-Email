@@ -6,12 +6,23 @@ import { recordEvent } from "@/server/modules/events";
 import { errorReporter } from "@/server/observability/runtime";
 import { openEvent } from "@/server/modules/tracking";
 import { PostgresEventRepo } from "@/server/repos";
-import { withPublicLimit } from "@/server/limits/http";
+import { withTrackingLimit } from "@/server/limits/http";
 
 const PIXEL = Buffer.from("R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==", "base64");
 
 export async function GET(request: Request, context: { params: Promise<{ token: string }> }) {
-  return withPublicLimit(request, "tracking.open", () => track(context));
+  return withTrackingLimit(request, "tracking.open", async (record) =>
+    record ? track(context) : pixel()
+  );
+}
+
+function pixel() {
+  return new NextResponse(PIXEL, {
+    headers: {
+      "Cache-Control": "no-store",
+      "Content-Type": "image/gif",
+    },
+  });
 }
 
 async function track({ params }: { params: Promise<{ token: string }> }) {
@@ -43,10 +54,5 @@ async function track({ params }: { params: Promise<{ token: string }> }) {
     errorReporter.capture(error, { route: "/api/track/open/[token]", action: "track.open" });
   }
 
-  return new NextResponse(PIXEL, {
-    headers: {
-      "Cache-Control": "no-store",
-      "Content-Type": "image/gif",
-    },
-  });
+  return pixel();
 }

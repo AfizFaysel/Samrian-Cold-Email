@@ -1,10 +1,14 @@
 import { isIP } from "node:net";
 
-import type { LimitGuard } from "../modules/limits";
+import type { LimitGuard, RateLimiter } from "../modules/limits";
 import { getLimitGuard } from "./index";
 import { RateLimitUnavailableError } from "./degraded";
+import { MemoryRateLimiter } from "./memory";
 
 export type TrustedProxyMode = "none" | "single";
+
+const TRACKING_FALLBACK_PER_MINUTE = 6000;
+const trackingFallback = new MemoryRateLimiter();
 
 export function getClientIp(headers: Headers, mode: TrustedProxyMode): string {
   if (mode === "none") return "unknown";
@@ -34,6 +38,54 @@ export function rateLimitResponse(
     { error: { code: "RATE_LIMITED", message: "Rate limit exceeded" } },
     { status: 429, headers: limitHeaders(decision) }
   );
+}
+
+// A recipient clicking a link is not abuse, so when limits say no the link still works and only
+// the analytics are skipped. The per-process cap keeps that lookup bounded.
+export async function withTrackingLimit(
+  request: Request,
+  operationId: string,
+  handler: (record: boolean) => Promise<Response>,
+  options: {
+    guard?: LimitGuard;
+    proxyMode?: TrustedProxyMode;
+    fallback?: RateLimiter;
+    fallbackPerMinute?: number;
+  } = {}
+): Promise<Response> {
+  const guard = options.guard ?? getLimitGuard();
+  const subject = getClientIp(
+    request.headers,
+    options.proxyMode ?? (process.env.TRUSTED_PROXY_MODE === "single" ? "single" : "none")
+  );
+
+  let refused: Response;
+  try {
+    const decision = await guard.checkPublic({ operationId, subject });
+    if (decision.allowed) {
+      const response = await handler(true);
+      for (const [name, value] of Object.entries(limitHeaders(decision))) {
+        response.headers.set(name, value);
+      }
+      return response;
+    }
+    refused = rateLimitResponse(decision);
+  } catch (error) {
+    if (!(error instanceof RateLimitUnavailableError)) throw error;
+    refused = Response.json(
+      { error: { code: "PROVIDER_UNAVAILABLE", message: error.message } },
+      { status: 503 }
+    );
+  }
+
+  const spare = await (options.fallback ?? trackingFallback).consume({
+    policyId: "tracking.fallback",
+    subject: "process",
+    limit: options.fallbackPerMinute ?? TRACKING_FALLBACK_PER_MINUTE,
+    windowMs: 60_000,
+    cost: 1,
+  });
+  return spare.allowed ? handler(false) : refused;
 }
 
 export async function withPublicLimit(
