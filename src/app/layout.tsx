@@ -1,27 +1,29 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Plus_Jakarta_Sans, IBM_Plex_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geistSans = Geist({
+const geistSans = localFont({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  src: "./fonts/geist-latin.woff2",
+  weight: "100 900",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  src: "./fonts/geist-mono-latin.woff2",
+  weight: "100 900",
 });
 
-const plusJakarta = Plus_Jakarta_Sans({
+const plusJakarta = localFont({
   variable: "--font-plus-jakarta",
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  src: "./fonts/plus-jakarta-sans-latin.woff2",
+  weight: "200 800",
 });
 
-const ibmPlex = IBM_Plex_Sans({
+const ibmPlex = localFont({
   variable: "--font-ibm-plex",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  src: "./fonts/ibm-plex-sans-latin.woff2",
+  weight: "100 700",
 });
 
 export const metadata: Metadata = {
