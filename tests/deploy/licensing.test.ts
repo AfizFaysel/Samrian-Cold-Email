@@ -20,10 +20,9 @@ function read(file: string) {
   return readFileSync(path.join(root, file), "utf8");
 }
 
+// Line endings depend on the checkout, and only the license text matters.
 function sha256(file: string) {
-  return createHash("sha256")
-    .update(readFileSync(path.join(root, file)))
-    .digest("hex");
+  return createHash("sha256").update(read(file).replace(/\r\n/g, "\n")).digest("hex");
 }
 
 function sourceFiles(directory: string): string[] {
@@ -42,7 +41,7 @@ describe("hybrid licensing", () => {
     expect(rootLicense).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
     expect(rootLicense).not.toContain("Samrian");
     expect(sha256("LICENSE")).toBe(
-      "0da032ca2dabfbd5f5cd67e1fd28499b7b17bb90f066c9a656e7678a7fc3d7e4"
+      "4ea76b3f1a0a1a489c16876a558012930a951ea0e716573b7c44e3b1b6b6d12a"
     );
 
     for (const packageName of permissivePackages) {
