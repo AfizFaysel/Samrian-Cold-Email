@@ -80,6 +80,7 @@ describe.skipIf(!testRedisUrl)("BullMqQueue", () => {
         "mailbox.check-all",
         "email.bounce",
         "maintenance.reset-counters",
+        "maintenance.purge-expired",
       ].map(async (name) => {
         const cleanup = new Queue(name, {
           connection: redisConnectionOptions(testRedisUrl!),

@@ -37,6 +37,7 @@ export class BullMqQueue implements JobQueue {
       [JOB_NAMES.mailboxRamp]: this.createQueue(JOB_NAMES.mailboxRamp, config.prefix),
       [JOB_NAMES.emailBounce]: this.createQueue(JOB_NAMES.emailBounce, config.prefix),
       [JOB_NAMES.resetCounters]: this.createQueue(JOB_NAMES.resetCounters, config.prefix),
+      [JOB_NAMES.purgeExpired]: this.createQueue(JOB_NAMES.purgeExpired, config.prefix),
     };
   }
 
@@ -54,6 +55,21 @@ export class BullMqQueue implements JobQueue {
 
   async enqueueBounceProcess(payload: BounceJob, options?: JobOptions): Promise<QueueResult> {
     return this.addJob(JOB_NAMES.emailBounce, payload, options);
+  }
+
+  async scheduleRetentionPurge(options: ScheduledJobOptions): Promise<QueueResult> {
+    const job = await this.queues[JOB_NAMES.purgeExpired].add(
+      JOB_NAMES.purgeExpired,
+      {},
+      {
+        jobId: JOB_NAMES.purgeExpired,
+        repeat: {
+          pattern: options.cron,
+          tz: options.timezone,
+        },
+      }
+    );
+    return { jobId: job.id ?? JOB_NAMES.purgeExpired };
   }
 
   async scheduleDailyCounterReset(options: ScheduledJobOptions): Promise<QueueResult> {

@@ -65,6 +65,12 @@ export class FakeJobQueue implements JobQueue {
     return { jobId: id };
   }
 
+  async scheduleRetentionPurge(options: ScheduledJobOptions): Promise<QueueResult> {
+    const id = this.nextId();
+    this.jobs.push({ id, name: "maintenance.purge-expired", options });
+    return { jobId: id };
+  }
+
   async scheduleCampaignDispatch(options: ScheduledJobOptions): Promise<QueueResult> {
     const id = this.nextId();
     this.jobs.push({ id, name: "campaign.dispatch", options });

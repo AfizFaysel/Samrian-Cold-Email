@@ -110,6 +110,7 @@ describe("BullMQ worker processors", () => {
       scheduleMailboxChecks: vi.fn(async () => ({ jobId: "checks" })),
       scheduleMailboxRamp: vi.fn(async () => ({ jobId: "ramp" })),
       scheduleDailyCounterReset: vi.fn(async () => ({ jobId: "reset" })),
+      scheduleRetentionPurge: vi.fn(async () => ({ jobId: "purge" })),
     } as unknown as JobQueue;
 
     await scheduleWorkerJobs(queue);
@@ -156,6 +157,10 @@ function createDeps(calls: string[]): WorkerDeps {
         bounceType: "hard",
         campaignPaused: false,
       } as const;
+    }),
+    purgeExpired: vi.fn(async () => {
+      calls.push("purge");
+      return { status: "purged", orgs: 0, purged: 0, failed: 0 } as const;
     }),
     resetCounters: vi.fn(async () => {
       calls.push("reset");

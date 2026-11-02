@@ -21,6 +21,8 @@ import {
 } from "../jobs";
 import { getWorkerDb } from "../db/db";
 import { withTenant } from "../db/tenant";
+import { purgeExpired } from "../jobs/retention";
+import { PostgresRetentionRepo } from "../repos/retention";
 import type { DbExecutor } from "../db/tx";
 import { createJobQueue } from "../queue";
 import type { JobQueue } from "../ports";
@@ -74,6 +76,18 @@ export function createWorkerDeps(queue?: JobQueue) {
       withTenant(db, { orgId: "system", actorType: "system" }, async (tx) =>
         resetCounters({ repos: createDeps(tx).repos })
       ),
+    purgeExpired: () =>
+      purgeExpired({
+        now: Date.now,
+        system: (operation) =>
+          withTenant(db, { orgId: "system", actorType: "system" }, (tx) =>
+            operation(new PostgresRetentionRepo(tx))
+          ),
+        tenant: (orgId, operation) =>
+          withTenant(db, { orgId, actorType: "worker" }, (tx) =>
+            operation(new PostgresRetentionRepo(tx))
+          ),
+      }),
     dispatchDueSends: () =>
       dispatchDueSends({
         queue: getQueue(),

@@ -51,18 +51,18 @@ by Samrian. Searchable tenant data uses RLS plus encrypted storage rather than f
 
 ## Retention
 
-| Data                                | Default                                            | Deletion behavior                                       |
-| ----------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
-| OAuth state                         | 10 minutes                                         | Expires cryptographically and cookie expires            |
-| API idempotency                     | 24 hours                                           | Ignored after expiry; maintenance purge may remove rows |
-| Temporary exports                   | At most 24 hours                                   | Delete temp object/file; signed URL expires earlier     |
-| Notifications                       | 90 days                                            | Purge read/expired records after policy window          |
-| Raw analytics events                | 365 days                                           | Delete or anonymize after rollup verification           |
-| Active contacts, campaigns, threads | While tenant needs them                            | Explicit tenant/resource deletion                       |
-| Archived mailbox                    | Metadata retained; credentials removed immediately | Provider revocation attempted, encrypted fields cleared |
-| Deleted organization live data      | At most 30 days                                    | Remove primary, derived, object, queue, and cache data  |
-| Backups containing deleted data     | At most 35 days                                    | Age out without restoring into ordinary service         |
-| Security/audit evidence             | 365 days unless legal hold applies                 | Restricted deletion after review                        |
+| Data                                | Default                                            | Deletion behavior                                                                                                                                                       |
+| ----------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OAuth state                         | 10 minutes                                         | Expires cryptographically and cookie expires                                                                                                                            |
+| API idempotency                     | 24 hours                                           | Ignored after expiry; a daily job deletes the rows                                                                                                                      |
+| Temporary exports                   | At most 24 hours                                   | Delete temp object/file; signed URL expires earlier                                                                                                                     |
+| Notifications                       | 90 days                                            | A daily job deletes them after the window                                                                                                                               |
+| Raw analytics events                | 365 days                                           | A daily job deletes them; daily rollups are kept                                                                                                                        |
+| Active contacts, campaigns, threads | While tenant needs them                            | Explicit tenant/resource deletion                                                                                                                                       |
+| Archived mailbox                    | Metadata retained; credentials removed immediately | Provider revocation attempted, encrypted fields cleared                                                                                                                 |
+| Deleted organization live data      | On request                                         | Self-service deletion is disabled. An operator runs `bun run data:purge-org`, which removes primary and derived rows but cannot revoke provider tokens or clear backups |
+| Backups containing deleted data     | At most 35 days                                    | Age out without restoring into ordinary service                                                                                                                         |
+| Security/audit evidence             | 365 days unless legal hold applies                 | Restricted deletion after review                                                                                                                                        |
 
 Hosted operators may shorten these values. Longer retention requires documented purpose, owner,
 review date, and customer disclosure. Legal hold exceptions must be scoped and access-controlled.

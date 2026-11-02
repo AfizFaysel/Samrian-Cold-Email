@@ -1,6 +1,7 @@
 import type { InngestFunction } from "inngest";
 import { sendCampaignEmail } from "./sendCampaignEmail";
 import { pollMailboxes, pollSingleMailbox } from "./pollMailboxes";
+import { purgeExpired } from "./purgeExpired";
 import { resetCounters } from "./resetCounters";
 import { processBounce } from "./processBounce";
 import { dispatchCampaignSends } from "./dispatchCampaignSends";
@@ -18,5 +19,6 @@ export const functions: InngestFunction.Any[] = [
   checkSingleMailbox,
   evaluateMailboxRamps,
   resetCounters,
+  purgeExpired,
   processBounce,
 ];

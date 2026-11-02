@@ -42,5 +42,6 @@ export async function scheduleWorkerJobs(queue: JobQueue) {
     queue.scheduleMailboxChecks({ cron: "0 * * * *", timezone: "UTC" }),
     queue.scheduleMailboxRamp({ cron: "15 0 * * *", timezone: "UTC" }),
     queue.scheduleDailyCounterReset({ cron: "0 0 * * *", timezone: "UTC" }),
+    queue.scheduleRetentionPurge({ cron: "0 2 * * *", timezone: "UTC" }),
   ]);
 }

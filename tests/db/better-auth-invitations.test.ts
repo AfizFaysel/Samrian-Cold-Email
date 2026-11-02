@@ -108,6 +108,18 @@ describe.skipIf(!adminUrl || !authUrl)("invitations on the auth database role", 
     await admin.delete(verifications);
   });
 
+  test("an organization cannot be deleted while no purge runs with it", async () => {
+    await expect(
+      api.deleteOrganization({ headers: owner, body: { organizationId } })
+    ).rejects.toThrow();
+
+    const [organization] = await admin
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+    expect(organization).toBeDefined();
+  });
+
   test("the schema still passes the library's startup check", async () => {
     await (await auth.$context).checkSchema?.();
   });

@@ -96,6 +96,8 @@ export function createAuthOptions(params?: { database?: BetterAuthOptions["datab
           member,
         },
         allowUserToCreateOrganization: true,
+        // Deleting here would orphan tenant data and credentials. Operators use data:purge-org.
+        disableOrganizationDeletion: true,
         creatorRole: "owner",
         membershipLimit: 100,
         invitationExpiresIn: 60 * 60 * 24 * 7,

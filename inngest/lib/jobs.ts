@@ -37,6 +37,7 @@ export function createInngestQueue(step: StepLike): JobQueue {
       return { jobId: payload.messageId };
     },
     scheduleDailyCounterReset: async () => ({ jobId: "inngest-cron-reset-counters" }),
+    scheduleRetentionPurge: async () => ({ jobId: "inngest-cron-purge-expired" }),
     scheduleCampaignDispatch: async () => ({ jobId: "inngest-cron-campaign-dispatch" }),
     scheduleMailboxPolls: async () => ({ jobId: "inngest-cron-mailbox-polls" }),
     scheduleMailboxChecks: async () => ({ jobId: "inngest-cron-mailbox-checks" }),
