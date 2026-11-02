@@ -21,10 +21,24 @@ export async function GET(request: Request) {
       );
       return {
         data: {
-          items: items.map(({ _id, userEmail, ...item }) => ({
-            id: _id,
-            ...item,
-            ...(userEmail ? { email: userEmail } : {}),
+          items: items.map((item) => ({
+            id: item._id,
+            name: item.name,
+            provider: item.provider,
+            ...(item.userEmail ? { email: item.userEmail } : {}),
+            status: item.status,
+            dailySendLimit: item.dailySendLimit,
+            emailsSentToday: item.emailsSentToday,
+            lastConnectionTestAt: item.lastConnectionTestAt,
+            lastConnectionError: item.lastConnectionError,
+            providerLimitCode: item.providerLimitCode,
+            providerLimitResetAt: item.providerLimitResetAt,
+            rampEnabled: item.rampEnabled,
+            rampStatus: item.rampStatus,
+            rampCurrentLimit: item.rampCurrentLimit,
+            rampTargetLimit: item.rampTargetLimit,
+            effectiveDailyLimit: item.effectiveDailyLimit,
+            availableToday: item.availableToday,
           })),
         },
       };

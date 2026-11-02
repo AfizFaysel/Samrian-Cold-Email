@@ -422,8 +422,12 @@ export const mailboxSchema = z
     lastConnectionError: z.string().optional(),
     providerLimitCode: z.string().optional(),
     providerLimitResetAt: z.number().optional(),
-    warmupEnabled: z.boolean(),
-    warmupCurrentDailyLimit: z.number().optional(),
+    rampEnabled: z.boolean(),
+    rampStatus: z.string(),
+    rampCurrentLimit: z.number().optional(),
+    rampTargetLimit: z.number(),
+    effectiveDailyLimit: z.number(),
+    availableToday: z.number(),
   })
   .strict();
 
@@ -644,6 +648,7 @@ export const capabilitiesSchema = z
           risk: z.enum(["read", "write", "high"]),
           idempotency: z.enum(["none", "required"]),
           mcp: z.boolean(),
+          maxBodyBytes: z.number().int().positive().optional(),
         })
         .strict()
     ),
@@ -656,7 +661,6 @@ export const limitsSchema = z
     tier: z.enum(["starter", "pro", "business", "enterprise", "self-hosted"]),
     hourlyUnits: z.number().int().positive(),
     burstUnits: z.number().int().positive(),
-    concurrentRequests: z.number().int().positive(),
   })
   .strict();
 
