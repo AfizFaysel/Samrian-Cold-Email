@@ -35,6 +35,8 @@ export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useAuthSession();
+  // Hosted sign-in (e.g. GitHub via WorkOS) can leave the name empty.
+  const displayName = session?.user?.name || session?.user?.email?.split("@")[0];
   const sourceUrl = process.env.NEXT_PUBLIC_SOURCE_URL;
 
   const handleSignOut = async () => {
@@ -125,15 +127,13 @@ export function AppSidebar() {
         {/* User card */}
         <div className="mt-4 flex items-center gap-3 px-3">
           <Avatar className="h-8 w-8 overflow-hidden rounded-full border border-slate-300 bg-slate-200">
-            <AvatarImage src={session?.user?.image || ""} alt={session?.user?.name || "User"} />
+            <AvatarImage src={session?.user?.image || ""} alt={displayName || "User"} />
             <AvatarFallback className="bg-slate-200 text-[10px] font-bold text-slate-500">
-              {session?.user?.name?.substring(0, 2).toUpperCase() || "ME"}
+              {displayName?.substring(0, 2).toUpperCase() || "ME"}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-slate-800">
-              {session?.user?.name || "Loading…"}
-            </span>
+            <span className="text-xs font-bold text-slate-800">{displayName || "Loading…"}</span>
             <span className="text-[10px] text-slate-400">{session?.user?.email || "…"}</span>
           </div>
         </div>
