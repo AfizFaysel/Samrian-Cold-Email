@@ -41,7 +41,9 @@ UI / API routes / workers
 ## Code Rules
 
 - Read touched flow before editing.
-- Write RED test before behavior change.
+- Add a test only where it makes a difference: risky logic, security boundaries, or a bug that
+  existing tests missed. Write it RED first. Skip new tests for UI, styling, copy, and small
+  wiring changes; run the existing suites instead.
 - Prefer smallest working change.
 - Extract shared logic after three real repetitions.
 - Use short domain names. Avoid `utils`, `helpers`, `manager`, and broad `service` files.
