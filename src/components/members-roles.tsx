@@ -115,10 +115,10 @@ export function MembersRoles() {
   const custom = roles.filter((role) => !role.builtIn);
 
   return (
-    <section className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-5">
+    <section className="flex flex-col gap-6 rounded-lg border bg-card p-5">
       <div>
-        <h2 className="text-base font-medium text-slate-950">Members and roles</h2>
-        <p className="text-sm text-slate-600">
+        <h2 className="text-lg font-semibold">Members and roles</h2>
+        <p className="text-base text-secondary">
           Control team access with provider-managed roles and permissions.
         </p>
       </div>
@@ -137,7 +137,7 @@ export function MembersRoles() {
           <Label htmlFor="invite-role">Invite role</Label>
           <select
             id="invite-role"
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+            className="h-9 rounded-sm border border-border-strong bg-card px-3 text-base"
             value={inviteRole}
             onChange={(event) => setInviteRole(event.target.value)}
           >
@@ -154,22 +154,22 @@ export function MembersRoles() {
       </div>
 
       <div>
-        <h3 className="text-sm font-medium text-slate-950">Members</h3>
-        <div className="mt-2 divide-y divide-slate-100 border-y border-slate-100">
+        <h3 className="text-base font-medium text-primary">Members</h3>
+        <div className="mt-2 divide-y divide-border border-y border-border">
           {members.map((member) => (
             <div
               key={member.id}
               className="grid gap-2 py-3 sm:grid-cols-[1fr_180px] sm:items-center"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-900">
+                <p className="truncate text-base font-medium text-primary">
                   {member.name || member.email || member.userId}
                 </p>
-                {member.email && <p className="truncate text-xs text-slate-500">{member.email}</p>}
+                {member.email && <p className="truncate text-sm text-secondary">{member.email}</p>}
               </div>
               <select
                 aria-label={`Role for ${member.email || member.userId}`}
-                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                className="h-9 rounded-sm border border-border-strong bg-card px-3 text-base"
                 value={member.role}
                 onChange={(event) => changeMember(member, event.target.value)}
               >
@@ -182,7 +182,7 @@ export function MembersRoles() {
             </div>
           ))}
           {!members.length && !status && (
-            <p className="py-3 text-sm text-slate-500">No members found.</p>
+            <p className="py-3 text-base text-secondary">No members found.</p>
           )}
         </div>
       </div>
@@ -192,16 +192,16 @@ export function MembersRoles() {
         <RoleList title="Custom roles" roles={custom} onDelete={deleteRole} onEdit={editRole} />
       </div>
 
-      <div className="flex flex-col gap-4 border-t border-slate-200 pt-5">
+      <div className="flex flex-col gap-4 border-t border-border pt-5">
         <div className="flex flex-col gap-2">
           <Label htmlFor="role-name">Role name</Label>
           <Input id="role-name" value={name} onChange={(event) => setName(event.target.value)} />
         </div>
         <fieldset>
-          <legend className="text-sm font-medium text-slate-900">Permissions</legend>
+          <legend className="text-base font-medium text-primary">Permissions</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {permissions.map((permission) => (
-              <label key={permission} className="flex items-center gap-2 text-sm text-slate-700">
+              <label key={permission} className="flex items-center gap-2 text-base text-primary">
                 <input
                   type="checkbox"
                   aria-label={permission}
@@ -214,7 +214,7 @@ export function MembersRoles() {
                     )
                   }
                 />
-                <span className="font-mono text-xs">{permission}</span>
+                <span className="font-mono text-sm">{permission}</span>
               </label>
             ))}
           </div>
@@ -239,7 +239,7 @@ export function MembersRoles() {
       </div>
 
       {status && (
-        <p role="status" className="text-sm text-slate-600">
+        <p role="status" className="text-base text-secondary">
           {status}
         </p>
       )}
@@ -260,13 +260,13 @@ function RoleList({
 }) {
   return (
     <div>
-      <h3 className="text-sm font-medium text-slate-950">{title}</h3>
-      <div className="mt-2 divide-y divide-slate-100 border-y border-slate-100">
+      <h3 className="text-base font-medium text-primary">{title}</h3>
+      <div className="mt-2 divide-y divide-border border-y border-border">
         {roles.map((role) => (
           <div key={role.id} className="flex min-h-12 items-center justify-between gap-3 py-2">
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-900">{role.name}</p>
-              <p className="text-xs text-slate-500">{role.permissions.length} permissions</p>
+              <p className="truncate text-base font-medium text-primary">{role.name}</p>
+              <p className="text-sm text-secondary">{role.permissions.length} permissions</p>
             </div>
             <div className="flex">
               {onEdit && (
@@ -294,7 +294,7 @@ function RoleList({
             </div>
           </div>
         ))}
-        {!roles.length && <p className="py-3 text-sm text-slate-500">None yet.</p>}
+        {!roles.length && <p className="py-3 text-base text-secondary">None yet.</p>}
       </div>
     </div>
   );

@@ -2,10 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
-import { Plus, Search, X, BarChart3, FileText } from "lucide-react";
-import { useApi } from "@/hooks/use-api";
+import { ChevronRight, Megaphone, Plus, Search, X } from "lucide-react";
+import { Page, Panel } from "@/components/page-header";
+import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
+import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
+import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useApi } from "@/hooks/use-api";
+import { cn } from "@/lib/utils";
 
 type CampaignItem = {
   _id: string;
@@ -18,356 +23,255 @@ type CampaignItem = {
   bounceRate: number;
 };
 
-type CampaignStatus = "all" | "active" | "draft" | "completed" | "paused";
+type CampaignStatus = "all" | "active" | "draft" | "paused" | "completed";
+
+const FILTERS: Array<{ value: CampaignStatus; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "draft", label: "Drafts" },
+  { value: "paused", label: "Paused" },
+  { value: "completed", label: "Completed" },
+];
+
+const percent = (value: number) => (value > 0 ? `${value.toFixed(1)}%` : "—");
 
 export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<CampaignStatus>("all");
 
-  const { data: campaignData } = useApi<{ campaigns: CampaignItem[] }>("/api/campaigns");
-  const { data: orgStats } = useApi<{
+  const campaignsApi = useApi<{ campaigns: CampaignItem[] }>("/api/campaigns");
+  const statsApi = useApi<{
     totalSent: number;
     estimatedOpenRate: number | null;
     replyRate: number;
   }>("/api/analytics/org");
-  const campaigns = campaignData?.campaigns;
+  const campaigns = campaignsApi.data?.campaigns;
 
-  const isLoading = campaigns === undefined;
-
-  // Filter campaigns by status
   const filteredCampaigns = React.useMemo(() => {
     if (!campaigns) return [];
-
-    let filtered = campaigns;
-
-    // Apply status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((c) => c.status === statusFilter);
-    }
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((c) => c.name.toLowerCase().includes(query));
-    }
-
-    return filtered;
+    const query = searchQuery.trim().toLowerCase();
+    return campaigns.filter(
+      (c) =>
+        (statusFilter === "all" || c.status === statusFilter) &&
+        (!query || c.name.toLowerCase().includes(query))
+    );
   }, [campaigns, statusFilter, searchQuery]);
 
-  // Calculate stats from backend
-  const stats = {
-    totalSent: orgStats?.totalSent ?? 0,
-    avgOpenRate: orgStats?.estimatedOpenRate,
-    avgReplyRate: orgStats?.replyRate ?? 0,
-    activeCampaigns: campaigns?.filter((c) => c.status === "active").length ?? 0,
-  };
-
-  // Count campaigns by status
-  const statusCounts = React.useMemo(() => {
-    if (!campaigns) return { all: 0, active: 0, draft: 0, completed: 0, paused: 0 };
-
-    return {
-      all: campaigns.length,
-      active: campaigns.filter((c) => c.status === "active").length,
-      draft: campaigns.filter((c) => c.status === "draft").length,
-      completed: campaigns.filter((c) => c.status === "completed").length,
-      paused: campaigns.filter((c) => c.status === "paused").length,
+  const counts = React.useMemo(() => {
+    const result: Record<CampaignStatus, number> = {
+      all: 0,
+      active: 0,
+      draft: 0,
+      paused: 0,
+      completed: 0,
     };
+    for (const campaign of campaigns ?? []) {
+      result.all += 1;
+      if (campaign.status in result) result[campaign.status as CampaignStatus] += 1;
+    }
+    return result;
   }, [campaigns]);
 
+  const statsLoading = statsApi.isLoading && !statsApi.data;
+  const statsFailed = Boolean(statsApi.error) && !statsApi.data;
+  const filtering = Boolean(searchQuery) || statusFilter !== "all";
+
   return (
-    <div className="flex h-full flex-col font-[family-name:var(--font-ibm-plex)]">
-      <PageHeader
-        title="Campaigns"
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Campaigns" }]}
-        actions={
-          <div className="flex items-center gap-3">
-            <div className="relative w-64">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <Search className="h-4 w-4 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search campaigns..."
-                className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-10 text-sm text-slate-900 placeholder-slate-400 shadow-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <Link
-              href="/dashboard/campaigns/new"
-              className="flex items-center gap-2 rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
-            >
-              <Plus className="h-4 w-4" />
-              New Campaign
-            </Link>
-          </div>
-        }
-      />
+    <Page
+      title="Campaigns"
+      description="Sequences you are sending, drafting or have finished."
+      actions={
+        <Link href="/dashboard/campaigns/new" className={buttonVariants()}>
+          <Plus data-icon="inline-start" />
+          New campaign
+        </Link>
+      }
+    >
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Emails sent"
+          isLoading={statsLoading}
+          value={statsFailed ? "—" : (statsApi.data?.totalSent ?? 0).toLocaleString()}
+          hint={statsFailed ? "Couldn't load" : undefined}
+        />
+        <StatCard
+          label="Open rate"
+          isLoading={statsLoading}
+          value={
+            statsApi.data?.estimatedOpenRate == null
+              ? "—"
+              : `${statsApi.data.estimatedOpenRate.toFixed(1)}%`
+          }
+          hint={
+            statsFailed
+              ? "Couldn't load"
+              : statsApi.data?.estimatedOpenRate == null
+                ? "Not tracked"
+                : undefined
+          }
+        />
+        <StatCard
+          label="Reply rate"
+          isLoading={statsLoading}
+          value={statsFailed ? "—" : percent(statsApi.data?.replyRate ?? 0)}
+          hint={statsFailed ? "Couldn't load" : undefined}
+        />
+        <StatCard
+          label="Active campaigns"
+          isLoading={campaignsApi.isLoading && !campaigns}
+          value={campaigns ? counts.active : "—"}
+        />
+      </div>
 
-      <div className="mx-auto w-full max-w-7xl p-10">
-        {/* Header Section */}
-        <div className="mb-10 flex flex-col gap-8">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="mb-1 text-sm font-medium text-slate-500">Overview</p>
-              <h2 className="font-[family-name:var(--font-plus-jakarta)] text-3xl font-extrabold tracking-tight text-slate-900">
-                Manage Outreach
-              </h2>
-            </div>
-
-            {/* Status Filter Tabs */}
-            <div className="flex rounded-xl border border-[rgba(199,196,216,0.4)] bg-slate-100 p-1">
-              {(["all", "active", "draft", "completed"] as const).map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`rounded-lg px-6 py-2 text-sm font-semibold transition-all ${
-                    statusFilter === status
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                  {status !== "all" && statusCounts[status] > 0 && (
-                    <span className="ml-1.5 text-xs">({statusCounts[status]})</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Stats Summary Cards */}
-          <div className="grid grid-cols-4 gap-6">
-            <StatCard
-              label="Total Sent"
-              value={stats.totalSent.toLocaleString()}
-              showSteady={stats.totalSent === 0}
-            />
-            <StatCard
-              label="Avg Open Rate"
-              value={stats.avgOpenRate == null ? "Not tracked" : `${stats.avgOpenRate.toFixed(1)}%`}
-              showSteady={stats.avgOpenRate == null}
-            />
-            <StatCard
-              label="Avg Reply Rate"
-              value={stats.avgReplyRate > 0 ? `${stats.avgReplyRate.toFixed(1)}%` : "—"}
-              showSteady={stats.avgReplyRate === 0}
-            />
-            <StatCard
-              label="Active Campaigns"
-              value={stats.activeCampaigns.toString()}
-              showSteady={stats.activeCampaigns === 0}
-            />
-          </div>
-        </div>
-
-        {/* Campaign Cards Grid */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-slate-50"
-              />
+      <Panel>
+        <div className="flex flex-col gap-3 border-b p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            role="tablist"
+            aria-label="Filter by status"
+            className="no-scrollbar flex gap-0.5 overflow-x-auto rounded-md bg-muted p-0.5"
+          >
+            {FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                role="tab"
+                aria-selected={statusFilter === filter.value}
+                onClick={() => setStatusFilter(filter.value)}
+                className={cn(
+                  "flex h-7 shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-secondary transition-colors hover:text-primary",
+                  statusFilter === filter.value && "bg-card text-primary shadow-sm"
+                )}
+              >
+                {filter.label}
+                <span className="tabular-nums opacity-60">{counts[filter.value]}</span>
+              </button>
             ))}
           </div>
-        ) : filteredCampaigns.length === 0 ? (
-          /* Empty State */
-          <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-24">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
-              <BarChart3 className="h-7 w-7 text-slate-400" />
-            </div>
-            <h3 className="font-[family-name:var(--font-plus-jakarta)] text-xl font-bold text-slate-900">
-              {searchQuery || statusFilter !== "all" ? "No campaigns found" : "No campaigns yet"}
-            </h3>
-            <p className="mt-2 max-w-md text-center text-sm text-slate-400">
-              {searchQuery || statusFilter !== "all"
-                ? "Try adjusting your filters or search query."
-                : "Create your first campaign to start reaching out to your contacts."}
-            </p>
-            {!searchQuery && statusFilter === "all" && (
-              <Link
-                href="/dashboard/campaigns/new"
-                className="mt-8 flex items-center gap-2 rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+          <div className="relative sm:w-64">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-secondary" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search campaigns"
+              aria-label="Search campaigns"
+              className="pr-8 pl-8"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-secondary hover:text-primary"
               >
-                <Plus className="h-4 w-4" />
-                Start New Outreach
-              </Link>
+                <X className="size-3.5" />
+              </button>
             )}
           </div>
+        </div>
+
+        {campaignsApi.error && !campaigns ? (
+          <ErrorState title="Couldn't load campaigns" onRetry={campaignsApi.refetch} />
+        ) : !campaigns ? (
+          <RowsSkeleton rows={4} />
+        ) : filteredCampaigns.length === 0 ? (
+          <EmptyState
+            icon={filtering ? Search : Megaphone}
+            title={filtering ? "No campaigns match" : "No campaigns yet"}
+            description={
+              filtering
+                ? "Try another status or search term."
+                : "Create a campaign to start reaching out to your contacts."
+            }
+            action={
+              filtering ? (
+                <button
+                  type="button"
+                  className={buttonVariants({ variant: "outline" })}
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("all");
+                  }}
+                >
+                  Clear filters
+                </button>
+              ) : (
+                <Link href="/dashboard/campaigns/new" className={buttonVariants()}>
+                  <Plus data-icon="inline-start" />
+                  New campaign
+                </Link>
+              )
+            }
+          />
         ) : (
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-            {filteredCampaigns.map((campaign) => (
-              <CampaignCard key={campaign._id} campaign={campaign} />
-            ))}
-
-            {/* Add New Placeholder */}
-            <Link
-              href="/dashboard/campaigns/new"
-              className="group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-8 transition-all hover:border-indigo-400 hover:bg-white"
-            >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-transform group-hover:scale-110">
-                <Plus className="h-5 w-5 text-slate-400 transition-colors group-hover:text-indigo-600" />
-              </div>
-              <span className="text-sm font-bold text-slate-500 group-hover:text-slate-900">
-                Start New Outreach
-              </span>
-            </Link>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-base">
+              <thead>
+                <tr className="border-b text-left text-sm text-secondary">
+                  <th className="px-4 py-2.5 font-medium">Campaign</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Sent</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Reply rate</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Bounce rate</th>
+                  <th className="w-10 px-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCampaigns.map((campaign) => {
+                  const href =
+                    campaign.status === "draft"
+                      ? `/dashboard/campaigns/new/wizard?draft=${campaign._id}`
+                      : `/dashboard/campaigns/${campaign._id}`;
+                  return (
+                    <tr
+                      key={campaign._id}
+                      className="group relative border-b transition-colors last:border-0 hover:bg-muted/60"
+                    >
+                      <td className="px-4 py-3">
+                        <Link
+                          href={href}
+                          className="font-medium after:absolute after:inset-0 group-hover:text-accent"
+                        >
+                          {campaign.name}
+                        </Link>
+                        <div className="text-sm text-secondary">
+                          Created {relativeTime(campaign._creationTime)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={campaign.status} />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {campaign.emailsSent > 0 ? campaign.emailsSent.toLocaleString() : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {percent(campaign.replyRate)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {percent(campaign.bounceRate)}
+                      </td>
+                      <td className="px-2 py-3 text-secondary">
+                        <ChevronRight className="size-4" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-
-        {/* Pagination Footer */}
-        {filteredCampaigns.length > 0 && (
-          <div className="mt-16 flex items-center justify-between text-slate-400">
-            <p className="text-[11px] font-medium">
-              Viewing 1-{filteredCampaigns.length} of {statusCounts.all} Campaigns
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
+      </Panel>
+    </Page>
   );
 }
 
-// ============================================================
-// REUSABLE COMPONENTS (Following DRY - extracted after 3+ uses)
-// ============================================================
-
-interface StatCardProps {
-  label: string;
-  value: string;
-  showSteady?: boolean;
-}
-
-function StatCard({ label, value, showSteady }: StatCardProps) {
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-[rgba(199,196,216,0.4)] bg-white p-6 shadow-[0px_24px_48px_rgba(70,69,85,0.08)]">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
-      <h4 className="mb-1 font-[family-name:var(--font-plus-jakarta)] text-2xl font-bold leading-none text-slate-900">
-        {value}
-      </h4>
-      {showSteady && (
-        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
-          </svg>
-          Steady
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface CampaignCardProps {
-  campaign: CampaignItem;
-}
-
-function CampaignCard({ campaign }: CampaignCardProps) {
-  const lastUpdated = getRelativeTime(campaign._creationTime);
-
-  return (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border border-[rgba(199,196,216,0.4)] bg-white shadow-[0px_24px_48px_rgba(70,69,85,0.08)] transition-all hover:border-indigo-400">
-      <div className="p-8">
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="font-[family-name:var(--font-plus-jakarta)] text-xl font-bold text-slate-900 transition-colors group-hover:text-indigo-600">
-              {campaign.name}
-            </h3>
-            <span className="text-[10px] font-medium text-slate-400">
-              Last updated: {lastUpdated}
-            </span>
-          </div>
-          <StatusBadge status={campaign.status} />
-        </div>
-
-        {/* Metrics */}
-        <div className="mb-6 grid grid-cols-3 gap-4 border-y border-slate-100 py-6">
-          <MetricItem
-            label="Sent"
-            value={campaign.emailsSent > 0 ? campaign.emailsSent.toLocaleString() : "—"}
-          />
-          <MetricItem
-            label="Reply Rate"
-            value={campaign.replyRate > 0 ? `${campaign.replyRate.toFixed(1)}%` : "—"}
-            bordered
-          />
-          <MetricItem
-            label="Bounce Rate"
-            value={campaign.bounceRate > 0 ? `${campaign.bounceRate.toFixed(1)}%` : "—"}
-            bordered
-          />
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-end">
-          {campaign.status === "draft" ? (
-            <Link
-              href={`/dashboard/campaigns/${campaign._id}/edit`}
-              className="flex items-center gap-1 rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-4 py-2 text-xs font-bold text-white transition-opacity hover:opacity-90"
-            >
-              Resume Setup
-            </Link>
-          ) : campaign.status === "completed" ? (
-            <Link
-              href={`/dashboard/campaigns/${campaign._id}`}
-              className="flex items-center gap-1 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Full Report
-            </Link>
-          ) : (
-            <Link
-              href={`/dashboard/campaigns/${campaign._id}`}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              View Analytics
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface MetricItemProps {
-  label: string;
-  value: string;
-  bordered?: boolean;
-}
-
-function MetricItem({ label, value, bordered }: MetricItemProps) {
-  return (
-    <div className={`flex flex-col ${bordered ? "border-l border-slate-100 pl-4" : ""}`}>
-      <span className="text-[10px] font-bold uppercase tracking-tighter text-slate-400">
-        {label}
-      </span>
-      <span className="font-[family-name:var(--font-plus-jakarta)] text-xl font-semibold tracking-tight text-slate-800">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function getRelativeTime(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
+function relativeTime(timestamp: number): string {
+  const minutes = Math.floor((Date.now() - timestamp) / 60_000);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
+  if (days > 30) return `on ${new Date(timestamp).toLocaleDateString()}`;
   if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
   if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
   if (minutes > 0) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
-  return "Just now";
+  return "just now";
 }

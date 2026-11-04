@@ -94,24 +94,24 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[540px] font-[family-name:var(--font-ibm-plex)] p-0">
+      <DialogContent className="sm:max-w-[540px] p-0">
         <DialogHeader className="px-6 pt-6 pb-4">
           <div className="flex items-center gap-3">
             {step === "form" && (
               <button
                 onClick={() => setStep("choose")}
-                className="p-1 -ml-1 hover:bg-slate-100 rounded transition-colors"
+                className="-ml-1 rounded-sm p-1 transition-colors hover:bg-muted"
                 aria-label="Back to provider selection"
               >
-                <ArrowLeft className="w-5 h-5 text-slate-600" />
+                <ArrowLeft className="size-4 text-secondary" />
               </button>
             )}
             <div>
-              <DialogTitle className="text-xl">Add Mailbox</DialogTitle>
+              <DialogTitle>Connect a mailbox</DialogTitle>
               <DialogDescription className="mt-1">
                 {step === "choose"
-                  ? "Choose how you want to connect your email account"
-                  : "Enter your SMTP credentials to connect"}
+                  ? "Choose where your sending account lives."
+                  : "Enter the SMTP details for this account."}
               </DialogDescription>
             </div>
           </div>
@@ -123,25 +123,23 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
               {/* Google Workspace Card */}
               <button
                 onClick={() => handleProviderSelect("google")}
-                className="group relative flex items-center gap-4 p-4 border-2 border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 text-left"
+                className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
               >
-                <div className="flex-shrink-0 w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-white">
                   <Image
                     src="/logos/google.svg"
                     alt="Google"
                     width={32}
                     height={32}
-                    className="w-8 h-8"
+                    className="size-5"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
-                    Google Workspace
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-0.5">Connect via OAuth (recommended)</p>
+                  <h3 className="text-base font-semibold">Google Workspace</h3>
+                  <p className="text-sm text-secondary">Sign in with OAuth. Recommended.</p>
                 </div>
-                <div className="flex-shrink-0 text-slate-400 group-hover:text-blue-500 transition-colors">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="shrink-0 text-secondary">
+                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -155,25 +153,23 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
               {/* Microsoft 365 Card */}
               <button
                 onClick={() => handleProviderSelect("microsoft")}
-                className="group relative flex items-center gap-4 p-4 border-2 border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 text-left"
+                className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
               >
-                <div className="flex-shrink-0 w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-white">
                   <Image
                     src="/logos/microsoft.svg"
                     alt="Microsoft"
                     width={32}
                     height={32}
-                    className="w-8 h-8"
+                    className="size-5"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
-                    Microsoft 365
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-0.5">Connect via OAuth (recommended)</p>
+                  <h3 className="text-base font-semibold">Microsoft 365</h3>
+                  <p className="text-sm text-secondary">Sign in with OAuth. Recommended.</p>
                 </div>
-                <div className="flex-shrink-0 text-slate-400 group-hover:text-blue-500 transition-colors">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="shrink-0 text-secondary">
+                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -187,11 +183,11 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
               {/* SMTP/IMAP Card */}
               <button
                 onClick={() => handleProviderSelect("smtp")}
-                className="group relative flex items-center gap-4 p-4 border-2 border-slate-200 rounded-lg hover:border-slate-400 hover:bg-slate-50 transition-all duration-200 text-left"
+                className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
               >
-                <div className="flex-shrink-0 w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted">
                   <svg
-                    className="w-7 h-7 text-slate-600"
+                    className="size-5 text-secondary"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -205,13 +201,13 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-900 group-hover:text-slate-700 transition-colors">
-                    SMTP / IMAP
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-0.5">Manual configuration (advanced)</p>
+                  <h3 className="text-base font-semibold">SMTP / IMAP</h3>
+                  <p className="text-sm text-secondary">
+                    Any provider, with host and app password.
+                  </p>
                 </div>
-                <div className="flex-shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="shrink-0 text-secondary">
+                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -225,9 +221,7 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
           ) : (
             <form onSubmit={handleSmtpSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium text-slate-700">
-                  Friendly Name
-                </Label>
+                <Label htmlFor="name">Friendly Name</Label>
                 <Input
                   id="name"
                   placeholder="e.g. Sales Account 1"
@@ -238,9 +232,7 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-sm font-medium text-slate-700">
-                  Email Address
-                </Label>
+                <Label htmlFor="username">Email Address</Label>
                 <Input
                   id="username"
                   type="email"
@@ -252,9 +244,7 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-slate-700">
-                  App Password
-                </Label>
+                <Label htmlFor="password">App Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -263,15 +253,13 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
                 />
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-secondary">
                   Use an app-specific password, not your main account password
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="dailyLimit" className="text-sm font-medium text-slate-700">
-                  Daily Send Limit
-                </Label>
+                <Label htmlFor="dailyLimit">Daily Send Limit</Label>
                 <Input
                   id="dailyLimit"
                   type="number"
@@ -298,7 +286,7 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Adding…" : "Add Mailbox"}
+                  {isSubmitting ? "Connecting…" : "Connect mailbox"}
                 </Button>
               </div>
             </form>

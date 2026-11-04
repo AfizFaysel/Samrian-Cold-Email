@@ -4,7 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { Logo } from "@/components/logo";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useAuthSession } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 
 // Accepting needs a click, so mail scanners that open the link cannot join on someone's behalf.
@@ -51,53 +54,55 @@ export function AcceptInvitation({ invitationId }: { invitationId: string }) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <section className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6">
-        <h1 className="text-xl font-semibold text-slate-900">Join your team on Samrian</h1>
+    <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-body p-6">
+      <Logo className="size-9" />
+      <section className="flex w-full max-w-sm flex-col gap-4 rounded-lg border bg-card p-6 shadow-sm">
+        <h1 className="text-xl font-semibold tracking-tight">Join your team on Samrian</h1>
 
-        {isPending ? <p className="text-sm text-slate-600">Loading...</p> : null}
+        {isPending ? <p className="text-base text-secondary">Loading…</p> : null}
 
         {!isPending && !session?.user ? (
           <>
-            <p className="text-sm text-slate-600">
+            <p className="text-base text-secondary">
               Sign in with the email address this invitation was sent to.
             </p>
-            <div className="flex gap-3 text-sm font-semibold">
-              <Link href={`/sign-in?redirect=${redirect}`}>Sign in</Link>
-              <Link href={`/sign-up?redirect=${redirect}`}>Create an account</Link>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Link
+                href={`/sign-in?redirect=${redirect}`}
+                className={cn(buttonVariants(), "flex-1")}
+              >
+                Sign in
+              </Link>
+              <Link
+                href={`/sign-up?redirect=${redirect}`}
+                className={cn(buttonVariants({ variant: "outline" }), "flex-1")}
+              >
+                Create an account
+              </Link>
             </div>
           </>
         ) : null}
 
         {!isPending && session?.user && !needsVerification ? (
-          <button
-            type="button"
-            onClick={accept}
-            disabled={isWorking}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {isWorking ? "Joining..." : "Accept invitation"}
-          </button>
+          <Button type="button" size="lg" onClick={accept} disabled={isWorking}>
+            {isWorking ? "Joining…" : "Accept invitation"}
+          </Button>
         ) : null}
 
         {needsVerification ? (
           <>
-            <p className="text-sm text-slate-600">
+            <p className="text-base text-secondary">
               Confirm you own this email address before joining.
             </p>
-            <button
-              type="button"
-              onClick={sendVerification}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-            >
+            <Button type="button" size="lg" onClick={sendVerification}>
               Send verification email
-            </button>
+            </Button>
           </>
         ) : null}
 
-        {notice ? <p className="text-sm text-slate-600">{notice}</p> : null}
+        {notice ? <p className="text-base text-secondary">{notice}</p> : null}
         {error ? (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-base text-error">
             {error}
           </p>
         ) : null}

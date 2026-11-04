@@ -120,97 +120,85 @@ export function ManualEntry({ onNext, onBack, onCancel }: ManualEntryProps) {
         {contacts.map((contact, contactIndex) => (
           <div
             key={contactIndex}
-            className="relative rounded-xl border-2 border-slate-200 bg-white p-6 transition-all hover:border-indigo-200"
+            className="relative rounded-lg border bg-card p-5 transition-all hover:border-accent/30"
           >
             {/* Remove Contact Button */}
             {contacts.length > 1 && (
               <button
                 onClick={() => removeContact(contactIndex)}
-                className="absolute right-4 top-4 rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                className="absolute right-4 top-4 rounded-md p-2 text-secondary transition-colors hover:bg-error-muted hover:text-error"
                 title="Remove contact"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
 
-            <h3 className="mb-4 font-[family-name:var(--font-plus-jakarta)] text-lg font-bold text-slate-900">
-              Contact {contactIndex + 1}
-            </h3>
+            <h3 className="mb-4 text-lg font-semibold text-primary">Contact {contactIndex + 1}</h3>
 
             {/* Standard Fields */}
             <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Email <span className="text-red-500">*</span>
+                <label className="mb-2 block text-sm font-medium text-secondary">
+                  Email <span className="text-error">*</span>
                 </label>
                 <input
                   type="email"
                   value={contact.email}
                   onChange={(e) => updateContact(contactIndex, "email", e.target.value)}
                   placeholder="sarah@company.com"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  First Name
-                </label>
+                <label className="mb-2 block text-sm font-medium text-secondary">First Name</label>
                 <input
                   type="text"
                   value={contact.firstName}
                   onChange={(e) => updateContact(contactIndex, "firstName", e.target.value)}
                   placeholder="Sarah"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Last Name
-                </label>
+                <label className="mb-2 block text-sm font-medium text-secondary">Last Name</label>
                 <input
                   type="text"
                   value={contact.lastName}
                   onChange={(e) => updateContact(contactIndex, "lastName", e.target.value)}
                   placeholder="Jenkins"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Company
-                </label>
+                <label className="mb-2 block text-sm font-medium text-secondary">Company</label>
                 <input
                   type="text"
                   value={contact.company}
                   onChange={(e) => updateContact(contactIndex, "company", e.target.value)}
                   placeholder="Acme Corp"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Timezone
-                </label>
+                <label className="mb-2 block text-sm font-medium text-secondary">Timezone</label>
                 <input
                   type="text"
                   value={contact.timezone}
                   onChange={(e) => updateContact(contactIndex, "timezone", e.target.value)}
                   placeholder="America/New_York"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
                 />
               </div>
             </div>
 
             {/* Custom Variables */}
             {contact.customVars.length > 0 && (
-              <div className="mb-4 space-y-3 border-t border-slate-200 pt-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Custom Variables
-                </h4>
+              <div className="mb-4 space-y-3 border-t border-border pt-4">
+                <h4 className="text-sm font-medium text-secondary">Custom Variables</h4>
                 {contact.customVars.map((cv, varIndex) => (
                   <div key={varIndex} className="flex gap-3">
                     <input
@@ -220,7 +208,7 @@ export function ManualEntry({ onNext, onBack, onCancel }: ManualEntryProps) {
                         updateCustomVar(contactIndex, varIndex, "key", e.target.value)
                       }
                       placeholder="Field name"
-                      className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="flex-1 rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
                     />
                     <input
                       type="text"
@@ -229,11 +217,11 @@ export function ManualEntry({ onNext, onBack, onCancel }: ManualEntryProps) {
                         updateCustomVar(contactIndex, varIndex, "value", e.target.value)
                       }
                       placeholder="Value"
-                      className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="flex-1 rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
                     />
                     <button
                       onClick={() => removeCustomVar(contactIndex, varIndex)}
-                      className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                      className="rounded-md p-2 text-secondary transition-colors hover:bg-error-muted hover:text-error"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -245,7 +233,7 @@ export function ManualEntry({ onNext, onBack, onCancel }: ManualEntryProps) {
             {/* Add Custom Variable Button */}
             <button
               onClick={() => addCustomVar(contactIndex)}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
+              className="flex items-center gap-2 rounded-md border border-border-strong px-4 py-2 text-base font-medium text-secondary transition-colors hover:border-accent/30 hover:bg-accent-muted hover:text-accent"
             >
               <Plus className="h-4 w-4" />
               Add Custom Variable
@@ -257,7 +245,7 @@ export function ManualEntry({ onNext, onBack, onCancel }: ManualEntryProps) {
       {/* Add Another Contact Button */}
       <button
         onClick={addContact}
-        className="mb-8 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-4 text-sm font-semibold text-slate-600 transition-all hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600"
+        className="mb-8 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border-strong bg-muted py-4 text-base font-semibold text-secondary transition-all hover:border-accent hover:bg-accent-muted hover:text-accent"
       >
         <Plus className="h-5 w-5" />
         Add Another Contact

@@ -2,28 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { Landing } from "@/components/landing";
 import { useAuthSession } from "@/lib/auth";
 
 export default function Home() {
   const router = useRouter();
-  const { data: session, isPending } = useAuthSession();
+  const { data: session } = useAuthSession();
+  const signedIn = Boolean(session?.user);
 
   useEffect(() => {
-    if (!isPending) {
-      if (session?.user) {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/sign-in");
-      }
-    }
-  }, [session, isPending, router]);
+    if (signedIn) router.replace("/dashboard");
+  }, [signedIn, router]);
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-2">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
-    </div>
-  );
+  return <Landing signedIn={signedIn} />;
 }

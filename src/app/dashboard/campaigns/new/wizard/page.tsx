@@ -2,9 +2,12 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
-import { Check, ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { ChevronLeft, ChevronRight, Rocket, Save } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Page } from "@/components/page-header";
+import { Stepper } from "@/components/stepper";
+import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
 
 // Step components
@@ -16,12 +19,12 @@ import { MailboxesStep } from "./steps/mailboxes";
 import { ReviewStep } from "./steps/review";
 
 const STEPS = [
-  { id: 1, name: "Basic Info", component: BasicInfoStep },
+  { id: 1, name: "Basics", component: BasicInfoStep },
   { id: 2, name: "Schedule", component: ScheduleStep },
-  { id: 3, name: "Email Sequence", component: EmailSequenceStep },
-  { id: 4, name: "Assign Contacts", component: ContactAssignmentStep },
-  { id: 5, name: "Select Mailboxes", component: MailboxesStep },
-  { id: 6, name: "Review & Launch", component: ReviewStep },
+  { id: 3, name: "Sequence", component: EmailSequenceStep },
+  { id: 4, name: "Contacts", component: ContactAssignmentStep },
+  { id: 5, name: "Mailboxes", component: MailboxesStep },
+  { id: 6, name: "Review", component: ReviewStep },
 ] as const;
 
 export type CampaignDraft = {
@@ -51,7 +54,7 @@ export default function CampaignWizardPage() {
   const [isLaunching, setIsLaunching] = React.useState(false);
 
   const { data: existingData } = useApi<{ campaign: any | null }>(
-    draftId ? `/api/campaigns/${draftId}` : "/api/campaigns/__new__"
+    draftId ? `/api/campaigns/${draftId}` : null
   );
   const existingDraft = draftId ? existingData?.campaign : null;
 
@@ -173,141 +176,65 @@ export default function CampaignWizardPage() {
   const isFirstStep = currentStep === 1;
 
   return (
-    <div className="flex h-full flex-col font-[family-name:var(--font-ibm-plex)]">
-      <PageHeader
-        title="Create Campaign"
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Campaigns", href: "/dashboard/campaigns" },
-          { label: "New Campaign" },
-        ]}
-        actions={
-          <div className="flex items-center gap-3">
-            {lastSaved && (
-              <span className="text-xs text-slate-400">
-                {isSaving ? "Saving..." : `Saved ${formatRelativeTime(lastSaved)}`}
-              </span>
-            )}
-            <button
-              onClick={handleSaveDraft}
-              disabled={isSaving || !draft.name.trim()}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              Save Draft
-            </button>
-          </div>
-        }
-      />
-
-      <div className="mx-auto w-full max-w-7xl p-10">
-        {/* Progress Indicator */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between">
-            {STEPS.map((step, index) => (
-              <React.Fragment key={step.id}>
-                <div className="flex flex-col items-center">
-                  <button
-                    onClick={() => setCurrentStep(step.id)}
-                    disabled={step.id > currentStep}
-                    className={`mb-2 flex h-10 w-10 items-center justify-center rounded-full border-2 font-bold transition-all ${
-                      step.id < currentStep
-                        ? "border-indigo-600 bg-indigo-600 text-white"
-                        : step.id === currentStep
-                          ? "border-indigo-600 bg-white text-indigo-600 ring-4 ring-indigo-100"
-                          : "border-slate-200 bg-white text-slate-400"
-                    } ${step.id <= currentStep ? "cursor-pointer hover:scale-110" : "cursor-not-allowed"}`}
-                  >
-                    {step.id < currentStep ? <Check className="h-5 w-5" /> : step.id}
-                  </button>
-                  <span
-                    className={`text-xs font-medium ${
-                      step.id === currentStep ? "text-indigo-600" : "text-slate-400"
-                    }`}
-                  >
-                    {step.name}
-                  </span>
-                </div>
-                {index < STEPS.length - 1 && (
-                  <div
-                    className={`mb-6 h-0.5 flex-1 ${
-                      step.id < currentStep ? "bg-indigo-600" : "bg-slate-200"
-                    }`}
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-
-        {/* Step Content */}
-        <div className="mb-10 min-h-[500px]">
-          <CurrentStepComponent draft={draft} setDraft={setDraft} />
-        </div>
-
-        {/* Navigation */}
-        <div className="flex items-center justify-between border-t border-slate-200 pt-6">
-          <button
-            onClick={handleBack}
-            disabled={isFirstStep}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+    <Page
+      title={draft.name.trim() || "New campaign"}
+      breadcrumbs={[
+        { label: "Campaigns", href: "/dashboard/campaigns" },
+        { label: "New campaign" },
+      ]}
+      actions={
+        <>
+          <span className="text-sm text-secondary" aria-live="polite">
+            {isSaving ? "Saving…" : lastSaved ? `Saved ${formatRelativeTime(lastSaved)}` : ""}
+          </span>
+          <Button
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={isSaving || !draft.name.trim()}
           >
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </button>
+            <Save data-icon="inline-start" />
+            Save draft
+          </Button>
+        </>
+      }
+    >
+      <Stepper steps={STEPS} current={currentStep} onSelect={setCurrentStep} />
 
-          {isLastStep ? (
-            <button
-              onClick={handleLaunchClick}
-              disabled={!draft.id || isLaunching}
-              className="flex items-center gap-2 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLaunching ? "Launching..." : "Launch Campaign"}
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              className="flex items-center gap-2 rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+      <div className="min-h-[420px]">
+        <CurrentStepComponent draft={draft} setDraft={setDraft} />
       </div>
 
-      {/* Launch Confirmation Modal */}
-      {showLaunchConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
-            <h3 className="mb-4 font-[family-name:var(--font-plus-jakarta)] text-xl font-bold text-slate-900">
-              Launch Campaign?
-            </h3>
-            <p className="mb-6 text-sm text-slate-600">
-              This will activate your campaign and start sending emails based on the configured
-              schedule. Make sure all settings are correct before proceeding.
-            </p>
+      <div className="sticky bottom-0 -mx-4 flex items-center justify-between gap-3 border-t bg-body/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        <Button variant="outline" onClick={handleBack} disabled={isFirstStep}>
+          <ChevronLeft data-icon="inline-start" />
+          Back
+        </Button>
+        <span className="text-sm text-secondary tabular-nums">
+          Step {currentStep} of {STEPS.length}
+        </span>
+        {isLastStep ? (
+          <Button onClick={handleLaunchClick} disabled={!draft.id || isLaunching}>
+            <Rocket data-icon="inline-start" />
+            {isLaunching ? "Launching…" : "Launch campaign"}
+          </Button>
+        ) : (
+          <Button onClick={handleNext}>
+            Continue
+            <ChevronRight data-icon="inline-end" />
+          </Button>
+        )}
+      </div>
 
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowLaunchConfirm(false)}
-                disabled={isLaunching}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLaunchConfirm}
-                disabled={isLaunching}
-                className="rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                {isLaunching ? "Launching..." : "Launch Campaign"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <ConfirmDialog
+        isOpen={showLaunchConfirm}
+        onOpenChange={setShowLaunchConfirm}
+        title="Launch this campaign?"
+        description="Emails start sending on the schedule you set. Check the review step before you launch."
+        confirmText="Launch campaign"
+        isLoading={isLaunching}
+        onConfirm={handleLaunchConfirm}
+      />
+    </Page>
   );
 }
 

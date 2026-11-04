@@ -46,10 +46,8 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-8">
-        <h2 className="font-[family-name:var(--font-plus-jakarta)] text-2xl font-bold text-slate-900">
-          Schedule Configuration
-        </h2>
-        <p className="mt-2 text-sm text-slate-500">
+        <h2 className="text-xl font-semibold text-primary">Schedule Configuration</h2>
+        <p className="mt-2 text-base text-secondary">
           Define when emails should be sent to respect your contacts' time zones and working hours.
         </p>
       </div>
@@ -57,9 +55,9 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
       <div className="space-y-8">
         {/* Default Timezone */}
         <div>
-          <label className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700">
+          <label className="mb-2 flex items-center gap-2 text-base font-medium text-primary">
             <Clock className="h-4 w-4" />
-            Default Timezone <span className="text-red-500">*</span>
+            Default Timezone <span className="text-error">*</span>
           </label>
           <select
             value={draft.schedule.defaultTimezone}
@@ -69,7 +67,7 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
                 schedule: { ...prev.schedule, defaultTimezone: e.target.value },
               }))
             }
-            className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
           >
             {TIMEZONES.map((tz) => (
               <option key={tz.value} value={tz.value}>
@@ -77,16 +75,16 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-sm text-secondary">
             Used for contacts without a specific timezone set
           </p>
         </div>
 
         {/* Days Allowed */}
         <div>
-          <label className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700">
+          <label className="mb-3 flex items-center gap-2 text-base font-medium text-primary">
             <Calendar className="h-4 w-4" />
-            Allowed Days <span className="text-red-500">*</span>
+            Allowed Days <span className="text-error">*</span>
           </label>
           <div className="grid grid-cols-7 gap-2">
             {DAYS.map((day) => {
@@ -95,10 +93,10 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
                 <button
                   key={day.value}
                   onClick={() => toggleDay(day.value)}
-                  className={`rounded-lg border-2 py-3 text-sm font-bold transition-all ${
+                  className={`rounded-md border-2 py-3 text-base font-medium transition-all ${
                     isSelected
-                      ? "border-indigo-600 bg-indigo-600 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300"
+                      ? "border-accent bg-accent-bg text-on-accent"
+                      : "border-border bg-card text-secondary hover:border-accent/30"
                   }`}
                 >
                   {day.label}
@@ -106,17 +104,17 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
               );
             })}
           </div>
-          <p className="mt-2 text-xs text-slate-400">Emails will only be sent on selected days</p>
+          <p className="mt-2 text-sm text-secondary">Emails will only be sent on selected days</p>
         </div>
 
         {/* Send Window */}
         <div>
-          <label className="mb-3 text-sm font-bold text-slate-700">
-            Send Window <span className="text-red-500">*</span>
+          <label className="mb-3 text-base font-medium text-primary">
+            Send Window <span className="text-error">*</span>
           </label>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-500">Start Time</label>
+              <label className="mb-2 block text-sm font-medium text-secondary">Start Time</label>
               <input
                 type="time"
                 value={draft.schedule.startTime}
@@ -126,11 +124,11 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
                     schedule: { ...prev.schedule, startTime: e.target.value },
                   }))
                 }
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
               />
             </div>
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-500">End Time</label>
+              <label className="mb-2 block text-sm font-medium text-secondary">End Time</label>
               <input
                 type="time"
                 value={draft.schedule.endTime}
@@ -140,21 +138,21 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
                     schedule: { ...prev.schedule, endTime: e.target.value },
                   }))
                 }
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
               />
             </div>
           </div>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-sm text-secondary">
             Emails will only be sent during this time window (in contact's timezone)
           </p>
         </div>
 
         {/* Info Box */}
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-6">
+        <div className="rounded-lg border border-success/15 bg-success-muted/30 p-6">
           <div className="flex gap-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success-muted">
               <svg
-                className="h-5 w-5 text-emerald-600"
+                className="h-5 w-5 text-success"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -168,8 +166,8 @@ export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
               </svg>
             </div>
             <div>
-              <h3 className="mb-1 text-sm font-bold text-emerald-900">Best Practice</h3>
-              <p className="text-sm leading-relaxed text-emerald-900/70">
+              <h3 className="mb-1 text-base font-medium text-success">Best Practice</h3>
+              <p className="text-base leading-relaxed text-success/70">
                 For B2B outreach, we recommend Monday-Friday, 9 AM - 5 PM in the contact's local
                 timezone. This maximizes open rates and response rates.
               </p>

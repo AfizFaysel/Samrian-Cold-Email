@@ -64,16 +64,16 @@ export function ApiKeys() {
   }
 
   return (
-    <section className="flex flex-col gap-5 rounded-lg border border-slate-200 bg-white p-5">
+    <section className="flex flex-col gap-5 rounded-lg border bg-card p-5">
       <div>
-        <h2 className="text-base font-medium text-slate-950">API keys</h2>
-        <p className="text-sm text-slate-600">Create separate scoped keys for CLI and CI use.</p>
+        <h2 className="text-lg font-semibold">API keys</h2>
+        <p className="text-base text-secondary">Create separate scoped keys for CLI and CI use.</p>
       </div>
 
       {created ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
-          <p className="font-medium text-amber-950">Key shown once</p>
-          <code className="mt-2 block break-all text-amber-950">{created}</code>
+        <div className="rounded-sm border border-warning/30 bg-warning-muted p-3 text-base">
+          <p className="font-medium text-warning">Key shown once</p>
+          <code className="mt-2 block break-all text-warning">{created}</code>
         </div>
       ) : null}
 
@@ -84,7 +84,7 @@ export function ApiKeys() {
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {scopes.map((scope) => (
-          <label key={scope} className="flex items-center gap-2 text-sm text-slate-700">
+          <label key={scope} className="flex items-center gap-2 text-base text-primary">
             <input
               type="checkbox"
               aria-label={scope}
@@ -108,12 +108,12 @@ export function ApiKeys() {
         </Button>
       </div>
 
-      <div className="divide-y divide-slate-200 border-t border-slate-200">
+      <div className="divide-y divide-border border-t border-border">
         {keys.map((key) => (
           <div key={key.id} className="flex items-center justify-between gap-4 py-3">
             <div className="min-w-0">
-              <p className="font-medium text-slate-950">{key.name}</p>
-              <p className="truncate text-sm text-slate-600">{key.scopes.join(", ")}</p>
+              <p className="font-medium text-primary">{key.name}</p>
+              <p className="truncate text-base text-secondary">{key.scopes.join(", ")}</p>
             </div>
             <Button variant="outline" onClick={() => revoke(key)} aria-label={`Revoke ${key.name}`}>
               Revoke
@@ -121,7 +121,7 @@ export function ApiKeys() {
           </div>
         ))}
       </div>
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="text-base text-error">{error}</p> : null}
     </section>
   );
 }

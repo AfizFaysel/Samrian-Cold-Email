@@ -41,6 +41,12 @@ describe("auth client facade", () => {
     expect(proxy).toContain('"/api/v1/:path*"');
   });
 
+  test("WorkOS proxy keeps the licensing page public for signed-out visitors", async () => {
+    const proxy = await readFile("src/proxy.ts", "utf8");
+
+    expect(proxy).toContain('"/licensing"');
+  });
+
   test("keeps user Google auth separate from Gmail mailbox OAuth", async () => {
     const config = await readFile("src/server/auth/config.ts", "utf8");
     const mailbox = await readFile("src/app/api/auth/google/route.ts", "utf8");

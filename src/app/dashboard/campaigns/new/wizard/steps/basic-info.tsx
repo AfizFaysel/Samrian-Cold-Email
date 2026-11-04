@@ -10,10 +10,8 @@ export function BasicInfoStep({ draft, setDraft }: BasicInfoStepProps) {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-8">
-        <h2 className="font-[family-name:var(--font-plus-jakarta)] text-2xl font-bold text-slate-900">
-          Campaign Details
-        </h2>
-        <p className="mt-2 text-sm text-slate-500">
+        <h2 className="text-xl font-semibold text-primary">Campaign Details</h2>
+        <p className="mt-2 text-base text-secondary">
           Give your campaign a name and description to help you identify it later.
         </p>
       </div>
@@ -21,26 +19,26 @@ export function BasicInfoStep({ draft, setDraft }: BasicInfoStepProps) {
       <div className="space-y-6">
         {/* Campaign Name */}
         <div>
-          <label className="mb-2 block text-sm font-bold text-slate-700">
-            Campaign Name <span className="text-red-500">*</span>
+          <label className="mb-2 block text-base font-medium text-primary">
+            Campaign Name <span className="text-error">*</span>
           </label>
           <input
             type="text"
             value={draft.name}
             onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
             placeholder="e.g., Q1 Outbound Sales Campaign"
-            className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
             maxLength={200}
           />
-          <p className="mt-1 text-xs text-slate-400">{draft.name.length}/200 characters</p>
+          <p className="mt-1 text-sm text-secondary">{draft.name.length}/200 characters</p>
         </div>
 
         {/* Info Box */}
-        <div className="rounded-xl border border-indigo-100 bg-indigo-50/30 p-6">
+        <div className="rounded-lg border border-accent/15 bg-accent-muted/30 p-6">
           <div className="flex gap-4">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-muted">
               <svg
-                className="h-5 w-5 text-indigo-600"
+                className="h-5 w-5 text-accent"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -54,8 +52,8 @@ export function BasicInfoStep({ draft, setDraft }: BasicInfoStepProps) {
               </svg>
             </div>
             <div>
-              <h3 className="mb-1 text-sm font-bold text-indigo-900">Pro Tip</h3>
-              <p className="text-sm leading-relaxed text-indigo-900/70">
+              <h3 className="mb-1 text-base font-medium text-accent">Pro Tip</h3>
+              <p className="text-base leading-relaxed text-accent/70">
                 Use descriptive names that include the target audience and goal. For example:
                 "Enterprise SaaS - Product Demo Requests" or "Recruitment - Senior Engineers Q1
                 2024".

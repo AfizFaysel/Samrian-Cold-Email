@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type TimePeriod = "7" | "30" | "90";
 
@@ -10,49 +10,40 @@ interface TimePeriodSelectorProps {
   onChange: (period: TimePeriod) => void;
 }
 
-const periodLabels: Record<TimePeriod, string> = {
-  "7": "Last 7 Days",
-  "30": "Last 30 Days",
-  "90": "Last 90 Days",
+const periodLabels: Record<TimePeriod, { short: string; long: string }> = {
+  "7": { short: "7d", long: "Last 7 days" },
+  "30": { short: "30d", long: "Last 30 days" },
+  "90": { short: "90d", long: "Last 90 days" },
 };
 
+/** Segmented control for the reporting window. */
 export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
-      >
-        <span>{periodLabels[value]}</span>
-        <ChevronDown className="h-4 w-4" />
-      </button>
-
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-
-          {/* Dropdown */}
-          <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-            {(Object.keys(periodLabels) as TimePeriod[]).map((period) => (
-              <button
-                key={period}
-                onClick={() => {
-                  onChange(period);
-                  setIsOpen(false);
-                }}
-                className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-slate-50 ${
-                  value === period ? "bg-indigo-50 font-medium text-indigo-600" : "text-slate-600"
-                }`}
-              >
-                {periodLabels[period]}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+    <div
+      role="radiogroup"
+      aria-label="Time period"
+      className="inline-flex h-8 items-center gap-0.5 rounded-md bg-muted p-0.5"
+    >
+      {(Object.keys(periodLabels) as TimePeriod[]).map((period) => {
+        const checked = value === period;
+        return (
+          <button
+            key={period}
+            type="button"
+            role="radio"
+            aria-checked={checked}
+            title={periodLabels[period].long}
+            onClick={() => onChange(period)}
+            className={cn(
+              "h-7 rounded-sm px-2.5 text-sm font-medium text-secondary transition-colors outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-accent",
+              checked && "bg-card text-primary shadow-sm"
+            )}
+          >
+            <span className="sr-only">{periodLabels[period].long}</span>
+            <span aria-hidden>{periodLabels[period].short}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

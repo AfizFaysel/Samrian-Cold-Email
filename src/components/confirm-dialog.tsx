@@ -59,11 +59,7 @@ export function ConfirmDialog({
                 setOpen(false);
               }
             }}
-            className={
-              variant === "destructive"
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                : ""
-            }
+            className={variant === "destructive" ? "bg-error text-on-error hover:bg-error/90" : ""}
             disabled={isLoading}
           >
             {isLoading ? "Loading..." : confirmText}

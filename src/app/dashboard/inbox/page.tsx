@@ -2,13 +2,22 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, ExternalLink, Mail, Reply, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ExternalLink,
+  Inbox,
+  MailOpen,
+  RefreshCw,
+  Send,
+} from "lucide-react";
 
-import { PageHeader } from "@/components/page-header";
+import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
 import { InboxAttachments, type InboxAttachment } from "@/components/inbox/attachments";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
+import { cn } from "@/lib/utils";
 
 type InboxThread = {
   id: string;
@@ -53,13 +62,19 @@ type ThreadResponse = {
 export default function InboxPage() {
   const searchParams = useSearchParams();
   const requestedThreadId = searchParams.get("thread") ?? undefined;
-  const { data, refetch } = useApi<InboxResponse>("/api/inbox?limit=50");
+  const { data, error: listError, refetch } = useApi<InboxResponse>("/api/inbox?limit=50");
   const [selectedId, setSelectedId] = React.useState<string | undefined>();
+  // On phones only one pane shows; the list comes first even after a thread auto-selects.
+  const [mobileList, setMobileList] = React.useState(true);
   const [draft, setDraft] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>();
   const threadUrl = selectedId ? `/api/inbox/threads/${selectedId}` : "";
-  const { data: threadData, refetch: refetchThread } = useApi<ThreadResponse>(threadUrl);
+  const {
+    data: threadData,
+    error: threadError,
+    refetch: refetchThread,
+  } = useApi<ThreadResponse>(threadUrl);
 
   const threads = data?.threads ?? [];
   const selectedThread = threadData?.thread;
@@ -116,152 +131,245 @@ export default function InboxPage() {
     }
   }
 
-  return (
-    <div className="flex h-full flex-col font-[family-name:var(--font-ibm-plex)]">
-      <PageHeader
-        title="Inbox"
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Inbox" }]}
-        actions={
-          <Button type="button" variant="outline" onClick={refetch}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        }
-      />
+  const senderLabel = (sender?: InboxSender) => sender?.name ?? sender?.address ?? "Unknown sender";
 
-      <div className="grid min-h-[calc(100vh-8rem)] grid-cols-[360px_1fr] border-t border-slate-200 bg-white">
-        <aside className="border-r border-slate-200">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+  return (
+    <div className="flex h-[calc(100svh-3rem)] min-h-0 flex-col md:h-svh">
+      <div className="grid min-h-0 flex-1 md:grid-cols-[340px_minmax(0,1fr)]">
+        <aside
+          className={cn(
+            "flex min-h-0 flex-col border-r bg-card",
+            selectedId && !mobileList && "max-md:hidden"
+          )}
+        >
+          <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4">
             <div>
-              <p className="text-sm font-semibold text-slate-900">Replies</p>
-              <p className="text-xs text-slate-500">{data?.unreadCount ?? 0} unread</p>
+              <h1 className="text-lg font-semibold">Inbox</h1>
+              <p className="text-sm text-secondary tabular-nums">
+                {data ? `${data.unreadCount} unread` : "Replies from every mailbox"}
+              </p>
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={refetch}
+              aria-label="Refresh"
+            >
+              <RefreshCw />
+            </Button>
           </div>
-          <div className="max-h-[calc(100vh-13rem)] overflow-y-auto">
-            {data === undefined ? (
-              <div className="p-5 text-sm text-slate-500">Loading replies...</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {listError && !data ? (
+              <ErrorState title="Couldn't load replies" onRetry={refetch} />
+            ) : data === undefined ? (
+              <RowsSkeleton rows={6} />
             ) : threads.length === 0 ? (
-              <div className="flex flex-col items-center px-6 py-16 text-center text-sm text-slate-500">
-                <Mail className="mb-3 h-8 w-8 text-slate-300" />
-                No replies yet
-              </div>
+              <EmptyState
+                icon={Inbox}
+                title="No replies yet"
+                description="When someone answers a campaign email, the conversation lands here."
+              />
             ) : (
-              threads.map((thread) => (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(thread.id);
-                    if (thread.unread) void markRead(thread.id);
-                  }}
-                  className={`w-full border-b border-slate-100 px-5 py-4 text-left transition-colors hover:bg-slate-50 ${
-                    selectedId === thread.id ? "bg-indigo-50" : "bg-white"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="min-w-0 truncate text-sm font-semibold text-slate-900">
-                      {thread.sender?.name ?? thread.sender?.address ?? "Unknown sender"}
-                    </p>
-                    {thread.unread ? (
-                      <span className="mt-1 size-2 rounded-full bg-indigo-600" />
-                    ) : null}
-                  </div>
-                  {thread.sender?.address ? (
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
-                      {thread.sender.address}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 truncate text-sm text-slate-700">{thread.subject}</p>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
-                    {thread.excerpt}
-                  </p>
-                </button>
-              ))
+              threads.map((thread) => {
+                const active = selectedId === thread.id;
+                const name = senderLabel(thread.sender);
+                return (
+                  <button
+                    key={thread.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(thread.id);
+                      setMobileList(false);
+                      if (thread.unread) void markRead(thread.id);
+                    }}
+                    aria-current={active ? "true" : undefined}
+                    className={cn(
+                      "flex w-full gap-3 border-b px-4 py-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted",
+                      active && "bg-accent-muted hover:bg-accent-muted"
+                    )}
+                  >
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-secondary">
+                      {name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex items-center justify-between gap-2">
+                        <span
+                          className={cn(
+                            "truncate text-base",
+                            thread.unread ? "font-semibold" : "font-medium"
+                          )}
+                        >
+                          {name}
+                        </span>
+                        <span className="shrink-0 text-sm text-secondary tabular-nums">
+                          {shortTime(thread.receivedAt)}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "truncate text-base",
+                            thread.unread ? "text-primary" : "text-secondary"
+                          )}
+                        >
+                          {thread.subject}
+                        </span>
+                        {thread.unread ? (
+                          <span
+                            className="ml-auto size-2 shrink-0 rounded-full bg-accent-bg"
+                            aria-label="Unread"
+                          />
+                        ) : null}
+                      </span>
+                      {thread.excerpt ? (
+                        <span className="line-clamp-1 text-sm text-secondary">
+                          {thread.excerpt}
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-col">
+        <section
+          className={cn(
+            "flex min-h-0 min-w-0 flex-col",
+            (!selectedId || mobileList) && "max-md:hidden"
+          )}
+        >
           {!selectedId ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-              Select a reply
-            </div>
+            <EmptyState
+              className="flex-1"
+              icon={MailOpen}
+              title="Pick a conversation"
+              description="Choose a reply on the left to read it and answer."
+            />
+          ) : threadError && !threadData ? (
+            <ErrorState
+              className="flex-1"
+              title="Couldn't open this conversation"
+              onRetry={refetchThread}
+            />
           ) : (
             <>
-              <div className="border-b border-slate-200 px-6 py-4">
-                <p className="text-lg font-semibold text-slate-900">
-                  {selectedThread?.subject ?? "Conversation"}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedThread?.sender?.name
-                    ? `${selectedThread.sender.name} <${selectedThread.sender.address ?? "unknown"}>`
-                    : (selectedThread?.sender?.address ?? "Unknown sender")}
-                </p>
-                {selectedThread?.sender?.suspicious ? (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-700">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Sender address uses a normalized or unusual domain. Verify before replying.
+              <div className="flex shrink-0 items-start gap-2 border-b bg-card px-4 py-3 sm:px-6">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-ml-2 md:hidden"
+                  onClick={() => setMobileList(true)}
+                  aria-label="Back to replies"
+                >
+                  <ArrowLeft />
+                </Button>
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-semibold">
+                    {selectedThread?.subject ?? "Conversation"}
+                  </h2>
+                  <p className="truncate text-base text-secondary">
+                    {selectedThread?.sender?.name
+                      ? `${selectedThread.sender.name} <${selectedThread.sender.address ?? "unknown"}>`
+                      : (selectedThread?.sender?.address ?? "Unknown sender")}
+                  </p>
+                  {selectedThread?.sender?.suspicious ? (
+                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-sm bg-warning-muted px-2 py-1 text-sm font-medium text-warning">
+                      <AlertTriangle className="size-3.5" />
+                      The sender&apos;s domain looks unusual. Check it before you reply.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-body px-4 py-5 sm:px-6">
+                {threadData === undefined ? (
+                  <RowsSkeleton rows={3} />
+                ) : (
+                  threadData.messages.map((message) => {
+                    const sent = message.direction === "sent";
+                    return (
+                      <article
+                        key={message.id}
+                        className={cn(
+                          "max-w-3xl rounded-lg border px-4 py-3",
+                          sent ? "ml-auto border-accent/20 bg-accent-muted" : "bg-card"
+                        )}
+                      >
+                        <header className="mb-2 flex items-center justify-between gap-4 text-sm text-secondary">
+                          <span className="font-medium text-primary">
+                            {sent ? "You" : (message.from ?? "Sender")}
+                          </span>
+                          <time className="tabular-nums">
+                            {formatTime(message.receivedAt ?? message.sentAt)}
+                          </time>
+                        </header>
+                        <p className="text-base leading-6 whitespace-pre-wrap">
+                          {message.displayText}
+                        </p>
+                        {message.links?.length ? (
+                          <div className="mt-3 border-t pt-3">
+                            <p className="mb-2 text-sm text-secondary">
+                              Links can report clicks to the sender. Check where they go first.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {message.links.map((link) => (
+                                <a
+                                  key={link.url}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex max-w-full items-center gap-1.5 rounded-sm border bg-card px-2 py-1 text-sm font-medium hover:bg-muted"
+                                  title={link.url}
+                                >
+                                  <span className="truncate">{link.hostname}</span>
+                                  <ExternalLink className="size-3 shrink-0" />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        <InboxAttachments threadId={message.id} attachments={message.attachments} />
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+              <div className="shrink-0 border-t bg-card p-3 sm:p-4">
+                {error ? (
+                  <p role="alert" className="mb-2 text-base text-error">
+                    {error}
                   </p>
                 ) : null}
-              </div>
-              <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 px-6 py-6">
-                {(threadData?.messages ?? []).map((message) => (
-                  <div
-                    key={message.id}
-                    className={`max-w-3xl rounded-lg border px-4 py-3 ${
-                      message.direction === "sent"
-                        ? "ml-auto border-indigo-100 bg-indigo-50"
-                        : "border-slate-200 bg-white"
-                    }`}
-                  >
-                    <div className="mb-2 flex items-center justify-between gap-4 text-xs text-slate-500">
-                      <span className="font-medium text-slate-700">
-                        {message.direction === "sent" ? "You" : (message.from ?? "Sender")}
-                      </span>
-                      <span>{formatTime(message.receivedAt ?? message.sentAt)}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                      {message.displayText}
-                    </p>
-                    {message.links?.length ? (
-                      <div className="mt-3 border-t border-slate-200 pt-3">
-                        <p className="mb-2 text-xs text-slate-500">
-                          External links can report clicks. Verify destination before opening.
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {message.links.map((link) => (
-                            <a
-                              key={link.url}
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex max-w-full items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-400 hover:text-slate-950"
-                              title={link.url}
-                            >
-                              <span className="truncate">{link.hostname}</span>
-                              <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                    <InboxAttachments threadId={message.id} attachments={message.attachments} />
+                <div className="rounded-lg border bg-card focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/50">
+                  <Textarea
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && (event.metaKey || event.ctrlKey))
+                        void sendReply();
+                    }}
+                    placeholder="Write a reply…"
+                    aria-label="Reply"
+                    className="min-h-24 resize-none border-0 bg-transparent focus-visible:ring-0 dark:bg-transparent"
+                  />
+                  <div className="flex items-center justify-between gap-2 px-3 pb-2">
+                    <span className="text-sm text-secondary max-sm:hidden">
+                      Ctrl + Enter to send
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="ml-auto"
+                      onClick={sendReply}
+                      disabled={sending || !draft.trim()}
+                    >
+                      <Send data-icon="inline-start" />
+                      {sending ? "Sending…" : "Send reply"}
+                    </Button>
                   </div>
-                ))}
-              </div>
-              <div className="border-t border-slate-200 bg-white p-4">
-                {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
-                <Textarea
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Write a reply..."
-                  className="min-h-28 resize-none"
-                />
-                <div className="mt-3 flex justify-end">
-                  <Button type="button" onClick={sendReply} disabled={sending || !draft.trim()}>
-                    <Reply className="mr-2 h-4 w-4" />
-                    {sending ? "Sending..." : "Send reply"}
-                  </Button>
                 </div>
               </div>
             </>
@@ -270,6 +378,15 @@ export default function InboxPage() {
       </div>
     </div>
   );
+}
+
+function shortTime(value?: number) {
+  if (!value) return "";
+  const date = new Date(value);
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return sameDay
+    ? date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function formatTime(value?: number) {

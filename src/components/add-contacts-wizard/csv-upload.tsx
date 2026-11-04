@@ -99,20 +99,18 @@ export function CsvUpload({ onNext, onBack, onCancel }: CsvUploadProps) {
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`cursor-pointer rounded-xl border-2 border-dashed p-16 text-center transition-all ${
+            className={`cursor-pointer rounded-lg border border-dashed px-6 py-12 text-center transition-colors ${
               isDragging
-                ? "border-indigo-600 bg-indigo-50"
-                : "border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/50"
+                ? "border-accent bg-accent-muted"
+                : "border-border-strong bg-muted/50 hover:border-accent hover:bg-accent-muted/60"
             }`}
           >
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
-              <Upload className="h-8 w-8 text-indigo-600" />
+            <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-md border bg-card">
+              <Upload className="size-4" />
             </div>
-            <h3 className="mb-2 font-[family-name:var(--font-plus-jakarta)] text-xl font-bold text-slate-900">
-              Drag and drop your CSV file here
-            </h3>
-            <p className="mb-6 text-sm text-slate-600">or click to browse</p>
-            <p className="text-xs text-slate-500">Supports .csv files up to 10MB</p>
+            <h3 className="mb-1 text-base font-semibold">Drop your CSV here</h3>
+            <p className="mb-3 text-base text-secondary">or click to choose a file</p>
+            <p className="text-sm text-secondary">Supports .csv files up to 10MB</p>
 
             <input
               ref={fileInputRef}
@@ -123,9 +121,9 @@ export function CsvUpload({ onNext, onBack, onCancel }: CsvUploadProps) {
             />
           </div>
 
-          <div className="flex items-center justify-center gap-2 text-sm text-slate-600">
+          <div className="flex items-center justify-center gap-2 text-base text-secondary">
             <Download className="h-4 w-4" />
-            <button className="font-semibold text-indigo-600 hover:underline">
+            <button className="font-semibold text-accent hover:underline">
               Download sample CSV template
             </button>
           </div>
@@ -133,39 +131,39 @@ export function CsvUpload({ onNext, onBack, onCancel }: CsvUploadProps) {
       ) : (
         <div className="mb-12">
           {/* File Info */}
-          <div className="mb-6 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-6">
+          <div className="mb-6 flex items-center justify-between rounded-lg border border-border bg-card p-6">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100">
-                <FileText className="h-6 w-6 text-indigo-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-md bg-accent-muted">
+                <FileText className="h-6 w-6 text-accent" />
               </div>
               <div>
-                <p className="font-semibold text-slate-900">{file.name}</p>
-                <p className="text-sm text-slate-600">
+                <p className="font-semibold text-primary">{file.name}</p>
+                <p className="text-base text-secondary">
                   {(file.size / 1024).toFixed(1)} KB • {rawData.length} rows
                 </p>
               </div>
             </div>
             <button
               onClick={removeFile}
-              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+              className="rounded-md p-2 text-secondary transition-colors hover:bg-error-muted hover:text-error"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* Preview */}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 bg-slate-50 px-6 py-3">
-              <p className="text-sm font-semibold text-slate-700">Preview (first 3 rows)</p>
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <div className="border-b border-border bg-muted px-6 py-3">
+              <p className="text-base font-semibold text-primary">Preview (first 3 rows)</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50">
+                  <tr className="border-b border-border bg-muted">
                     {rawData[0]?.map((header, i) => (
                       <th
                         key={i}
-                        className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600"
+                        className="px-4 py-3 text-left text-sm font-medium text-secondary"
                       >
                         {header}
                       </th>
@@ -174,9 +172,9 @@ export function CsvUpload({ onNext, onBack, onCancel }: CsvUploadProps) {
                 </thead>
                 <tbody>
                   {rawData.slice(1, 4).map((row, i) => (
-                    <tr key={i} className="border-b border-slate-100">
+                    <tr key={i} className="border-b border-border">
                       {row.map((cell, j) => (
-                        <td key={j} className="px-4 py-3 text-sm text-slate-700">
+                        <td key={j} className="px-4 py-3 text-base text-primary">
                           {cell}
                         </td>
                       ))}

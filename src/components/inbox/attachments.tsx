@@ -64,8 +64,8 @@ export function InboxAttachments({
   }
 
   return (
-    <div className="mt-3 border-t border-slate-200 pt-3">
-      <p className="mb-2 text-xs font-medium text-slate-600">Attachments</p>
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="mb-2 text-sm font-medium text-secondary">Attachments</p>
       <div className="flex flex-wrap gap-2">
         {attachments.map((attachment) => (
           <Button
@@ -78,13 +78,13 @@ export function InboxAttachments({
           >
             <FileText className="size-4 shrink-0" />
             <span className="min-w-0 truncate">{attachment.filename}</span>
-            <span className="shrink-0 text-xs text-slate-500">{formatBytes(attachment.size)}</span>
+            <span className="shrink-0 text-sm text-secondary">{formatBytes(attachment.size)}</span>
             <Download className="size-3.5 shrink-0" />
           </Button>
         ))}
       </div>
       {error ? (
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-red-700">
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-error">
           <ShieldAlert className="size-3.5" />
           {error}
         </p>

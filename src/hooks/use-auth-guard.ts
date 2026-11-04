@@ -8,7 +8,7 @@ export function useAuthGuard() {
 
   useEffect(() => {
     if (!isPending && !session) {
-      router.push("/");
+      router.push("/sign-in");
     }
   }, [session, isPending, router]);
 

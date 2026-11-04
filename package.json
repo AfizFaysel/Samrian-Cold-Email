@@ -52,6 +52,8 @@
     "validate": "bun run type-check && bun run lint && bun run format:check"
   },
   "dependencies": {
+    "@astryxdesign/core": "0.7.7",
+    "@astryxdesign/theme-neutral": "0.7.7",
     "@aws-sdk/client-s3": "^3.1109.0",
     "@aws-sdk/s3-request-presigner": "^3.1109.0",
     "@base-ui/react": "^1.7.0",
@@ -91,6 +93,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@astryxdesign/cli": "^0.7.7",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/dom": "^10.4.1",

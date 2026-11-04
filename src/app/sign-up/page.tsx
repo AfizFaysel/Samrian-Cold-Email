@@ -15,6 +15,10 @@ import { HostedAuth } from "@/components/hosted-auth";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import { AuthDivider, AuthShell } from "@/components/auth-shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { safeRedirectPath } from "@/lib/redirect";
 
 export default function SignUpPage() {
@@ -101,223 +105,124 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f9f9f9] font-[family-name:var(--font-ibm-plex)]">
-      {/* Minimal Header */}
-      <nav className="mx-auto flex w-full max-w-7xl items-center justify-start px-6 py-8">
-        <Link
-          href="/"
-          className="font-[family-name:var(--font-plus-jakarta)] text-xl font-bold tracking-tight text-slate-900"
-        >
-          Samrian
-        </Link>
-      </nav>
-
-      {/* Main */}
-      <main className="flex flex-grow items-center justify-center px-6 pb-20">
-        <div className="w-full max-w-[480px]">
-          {/* Central Sign Up Card */}
-          <section className="rounded-xl border border-[#c7c4d8] bg-white p-8 md:p-12">
-            <header className="mb-10 text-left">
-              <h1 className="mb-3 font-[family-name:var(--font-plus-jakarta)] text-3xl font-bold leading-tight tracking-tight text-[#1a1c1c] md:text-4xl">
-                Create your account
-              </h1>
-              <p className="text-sm leading-relaxed text-[#464555]">
-                Join the next generation of technical outreach. Precise, focused, and brutally
-                efficient.
-              </p>
-            </header>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Full Name */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="name"
-                  className="block text-[0.6875rem] font-semibold uppercase tracking-wider text-[#464555]"
-                >
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  autoComplete="name"
-                  placeholder="Nikola Tesla"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg border border-[#c7c4d8] bg-white px-4 py-3 text-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#3525cd] focus:ring-2 focus:ring-[#3525cd]/10"
-                />
-              </div>
-
-              {/* Email */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="block text-[0.6875rem] font-semibold uppercase tracking-wider text-[#464555]"
-                >
-                  Email Address
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="name@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-[#c7c4d8] bg-white px-4 py-3 text-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#3525cd] focus:ring-2 focus:ring-[#3525cd]/10"
-                />
-              </div>
-
-              {/* Password */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="password"
-                  className="block text-[0.6875rem] font-semibold uppercase tracking-wider text-[#464555]"
-                >
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    minLength={8}
-                    autoComplete="new-password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-lg border border-[#c7c4d8] bg-white px-4 py-3 pr-10 text-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#3525cd] focus:ring-2 focus:ring-[#3525cd]/10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#464555] opacity-60 transition-opacity hover:opacity-100"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Organization Name */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="orgName"
-                  className="block text-[0.6875rem] font-semibold uppercase tracking-wider text-[#464555]"
-                >
-                  Organization Name
-                </label>
-                <input
-                  id="orgName"
-                  name="orgName"
-                  type="text"
-                  required
-                  placeholder="Acme Corp"
-                  value={orgName}
-                  onChange={(e) => {
-                    setOrgName(e.target.value);
-                    setOrgSlug(generateSlug(e.target.value));
-                  }}
-                  className="w-full rounded-lg border border-[#c7c4d8] bg-white px-4 py-3 text-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#3525cd] focus:ring-2 focus:ring-[#3525cd]/10"
-                />
-              </div>
-
-              {/* Organization Slug */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="orgSlug"
-                  className="block text-[0.6875rem] font-semibold uppercase tracking-wider text-[#464555]"
-                >
-                  Organization ID (Slug)
-                </label>
-                <input
-                  id="orgSlug"
-                  name="orgSlug"
-                  type="text"
-                  required
-                  placeholder="acme-corp"
-                  value={orgSlug}
-                  onChange={(e) => setOrgSlug(generateSlug(e.target.value))}
-                  className="w-full rounded-lg border border-[#c7c4d8] bg-white px-4 py-3 text-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#3525cd] focus:ring-2 focus:ring-[#3525cd]/10"
-                />
-                {orgSlug && (
-                  <p className="text-[0.6875rem] text-[#464555]/60">
-                    Workspace ID: <span className="font-medium">{orgSlug}</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-6 py-4 font-[family-name:var(--font-plus-jakarta)] text-sm font-semibold text-white shadow-sm transition-opacity duration-200 hover:opacity-95 disabled:opacity-70"
-              >
-                {isLoading ? "Creating account…" : "Create Account"}
-              </button>
-            </form>
-
-            {/* Divider */}
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#c7c4d8]/40" />
-              </div>
-              <div className="relative flex justify-center text-[0.6875rem] uppercase">
-                <span className="bg-white px-4 text-[#464555]">Or continue with</span>
-              </div>
-            </div>
-
-            {/* Social Sign Up */}
-            <div className="grid grid-cols-1 gap-4">
-              <button
-                type="button"
-                onClick={handleGoogleSignUp}
-                disabled={!googleSignInAvailable || isGoogleLoading}
-                title={googleSignInAvailable ? undefined : "Google sign-in is not configured"}
-                className="flex items-center justify-center gap-3 border border-[#c7c4d8] bg-white px-4 py-3 text-sm font-medium transition-colors duration-200 hover:bg-[#f3f3f3] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Image src="/logos/google.svg" alt="" width={20} height={20} />
-                {isGoogleLoading ? "Connecting to Google…" : "Google"}
-              </button>
-            </div>
-
-            {/* Login Redirect */}
-            <footer className="mt-10 text-center">
-              <p className="text-sm text-[#464555]">
-                Already have an account?{" "}
-                <Link
-                  href="/sign-in"
-                  className="ml-1 font-semibold text-[#3525cd] underline-offset-4 transition-all hover:underline hover:decoration-[#3525cd]/30"
-                >
-                  Login
-                </Link>
-              </p>
-            </footer>
-          </section>
+    <AuthShell
+      title="Create your account"
+      description="Set up your workspace and connect your first mailbox in a few minutes."
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link href="/sign-in" className="font-medium text-accent hover:underline">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="name">Full name</Label>
+          <Input
+            id="name"
+            name="name"
+            type="text"
+            required
+            autoComplete="name"
+            placeholder="Ada Lovelace"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="h-10"
+          />
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-slate-50">
-        <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-6 px-6 py-12 md:flex-row">
-          <div className="font-[family-name:var(--font-plus-jakarta)] text-lg font-bold text-slate-900">
-            Samrian
-          </div>
-          <nav className="flex flex-wrap justify-center gap-8">
-            <Link
-              href="/licensing"
-              className="text-sm text-slate-500 transition-colors hover:text-slate-900"
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email">Work email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-10"
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-10 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-sm text-secondary hover:text-primary"
             >
-              License and source
-            </Link>
-          </nav>
-          <p className="text-[0.6875rem] font-medium text-slate-500">
-            Open source under AGPL-3.0-or-later.
-          </p>
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+          <p className="text-sm text-secondary">At least 8 characters.</p>
         </div>
-      </footer>
-    </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="orgName">Workspace name</Label>
+            <Input
+              id="orgName"
+              name="orgName"
+              type="text"
+              required
+              placeholder="Acme Corp"
+              value={orgName}
+              onChange={(e) => {
+                setOrgName(e.target.value);
+                setOrgSlug(generateSlug(e.target.value));
+              }}
+              className="h-10"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="orgSlug">Workspace ID</Label>
+            <Input
+              id="orgSlug"
+              name="orgSlug"
+              type="text"
+              required
+              placeholder="acme-corp"
+              value={orgSlug}
+              onChange={(e) => setOrgSlug(generateSlug(e.target.value))}
+              className="h-10"
+            />
+          </div>
+        </div>
+
+        <Button type="submit" size="lg" className="mt-2 h-10 w-full" disabled={isLoading}>
+          {isLoading ? "Creating account…" : "Create account"}
+        </Button>
+      </form>
+
+      <AuthDivider />
+
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        className="h-10 w-full"
+        onClick={handleGoogleSignUp}
+        disabled={!googleSignInAvailable || isGoogleLoading}
+        title={googleSignInAvailable ? undefined : "Google sign-in is not configured"}
+      >
+        <Image src="/logos/google.svg" alt="" width={16} height={16} />
+        {isGoogleLoading ? "Connecting to Google…" : "Continue with Google"}
+      </Button>
+    </AuthShell>
   );
 }

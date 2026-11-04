@@ -2,34 +2,79 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
-  Building2,
-  Settings,
-  LogOut,
+  BarChart3,
+  ChevronsUpDown,
+  Code2,
+  Contact2,
+  Inbox,
   LayoutDashboard,
+  LogOut,
   Mailbox,
   Megaphone,
-  Mail,
-  Contact2,
-  BarChart3,
-  Code2,
   Scale,
+  Settings,
+  ShieldOff,
 } from "lucide-react";
 import { signOut, useAuthSession } from "@/lib/auth";
-import { useRouter } from "next/navigation";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/theme";
+import { Logo } from "@/components/logo";
+import { NotificationsBell } from "@/components/notifications";
 
-const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Campaigns", url: "/dashboard/campaigns", icon: Megaphone },
-  { title: "Contacts", url: "/dashboard/contacts", icon: Contact2 },
-  { title: "Inbox", url: "/dashboard/inbox", icon: Mail },
-  { title: "Mailboxes", url: "/dashboard/mailboxes", icon: Mailbox },
-  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
-  { title: "Settings", url: "/dashboard/settings", icon: Settings },
+type NavItem = { title: string; url: string; icon: React.ComponentType };
+
+const navGroups: Array<{ label?: string; items: NavItem[] }> = [
+  {
+    items: [
+      { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Inbox", url: "/dashboard/inbox", icon: Inbox },
+      { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Outreach",
+    items: [
+      { title: "Campaigns", url: "/dashboard/campaigns", icon: Megaphone },
+      { title: "Contacts", url: "/dashboard/contacts", icon: Contact2 },
+    ],
+  },
+  {
+    label: "Sending",
+    items: [
+      { title: "Mailboxes", url: "/dashboard/mailboxes", icon: Mailbox },
+      { title: "Blocklist", url: "/dashboard/blocklist", icon: ShieldOff },
+      { title: "Settings", url: "/dashboard/settings", icon: Settings },
+    ],
+  },
 ];
+
+function isActive(pathname: string, url: string) {
+  if (url === "/dashboard") return pathname === url;
+  return pathname === url || pathname.startsWith(`${url}/`);
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -45,98 +90,92 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar
-      variant="inset"
-      className="border-r border-slate-200 bg-slate-50 font-[family-name:var(--font-plus-jakarta)]"
-    >
-      {/* ── Brand ── */}
-      <SidebarHeader className="mb-10 border-b-0 px-6 pb-0 pt-6">
-        <Link href="/dashboard" className="flex items-center gap-3 px-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5]">
-            <Building2 className="h-4 w-4 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xl font-bold leading-none tracking-tight text-indigo-700">
-              Samrian
-            </span>
-            <span className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-              Scale Outreach
-            </span>
-          </div>
+    <Sidebar className="border-border">
+      <SidebarHeader className="flex-row items-center justify-between px-3 pt-4 pb-2">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2.5 rounded-md px-1.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <Logo className="size-7" />
+          <span className="text-base font-semibold tracking-tight">Samrian</span>
         </Link>
+        {/* On phones the bell lives in the top bar instead. */}
+        <div className="max-md:hidden">
+          <NotificationsBell />
+        </div>
       </SidebarHeader>
 
-      {/* ── Navigation ── */}
-      <SidebarContent className="flex-1 px-4">
-        <nav className="flex flex-col space-y-1">
-          {navItems.map((item) => {
-            const isExact = pathname === item.url;
-            const isNested = pathname.startsWith(`${item.url}/`);
-            const isActive = isExact || (item.url !== "/dashboard" && isNested);
-
-            return (
-              <Link
-                key={item.title}
-                href={item.url}
-                className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] font-medium transition-colors duration-200 ${
-                  isActive
-                    ? "border-r-2 border-indigo-600 bg-indigo-50 text-indigo-700"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-indigo-600"
-                }`}
-              >
-                <item.icon className="h-[18px] w-[18px] shrink-0" />
-                <span>{item.title}</span>
-              </Link>
-            );
-          })}
-        </nav>
+      <SidebarContent className="gap-0 px-1">
+        {navGroups.map((group, index) => (
+          <SidebarGroup key={group.label ?? index} className="py-1.5">
+            {group.label && (
+              <SidebarGroupLabel className="h-7 text-sm font-medium text-secondary">
+                {group.label}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton
+                      isActive={isActive(pathname, item.url)}
+                      render={<Link href={item.url} />}
+                      className="h-8 gap-2.5 rounded-md px-2.5 text-secondary hover:text-primary data-active:font-medium data-active:text-primary [&_svg]:size-4"
+                    >
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
-      {/* ── Footer ── */}
-      <SidebarFooter className="mt-auto border-t border-slate-200 px-4 pb-5 pt-6">
-        <div className="flex flex-col gap-1">
-          {sourceUrl ? (
-            <a
-              href={sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] text-slate-500 transition-colors hover:bg-slate-100"
-            >
-              <Code2 className="h-[18px] w-[18px]" />
-              <span>Source</span>
-            </a>
-          ) : null}
-          <Link
-            href="/licensing"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] text-slate-500 transition-colors hover:bg-slate-100"
+      <SidebarFooter className="border-t border-border p-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="flex w-full items-center gap-2.5 rounded-md p-1.5 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-muted"
+            aria-label="Account menu"
           >
-            <Scale className="h-[18px] w-[18px]" />
-            <span>License</span>
-          </Link>
-
-          {/* Sign Out */}
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] text-slate-500 transition-colors hover:bg-slate-100"
-          >
-            <LogOut className="h-[18px] w-[18px]" />
-            <span>Sign Out</span>
-          </button>
-        </div>
-
-        {/* User card */}
-        <div className="mt-4 flex items-center gap-3 px-3">
-          <Avatar className="h-8 w-8 overflow-hidden rounded-full border border-slate-300 bg-slate-200">
-            <AvatarImage src={session?.user?.image || ""} alt={displayName || "User"} />
-            <AvatarFallback className="bg-slate-200 text-[10px] font-bold text-slate-500">
-              {displayName?.substring(0, 2).toUpperCase() || "ME"}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="text-xs font-bold text-slate-800">{displayName || "Loading…"}</span>
-            <span className="text-[10px] text-slate-400">{session?.user?.email || "…"}</span>
-          </div>
-        </div>
+            <Avatar className="size-8 rounded-md">
+              <AvatarImage src={session?.user?.image || ""} alt={displayName || "User"} />
+              <AvatarFallback className="rounded-md bg-muted text-sm font-semibold text-secondary">
+                {displayName?.substring(0, 2).toUpperCase() || "ME"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-base font-medium">{displayName || "Loading…"}</span>
+              <span className="truncate text-sm text-secondary">{session?.user?.email || "…"}</span>
+            </div>
+            <ChevronsUpDown className="size-4 shrink-0 text-secondary" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="w-60">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="flex items-center justify-between gap-2">
+                <span>Theme</span>
+                <ThemeToggle />
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            {sourceUrl ? (
+              <DropdownMenuItem render={<a href={sourceUrl} target="_blank" rel="noreferrer" />}>
+                <Code2 />
+                Source code
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem render={<Link href="/licensing" />}>
+              <Scale />
+              License
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSignOut}>
+              <LogOut />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </Sidebar>
   );

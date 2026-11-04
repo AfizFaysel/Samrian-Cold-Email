@@ -39,6 +39,8 @@ export function NotificationsBell() {
       const response = await fetch("/api/notifications?limit=10");
       if (!response.ok) throw new Error(`Request failed: ${response.status}`);
       setData((await response.json()) as NotificationResponse);
+    } catch {
+      // The bell is secondary: keep the last known list rather than break the header.
     } finally {
       setLoading(false);
     }
@@ -77,43 +79,56 @@ export function NotificationsBell() {
     >
       <DropdownMenuTrigger
         type="button"
-        className="relative inline-flex size-8 items-center justify-center rounded-lg hover:bg-slate-100"
+        className="relative inline-flex size-8 items-center justify-center rounded-md text-secondary outline-none hover:bg-muted hover:text-primary focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-muted"
         aria-label="Notifications"
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="size-4" />
         {data.unreadCount > 0 ? (
-          <span className="absolute right-1 top-1 min-w-4 rounded-full bg-indigo-600 px-1 text-[10px] font-semibold text-white">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-bg px-1 text-xs font-semibold text-on-accent tabular-nums ring-2 ring-background">
             {data.unreadCount}
           </span>
         ) : null}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Notifications</h2>
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 className="text-base font-semibold text-primary">Notifications</h2>
           <Button type="button" variant="ghost" size="sm" onClick={markAllRead}>
-            <Check className="mr-1 h-4 w-4" />
-            Mark all
+            <Check data-icon="inline-start" />
+            Mark all read
           </Button>
         </div>
         <div className="max-h-96 overflow-y-auto">
           {loading ? (
-            <div className="flex items-center justify-center py-8 text-slate-500">
+            <div className="flex items-center justify-center py-8 text-secondary">
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
           ) : data.notifications.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-slate-500">No notifications</div>
+            <div className="flex flex-col items-center gap-1 px-4 py-10 text-center">
+              <Bell className="size-5 text-secondary" />
+              <p className="text-base font-medium">You&apos;re all caught up</p>
+              <p className="text-sm text-secondary">Replies and alerts will show here.</p>
+            </div>
           ) : (
             data.notifications.map((notification) => (
-              <div key={notification.id} className="border-b border-slate-100 px-4 py-3">
+              <div
+                key={notification.id}
+                className="relative border-b border-border px-4 py-3 last:border-0 hover:bg-muted/60"
+              >
+                {!notification.readAt ? (
+                  <span
+                    className="absolute top-4.5 left-1.5 size-1.5 rounded-full bg-accent-bg"
+                    aria-label="Unread"
+                  />
+                ) : null}
                 <div className="flex items-start justify-between gap-3">
                   <button
                     type="button"
                     onClick={() => openNotification(notification)}
                     className="min-w-0 flex-1 text-left"
                   >
-                    <p className="text-sm font-medium text-slate-900">{notification.title}</p>
+                    <p className="text-base font-medium text-primary">{notification.title}</p>
                     {notification.body ? (
-                      <p className="mt-1 text-xs text-slate-500">{notification.body}</p>
+                      <p className="mt-1 text-sm text-secondary">{notification.body}</p>
                     ) : null}
                   </button>
                   {!notification.readAt ? (

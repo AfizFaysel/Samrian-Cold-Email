@@ -59,69 +59,61 @@ export function ReviewValidation({ contacts, onImport, onBack, onCancel }: Revie
 
       {/* Stats */}
       <div className="mb-8 grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-6">
-          <p className="text-3xl font-bold text-slate-900">{contacts.length}</p>
-          <p className="text-sm text-slate-600">Total Contacts</p>
+        <div className="rounded-lg border border-border bg-card p-6">
+          <p className="text-2xl font-semibold text-primary">{contacts.length}</p>
+          <p className="text-base text-secondary">Total Contacts</p>
         </div>
-        <div className="rounded-xl border border-green-200 bg-green-50 p-6">
-          <p className="text-3xl font-bold text-green-600">{validContacts.length}</p>
-          <p className="text-sm text-green-700">Valid Emails</p>
+        <div className="rounded-lg border border-success/30 bg-success-muted p-6">
+          <p className="text-2xl font-semibold text-success">{validContacts.length}</p>
+          <p className="text-base text-success">Valid Emails</p>
         </div>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-          <p className="text-3xl font-bold text-red-600">{invalidContacts.length}</p>
-          <p className="text-sm text-red-700">Invalid Emails</p>
+        <div className="rounded-lg border border-error/30 bg-error-muted p-6">
+          <p className="text-2xl font-semibold text-error">{invalidContacts.length}</p>
+          <p className="text-base text-error">Invalid Emails</p>
         </div>
       </div>
 
       {/* Options */}
       <div className="mb-8 space-y-3">
-        <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
+        <label className="flex items-center gap-3 rounded-md border border-border bg-card p-4">
           <input
             type="checkbox"
             checked={skipInvalid}
             onChange={(e) => setSkipInvalid(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+            className="h-4 w-4 rounded border-border-strong text-accent focus:ring-accent"
           />
-          <span className="text-sm font-medium text-slate-700">Skip invalid emails</span>
+          <span className="text-base font-medium text-primary">Skip invalid emails</span>
         </label>
       </div>
 
       {/* Contact List */}
-      <div className="mb-12 max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+      <div className="mb-12 max-h-96 overflow-y-auto rounded-lg border border-border bg-card">
         <table className="w-full">
-          <thead className="sticky top-0 bg-slate-50">
-            <tr className="border-b border-slate-200">
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Company
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Status
-              </th>
+          <thead className="sticky top-0 bg-muted">
+            <tr className="border-b border-border">
+              <th className="px-4 py-2.5 text-left text-sm font-medium text-secondary">Email</th>
+              <th className="px-4 py-2.5 text-left text-sm font-medium text-secondary">Name</th>
+              <th className="px-4 py-2.5 text-left text-sm font-medium text-secondary">Company</th>
+              <th className="px-4 py-2.5 text-center text-sm font-medium text-secondary">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border">
             {contacts.map((contact, i) => {
               const isValid = isValidEmail(contact.email);
               return (
-                <tr key={i} className={!isValid ? "bg-red-50/50" : ""}>
-                  <td className="px-6 py-4 text-sm text-slate-900">{contact.email}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
+                <tr key={i} className={!isValid ? "bg-error-muted/50" : ""}>
+                  <td className="px-6 py-4 text-base text-primary">{contact.email}</td>
+                  <td className="px-6 py-4 text-base text-primary">
                     {contact.customVars?.firstName} {contact.customVars?.lastName}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-700">
+                  <td className="px-6 py-4 text-base text-primary">
                     {contact.customVars?.company || "—"}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {isValid ? (
-                      <CheckCircle2 className="mx-auto h-5 w-5 text-green-600" />
+                      <CheckCircle2 className="mx-auto h-5 w-5 text-success" />
                     ) : (
-                      <AlertCircle className="mx-auto h-5 w-5 text-red-600" />
+                      <AlertCircle className="mx-auto h-5 w-5 text-error" />
                     )}
                   </td>
                 </tr>

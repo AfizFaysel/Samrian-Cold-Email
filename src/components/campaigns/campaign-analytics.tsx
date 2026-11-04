@@ -1,158 +1,132 @@
 "use client";
 
 import * as React from "react";
-import { Users, Send, Reply, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Reply, Send, Users } from "lucide-react";
+import { Panel } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-state";
+import { StatCard } from "@/components/stat-card";
 import { useApi } from "@/hooks/use-api";
+import { cn } from "@/lib/utils";
 
 interface CampaignAnalyticsProps {
   campaignId: string;
 }
 
-export function CampaignAnalytics({ campaignId }: CampaignAnalyticsProps) {
-  const { data: stats } = useApi<{
-    totalContacts: number;
-    emailsSent: number;
-    replyRate: number;
-    activeContacts: number;
-    repliedContacts: number;
-    bouncedContacts: number;
-    completedContacts: number;
-  }>(`/api/campaigns/${campaignId}/stats`);
+type CampaignStats = {
+  totalContacts: number;
+  emailsSent: number;
+  replyRate: number;
+  activeContacts: number;
+  repliedContacts: number;
+  bouncedContacts: number;
+  completedContacts: number;
+};
 
-  if (stats === undefined) {
+export function CampaignAnalytics({ campaignId }: CampaignAnalyticsProps) {
+  const {
+    data: stats,
+    error,
+    isLoading,
+    refetch,
+  } = useApi<CampaignStats>(`/api/campaigns/${campaignId}/stats`);
+
+  if (error && !stats) {
     return (
-      <div className="space-y-6">
-        {/* Loading skeleton */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-32 animate-pulse rounded-xl border border-slate-200 bg-slate-50"
-            />
-          ))}
-        </div>
-        <div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
-      </div>
+      <Panel>
+        <ErrorState title="Couldn't load campaign numbers" onRetry={refetch} />
+      </Panel>
     );
   }
 
-  // Calculate bounce rate
-  const bounceRate = stats.emailsSent > 0 ? (stats.bouncedContacts / stats.emailsSent) * 100 : 0;
+  const loading = isLoading && !stats;
+  const bounceRate =
+    stats && stats.emailsSent > 0 ? (stats.bouncedContacts / stats.emailsSent) * 100 : 0;
 
-  // Stat cards configuration (DRY - single source of truth)
-  const statCards = [
-    {
-      label: "Total Contacts",
-      value: stats.totalContacts.toLocaleString(),
-      icon: Users,
-      color: "text-indigo-600",
-      bgColor: "bg-indigo-50",
-    },
-    {
-      label: "Emails Sent",
-      value: stats.emailsSent.toLocaleString(),
-      icon: Send,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-    },
-    {
-      label: "Reply Rate",
-      value: `${stats.replyRate.toFixed(1)}%`,
-      icon: Reply,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
-    },
-    {
-      label: "Bounce Rate",
-      value: `${bounceRate.toFixed(1)}%`,
-      icon: AlertTriangle,
-      color: bounceRate > 5 ? "text-red-600" : "text-amber-600",
-      bgColor: bounceRate > 5 ? "bg-red-50" : "bg-amber-50",
-    },
+  const breakdown = [
+    { label: "In sequence", count: stats?.activeContacts ?? 0, color: "bg-accent-bg" },
+    { label: "Replied", count: stats?.repliedContacts ?? 0, color: "bg-success" },
+    { label: "Bounced", count: stats?.bouncedContacts ?? 0, color: "bg-error" },
+    { label: "Finished", count: stats?.completedContacts ?? 0, color: "bg-neutral" },
   ];
-
-  // Status breakdown data (DRY - single source of truth)
-  const statusData = [
-    { label: "Active", count: stats.activeContacts, color: "bg-emerald-500" },
-    { label: "Replied", count: stats.repliedContacts, color: "bg-blue-500" },
-    { label: "Bounced", count: stats.bouncedContacts, color: "bg-red-500" },
-    { label: "Completed", count: stats.completedContacts, color: "bg-slate-400" },
-  ];
-
-  const totalStatusCount = statusData.reduce((sum, item) => sum + item.count, 0);
+  const total = breakdown.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <div className="space-y-8">
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className="overflow-hidden rounded-xl border border-[rgba(199,196,216,0.4)] bg-white p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  {card.label}
-                </p>
-                <p
-                  className={`font-[family-name:var(--font-plus-jakarta)] text-3xl font-bold ${card.color}`}
-                >
-                  {card.value}
-                </p>
-              </div>
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-full ${card.bgColor}`}
-              >
-                <card.icon className={`h-6 w-6 ${card.color}`} />
-              </div>
-            </div>
-          </div>
-        ))}
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Contacts"
+          icon={Users}
+          isLoading={loading}
+          value={stats?.totalContacts.toLocaleString()}
+        />
+        <StatCard
+          label="Emails sent"
+          icon={Send}
+          isLoading={loading}
+          value={stats?.emailsSent.toLocaleString()}
+        />
+        <StatCard
+          label="Reply rate"
+          icon={Reply}
+          isLoading={loading}
+          value={`${stats?.replyRate.toFixed(1) ?? "0.0"}%`}
+        />
+        <StatCard
+          label="Bounce rate"
+          icon={AlertTriangle}
+          isLoading={loading}
+          value={
+            <span className={cn(bounceRate > 5 && "text-error")}>{bounceRate.toFixed(1)}%</span>
+          }
+          hint={bounceRate > 5 ? "Above 5%: check your list" : undefined}
+        />
       </div>
 
-      {/* Status Breakdown */}
-      <div className="overflow-hidden rounded-xl border border-[rgba(199,196,216,0.4)] bg-white p-6 shadow-sm">
-        <h3 className="mb-6 font-[family-name:var(--font-plus-jakarta)] text-lg font-bold text-indigo-900">
-          Contact Status Breakdown
-        </h3>
-
-        {totalStatusCount === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">No contacts assigned yet</p>
+      <Panel title="Where contacts are">
+        {loading ? (
+          <div className="p-4">
+            <div className="h-3 animate-pulse rounded-full bg-muted" />
+          </div>
+        ) : total === 0 ? (
+          <EmptyState
+            className="py-10"
+            icon={Users}
+            title="No contacts assigned yet"
+            description="Contacts appear here once the campaign assigns them."
+          />
         ) : (
-          <div className="space-y-4">
-            {/* Visual bar chart */}
-            <div className="flex h-8 w-full overflow-hidden rounded-full bg-slate-100">
-              {statusData.map((item) => {
-                const percentage = (item.count / totalStatusCount) * 100;
-                return percentage > 0 ? (
+          <div className="flex flex-col gap-4 p-4">
+            <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-muted">
+              {breakdown.map((item) =>
+                item.count > 0 ? (
                   <div
                     key={item.label}
-                    className={`${item.color} transition-all duration-300`}
-                    style={{ width: `${percentage}%` }}
-                    title={`${item.label}: ${item.count} (${percentage.toFixed(1)}%)`}
+                    className={cn(item.color, "transition-all duration-300")}
+                    style={{ width: `${(item.count / total) * 100}%` }}
+                    title={`${item.label}: ${item.count}`}
                   />
-                ) : null;
-              })}
+                ) : null
+              )}
             </div>
-
-            {/* Legend */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {statusData.map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <div className={`h-3 w-3 rounded-full ${item.color}`} />
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-slate-600">{item.label}</p>
-                    <p className="text-sm font-bold text-slate-900">
+            <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {breakdown.map((item) => (
+                <div key={item.label} className="flex items-start gap-2">
+                  <span className={cn("mt-1.5 size-2 rounded-full", item.color)} />
+                  <div>
+                    <dt className="text-sm text-secondary">{item.label}</dt>
+                    <dd className="text-base font-semibold tabular-nums">
                       {item.count.toLocaleString()}
-                    </p>
+                      <span className="ml-1 text-sm font-normal text-secondary">
+                        {((item.count / total) * 100).toFixed(0)}%
+                      </span>
+                    </dd>
                   </div>
                 </div>
               ))}
-            </div>
+            </dl>
           </div>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

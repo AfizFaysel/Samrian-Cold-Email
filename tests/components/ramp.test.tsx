@@ -28,6 +28,7 @@ describe("mailbox ramp settings", () => {
     });
 
     render(<SettingsPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "Sending" }));
 
     expect(await screen.findByDisplayValue("25")).toBeInTheDocument();
     expect(screen.getByDisplayValue("3")).toBeInTheDocument();
@@ -36,7 +37,7 @@ describe("mailbox ramp settings", () => {
     fireEvent.change(screen.getByLabelText("Default target per day"), {
       target: { value: "30" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save sending" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(

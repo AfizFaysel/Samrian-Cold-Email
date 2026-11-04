@@ -2,8 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
-import { ArrowLeft, Pause, Play, CheckCircle, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle, Megaphone, Pause, Play } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Page, Panel } from "@/components/page-header";
+import { EmptyState, ErrorState } from "@/components/page-state";
+import { StatusBadge } from "@/components/status-badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { CampaignAnalytics } from "@/components/campaigns/campaign-analytics";
 import { ContactActivity } from "@/components/campaigns/contact-activity";
@@ -19,7 +24,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   // Unwrap params Promise (Next.js 15+ requirement)
   const { id: campaignId } = React.use(params);
 
-  const { data, refetch } = useApi<{ campaign: any | null }>(`/api/campaigns/${campaignId}`);
+  const { data, error, refetch } = useApi<{ campaign: any | null }>(`/api/campaigns/${campaignId}`);
   const campaign = data?.campaign;
 
   const [isUpdating, setIsUpdating] = React.useState(false);
@@ -59,212 +64,150 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
     }
   };
 
+  const crumbs = [
+    { label: "Campaigns", href: "/dashboard/campaigns" },
+    { label: campaign?.name ?? "Campaign" },
+  ];
+
+  if (error && !data) {
+    return (
+      <Page title="Campaign" breadcrumbs={crumbs}>
+        <Panel>
+          <ErrorState title="Couldn't load this campaign" onRetry={refetch} />
+        </Panel>
+      </Page>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="flex h-full flex-col font-[family-name:var(--font-ibm-plex)]">
-        <PageHeader
-          title="Loading..."
-          breadcrumbs={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Campaigns", href: "/dashboard/campaigns" },
-            { label: "..." },
-          ]}
-        />
-        <div className="mx-auto w-full max-w-7xl p-10">
-          <div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
+      <Page title="Campaign" breadcrumbs={crumbs}>
+        <div className="grid gap-4 md:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
         </div>
-      </div>
+        <Skeleton className="h-72 rounded-lg" />
+      </Page>
     );
   }
 
   if (!campaign) {
     return (
-      <div className="flex h-full flex-col font-[family-name:var(--font-ibm-plex)]">
-        <PageHeader
-          title="Campaign Not Found"
-          breadcrumbs={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Campaigns", href: "/dashboard/campaigns" },
-            { label: "Not Found" },
-          ]}
-        />
-        <div className="mx-auto w-full max-w-7xl p-10">
-          <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-24">
-            <h3 className="font-[family-name:var(--font-plus-jakarta)] text-xl font-bold text-slate-900">
-              Campaign not found
-            </h3>
-            <p className="mt-2 text-sm text-slate-400">
-              This campaign may have been deleted or you don't have access to it.
-            </p>
-            <Link
-              href="/dashboard/campaigns"
-              className="mt-8 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Campaigns
-            </Link>
-          </div>
-        </div>
-      </div>
+      <Page title="Campaign not found" breadcrumbs={crumbs}>
+        <Panel>
+          <EmptyState
+            icon={Megaphone}
+            title="Campaign not found"
+            description="It may have been deleted, or it belongs to another workspace."
+            action={
+              <Link href="/dashboard/campaigns" className={buttonVariants({ variant: "outline" })}>
+                <ArrowLeft data-icon="inline-start" />
+                Back to campaigns
+              </Link>
+            }
+          />
+        </Panel>
+      </Page>
     );
   }
 
+  const canStop = campaign.status === "active" || campaign.status === "paused";
+
   return (
-    <div className="flex h-full flex-col font-[family-name:var(--font-ibm-plex)]">
-      <PageHeader
-        title={campaign.name}
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Campaigns", href: "/dashboard/campaigns" },
-          { label: campaign.name },
-        ]}
-        actions={
-          <div className="flex items-center gap-3">
-            {campaign.status === "active" && (
-              <button
-                onClick={() => handleStatusChange("paused", "Paused")}
-                disabled={isUpdating}
-                className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-600 shadow-sm transition-colors hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Pause className="h-4 w-4" />
-                {isUpdating ? "Pausing..." : "Pause Campaign"}
-              </button>
-            )}
-            {campaign.status === "paused" && (
-              <button
-                onClick={handleResume}
-                disabled={isUpdating}
-                className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 shadow-sm transition-colors hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Play className="h-4 w-4" />
-                {isUpdating ? "Resuming..." : "Resume Campaign"}
-              </button>
-            )}
-            {(campaign.status === "active" || campaign.status === "paused") && (
-              <button
-                onClick={() => setShowCompleteConfirm(true)}
-                disabled={isUpdating}
-                className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-600 shadow-sm transition-colors hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Mark Complete
-              </button>
-            )}
-            <Link
-              href="/dashboard/campaigns"
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
+    <Page
+      title={campaign.name}
+      description={
+        <span className="inline-flex items-center gap-2">
+          <StatusBadge status={campaign.status} />
+        </span>
+      }
+      breadcrumbs={crumbs}
+      actions={
+        <>
+          {canStop && (
+            <Button
+              variant="outline"
+              onClick={() => setShowCompleteConfirm(true)}
+              disabled={isUpdating}
             >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Link>
-          </div>
-        }
-      />
-
-      <div className="mx-auto w-full max-w-7xl p-10">
-        {/* Campaign Info Card */}
-        <div className="mb-8 rounded-xl border border-[rgba(199,196,216,0.4)] bg-white p-6 shadow-sm">
-          <h3 className="mb-4 font-[family-name:var(--font-plus-jakarta)] text-lg font-bold text-indigo-900">
-            Campaign Configuration
-          </h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Status</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{campaign.status}</p>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Timezone</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {campaign.schedule.defaultTimezone}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Send Window
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {campaign.schedule.startTime} - {campaign.schedule.endTime}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Days Allowed
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {campaign.schedule.daysAllowed.join(", ")}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-8 rounded-xl border border-[rgba(199,196,216,0.4)] bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <Send className="h-5 w-5 text-indigo-600" />
-            <h3 className="font-[family-name:var(--font-plus-jakarta)] text-lg font-bold text-indigo-900">
-              Sending Mailboxes
-            </h3>
-          </div>
-          {(campaign.mailboxIds?.length ?? 0) === 0 ? (
-            <p className="text-sm text-amber-700">No sending mailboxes linked.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {campaign.mailboxIds.map((mailboxId: string) => (
-                <span
-                  key={mailboxId}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600"
-                >
-                  {mailboxId}
-                </span>
-              ))}
-            </div>
+              <CheckCircle data-icon="inline-start" />
+              Mark complete
+            </Button>
           )}
-        </div>
-
-        {/* Analytics Dashboard */}
-        <div className="mb-8">
-          <CampaignAnalytics campaignId={campaignId} />
-        </div>
-
-        {/* Contact Activity */}
-        <ContactActivity campaignId={campaignId} />
-      </div>
-
-      {/* Complete Confirmation Modal */}
-      {showCompleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
-            <h3 className="mb-4 font-[family-name:var(--font-plus-jakarta)] text-xl font-bold text-slate-900">
-              Mark Campaign Complete?
-            </h3>
-            <p className="mb-6 text-sm text-slate-600">
-              This will stop all scheduled emails and mark the campaign as completed. This action
-              cannot be undone.
-            </p>
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowCompleteConfirm(false)}
-                disabled={isUpdating}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  await handleStatusChange("completed", "Completed");
-                  setShowCompleteConfirm(false);
-                }}
-                disabled={isUpdating}
-                className="rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isUpdating ? "Completing..." : "Mark Complete"}
-              </button>
-            </div>
+          {campaign.status === "active" && (
+            <Button
+              variant="secondary"
+              onClick={() => handleStatusChange("paused", "Paused")}
+              disabled={isUpdating}
+            >
+              <Pause data-icon="inline-start" />
+              {isUpdating ? "Pausing…" : "Pause"}
+            </Button>
+          )}
+          {campaign.status === "paused" && (
+            <Button onClick={handleResume} disabled={isUpdating}>
+              <Play data-icon="inline-start" />
+              {isUpdating ? "Resuming…" : "Resume"}
+            </Button>
+          )}
+        </>
+      }
+    >
+      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-4">
+        {[
+          { label: "Time zone", value: campaign.schedule.defaultTimezone },
+          {
+            label: "Send window",
+            value: `${campaign.schedule.startTime} – ${campaign.schedule.endTime}`,
+          },
+          { label: "Days", value: formatDays(campaign.schedule.daysAllowed) },
+          {
+            label: "Mailboxes",
+            value:
+              (campaign.mailboxIds?.length ?? 0) === 0 ? (
+                <span className="text-warning">None linked</span>
+              ) : (
+                `${campaign.mailboxIds.length} linked`
+              ),
+          },
+        ].map((item) => (
+          <div key={item.label} className="flex flex-col gap-1 bg-card p-4">
+            <dt className="text-sm text-secondary">{item.label}</dt>
+            <dd className="text-base font-medium">{item.value}</dd>
           </div>
-        </div>
-      )}
-    </div>
+        ))}
+      </dl>
+
+      <CampaignAnalytics campaignId={campaignId} />
+
+      <ContactActivity campaignId={campaignId} />
+
+      <ConfirmDialog
+        isOpen={showCompleteConfirm}
+        onOpenChange={setShowCompleteConfirm}
+        title="Mark this campaign complete?"
+        description="Scheduled emails stop and the campaign moves to Completed. This can't be undone."
+        confirmText="Mark complete"
+        isLoading={isUpdating}
+        onConfirm={async () => {
+          await handleStatusChange("completed", "Completed");
+          setShowCompleteConfirm(false);
+        }}
+      />
+    </Page>
   );
+}
+
+const DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function formatDays(days: string[]) {
+  if (!days?.length) return "—";
+  const short = days.map((day) => day.charAt(0).toUpperCase() + day.slice(1, 3).toLowerCase());
+  if (short.length === 5 && DAY_ORDER.slice(0, 5).every((day) => short.includes(day)))
+    return "Weekdays";
+  if (short.length === 7) return "Every day";
+  return DAY_ORDER.filter((day) => short.includes(day)).join(", ");
 }
 
 async function requestJson(url: string, init: RequestInit) {

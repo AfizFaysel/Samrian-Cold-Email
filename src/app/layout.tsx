@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { themeScript } from "@/components/theme";
+import { Toaster } from "@/components/toaster";
 import "./globals.css";
 
-const geistSans = localFont({
-  variable: "--font-geist-sans",
-  src: "./fonts/geist-latin.woff2",
-  weight: "100 900",
+const figtree = localFont({
+  variable: "--font-figtree",
+  src: "./fonts/figtree-latin.woff2",
+  weight: "300 900",
+  display: "swap",
 });
 
 const geistMono = localFont({
@@ -14,20 +17,8 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
-const plusJakarta = localFont({
-  variable: "--font-plus-jakarta",
-  src: "./fonts/plus-jakarta-sans-latin.woff2",
-  weight: "200 800",
-});
-
-const ibmPlex = localFont({
-  variable: "--font-ibm-plex",
-  src: "./fonts/ibm-plex-sans-latin.woff2",
-  weight: "100 700",
-});
-
 export const metadata: Metadata = {
-  title: "Samrian",
+  title: { default: "Samrian", template: "%s · Samrian" },
   description: "Self-hostable cold email outreach platform",
 };
 
@@ -37,11 +28,18 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${plusJakarta.variable} ${ibmPlex.variable} antialiased`}
-      >
+    <html
+      lang="en"
+      data-astryx-theme="samrian"
+      className={`${figtree.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="antialiased">
         {children}
+        <Toaster />
       </body>
     </html>
   );

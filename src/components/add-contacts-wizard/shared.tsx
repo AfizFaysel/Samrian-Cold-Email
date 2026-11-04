@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { ChevronLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // Shared Step Header Component
 interface StepHeaderProps {
@@ -12,14 +14,12 @@ interface StepHeaderProps {
 
 export function StepHeader({ stepNumber, stepLabel, title, description }: StepHeaderProps) {
   return (
-    <div className="mb-12 text-center">
-      <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-600">
-        Step {stepNumber}: {stepLabel}
-      </div>
-      <h1 className="mb-4 font-[family-name:var(--font-plus-jakarta)] text-4xl font-bold tracking-tight text-slate-900">
-        {title}
-      </h1>
-      <p className="mx-auto max-w-2xl text-lg font-light text-slate-600">{description}</p>
+    <div className="mb-8 flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-accent">
+        Step {stepNumber} · {stepLabel}
+      </span>
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      <p className="max-w-2xl text-base text-secondary">{description}</p>
     </div>
   );
 }
@@ -47,25 +47,21 @@ export function WizardFooter({
   leftContent,
 }: WizardFooterProps) {
   return (
-    <div className="flex items-center justify-between border-t border-slate-200 pt-8">
+    <div className="-mx-6 -mb-6 mt-8 flex flex-col-reverse gap-3 border-t bg-muted/40 px-6 py-4 sm:-mx-8 sm:-mb-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
       {leftContent || (
         <>
           {showBackButton && onBack ? (
-            <button
-              onClick={onBack}
-              disabled={isLoading}
-              className="flex items-center gap-2 rounded-lg border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-            >
-              <BackArrowIcon />
+            <Button variant="ghost" onClick={onBack} disabled={isLoading}>
+              <ChevronLeft data-icon="inline-start" />
               Back
-            </button>
+            </Button>
           ) : (
             <div />
           )}
         </>
       )}
 
-      <div className="flex gap-4">
+      <div className="flex justify-end gap-2">
         <CancelButton onClick={onCancel} disabled={isLoading} />
         {onNext && (
           <PrimaryButton
@@ -89,27 +85,19 @@ interface ButtonProps {
   isLoading?: boolean;
 }
 
-export function PrimaryButton({ onClick, disabled, children, isLoading }: ButtonProps) {
+export function PrimaryButton({ onClick, disabled, children }: ButtonProps) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded-lg bg-gradient-to-br from-[#3525cd] to-[#4f46e5] px-10 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400"
-    >
+    <Button onClick={onClick} disabled={disabled}>
       {children}
-    </button>
+    </Button>
   );
 }
 
 export function CancelButton({ onClick, disabled }: Omit<ButtonProps, "children" | "isLoading">) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded-lg border border-slate-300 px-8 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-    >
+    <Button variant="outline" onClick={onClick} disabled={disabled}>
       Cancel
-    </button>
+    </Button>
   );
 }
 
@@ -132,7 +120,12 @@ export function CheckmarkIcon() {
 
 export function SecurityShieldIcon() {
   return (
-    <svg className="h-5 w-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg
+      className="size-4 shrink-0 text-success"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -149,5 +142,5 @@ interface WizardContainerProps {
 }
 
 export function WizardContainer({ children }: WizardContainerProps) {
-  return <div className="p-12">{children}</div>;
+  return <div className="p-6 sm:p-8">{children}</div>;
 }

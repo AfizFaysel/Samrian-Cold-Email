@@ -38,59 +38,39 @@ export type MailboxListItem = {
   availableToday: number;
 };
 
+const PROVIDER_LABELS: Record<string, string> = {
+  google: "Google",
+  microsoft: "Microsoft 365",
+  smtp: "SMTP",
+  mailpool: "Mailpool",
+  puzzle: "Puzzle",
+};
+
 export const columns: ColumnDef<MailboxListItem>[] = [
   {
     accessorKey: "name",
-    header: () => (
-      <div className="font-[family-name:var(--font-ibm-plex)] text-xs font-bold uppercase tracking-wider text-slate-500">
-        Name
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="font-[family-name:var(--font-ibm-plex)] font-medium text-slate-900">
-        {row.getValue("name")}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "email",
-    header: () => (
-      <div className="font-[family-name:var(--font-ibm-plex)] text-xs font-bold uppercase tracking-wider text-slate-500">
-        Email
-      </div>
-    ),
+    header: () => <div className="text-sm font-medium text-secondary">Mailbox</div>,
     cell: ({ row }) => {
       const email = row.original.userEmail || row.original.username;
       return (
-        <div className="font-[family-name:var(--font-ibm-plex)] font-mono text-sm text-slate-600">
-          {email || "—"}
+        <div className="min-w-0">
+          <div className="font-medium text-primary">{row.getValue("name")}</div>
+          <div className="text-sm text-secondary">{email || "—"}</div>
         </div>
       );
     },
   },
   {
     accessorKey: "provider",
-    header: () => (
-      <div className="font-[family-name:var(--font-ibm-plex)] text-xs font-bold uppercase tracking-wider text-slate-500">
-        Provider
-      </div>
-    ),
+    header: () => <div className="text-sm font-medium text-secondary">Provider</div>,
     cell: ({ row }) => {
       const provider = row.getValue("provider") as string;
-      return (
-        <div className="font-[family-name:var(--font-ibm-plex)] text-sm capitalize text-slate-900">
-          {provider}
-        </div>
-      );
+      return <div className="text-base text-primary">{PROVIDER_LABELS[provider] ?? provider}</div>;
     },
   },
   {
     accessorKey: "status",
-    header: () => (
-      <div className="font-[family-name:var(--font-ibm-plex)] text-xs font-bold uppercase tracking-wider text-slate-500">
-        Status
-      </div>
-    ),
+    header: () => <div className="text-sm font-medium text-secondary">Status</div>,
     cell: ({ row }) => {
       const status = row.getValue("status") as any;
       return <StatusBadge status={status} />;
@@ -98,29 +78,25 @@ export const columns: ColumnDef<MailboxListItem>[] = [
   },
   {
     id: "ramp",
-    header: () => (
-      <div className="font-[family-name:var(--font-ibm-plex)] text-xs font-bold uppercase tracking-wider text-slate-500">
-        Ramp
-      </div>
-    ),
+    header: () => <div className="text-sm font-medium text-secondary">Ramp</div>,
     cell: ({ row }) => {
       const mailbox = row.original;
-      if (!mailbox.rampEnabled) return <span className="text-xs text-slate-400">Off</span>;
+      if (!mailbox.rampEnabled) return <span className="text-sm text-secondary">Off</span>;
       return (
-        <div className="min-w-[120px] text-xs">
-          <p className="font-medium capitalize text-slate-900">
+        <div className="min-w-[120px] text-sm">
+          <p className="font-medium capitalize text-primary">
             {mailbox.rampStatus.replace("-", " ")}
           </p>
-          <p className="mt-1 text-slate-500">
+          <p className="mt-1 text-secondary">
             {mailbox.rampCurrentLimit ?? 5} / {mailbox.rampTargetLimit} daily
           </p>
           <Progress
             value={((mailbox.rampCurrentLimit ?? 5) / mailbox.rampTargetLimit) * 100}
             className="mt-1.5 h-1.5"
           />
-          {mailbox.rampReason ? <p className="mt-1 text-slate-500">{mailbox.rampReason}</p> : null}
+          {mailbox.rampReason ? <p className="mt-1 text-secondary">{mailbox.rampReason}</p> : null}
           {mailbox.rampNextCheckAt ? (
-            <p className="mt-1 text-slate-400">
+            <p className="mt-1 text-secondary">
               Next {new Date(mailbox.rampNextCheckAt).toLocaleDateString()}
             </p>
           ) : null}
@@ -130,11 +106,7 @@ export const columns: ColumnDef<MailboxListItem>[] = [
   },
   {
     id: "usage",
-    header: () => (
-      <div className="font-[family-name:var(--font-ibm-plex)] text-xs font-bold uppercase tracking-wider text-slate-500">
-        Daily Usage
-      </div>
-    ),
+    header: () => <div className="text-sm font-medium text-secondary">Sent today</div>,
     cell: ({ row }) => {
       const limit = row.original.effectiveDailyLimit;
       const sent = row.original.emailsSentToday;
@@ -142,22 +114,18 @@ export const columns: ColumnDef<MailboxListItem>[] = [
 
       return (
         <div className="w-[120px] flex flex-col gap-1.5">
-          <div className="flex items-center justify-between text-xs font-[family-name:var(--font-ibm-plex)]">
-            <span className="font-medium text-slate-900">{sent}</span>
-            <span className="text-slate-500">/ {limit}</span>
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-primary">{sent}</span>
+            <span className="text-secondary">/ {limit}</span>
           </div>
-          <Progress value={percentage} className="h-2" />
+          <Progress value={percentage} className="h-1.5" />
         </div>
       );
     },
   },
   {
     id: "health",
-    header: () => (
-      <div className="font-[family-name:var(--font-ibm-plex)] text-xs font-bold uppercase tracking-wider text-slate-500">
-        Health
-      </div>
-    ),
+    header: () => <div className="text-sm font-medium text-secondary">Health</div>,
     cell: ({ row }) => {
       const mailbox = row.original;
       const error =
@@ -165,15 +133,15 @@ export const columns: ColumnDef<MailboxListItem>[] = [
         mailbox.lastTokenRefreshError ||
         (mailbox.providerLimitCode ? `Provider limit: ${mailbox.providerLimitCode}` : undefined);
       return (
-        <div className="max-w-[220px] font-[family-name:var(--font-ibm-plex)] text-xs">
+        <div className="max-w-[220px] text-sm">
           {error ? (
-            <span className="text-red-600">{error}</span>
+            <span className="text-error">{error}</span>
           ) : mailbox.lastConnectionTestAt ? (
-            <span className="text-slate-500">
+            <span className="text-secondary">
               Checked {new Date(mailbox.lastConnectionTestAt).toLocaleDateString()}
             </span>
           ) : (
-            <span className="text-slate-400">Not checked</span>
+            <span className="text-secondary">Not checked</span>
           )}
         </div>
       );
@@ -265,11 +233,11 @@ export const columns: ColumnDef<MailboxListItem>[] = [
 
       return (
         <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md p-0 text-sm font-medium transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50">
+          <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-sm p-0 text-base font-medium transition-colors hover:bg-muted hover:text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50">
             <span className="sr-only">Open menu</span>
             <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="font-[family-name:var(--font-ibm-plex)]">
+          <DropdownMenuContent align="end" className="">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => navigator.clipboard.writeText(mailbox._id)}>
               Copy Mailbox ID
@@ -336,7 +304,7 @@ export const columns: ColumnDef<MailboxListItem>[] = [
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
-              className="text-red-600 focus:bg-red-50 focus:text-red-600"
+              className="text-error focus:bg-error-muted focus:text-error"
               onClick={() => void deleteMailbox().catch((error) => toast.error(error.message))}
             >
               <Trash2 className="mr-2 h-4 w-4" />

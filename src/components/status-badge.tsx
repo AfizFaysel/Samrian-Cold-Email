@@ -1,49 +1,96 @@
 import * as React from "react";
-import { Badge } from "@/components/ui/badge";
-import { BOUNCE_STATUSES, CAMPAIGN_STATUSES, CONTACT_STATUSES } from "@/lib/constants";
 import {
+  AlertCircle,
   CheckCircle2,
   CircleDashed,
   Clock,
-  AlertCircle,
-  PlayCircle,
+  Info,
   PauseCircle,
+  PlayCircle,
   Send,
   XCircle,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-type StatusMap = Record<
-  string,
-  {
-    label: string;
-    variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning";
-    icon: React.ComponentType<{ className?: string }>;
-  }
->;
+export type StatusTone = "success" | "warning" | "error" | "info" | "neutral";
 
-const statusConfig: StatusMap = {
-  // Campaign Statuses
-  draft: { label: "Draft", variant: "secondary", icon: CircleDashed },
-  scheduled: { label: "Scheduled", variant: "warning", icon: Clock },
-  running: { label: "Running", variant: "default", icon: PlayCircle },
-  paused: { label: "Paused", variant: "outline", icon: PauseCircle },
-  completed: { label: "Completed", variant: "success", icon: CheckCircle2 },
-  error: { label: "Error", variant: "destructive", icon: AlertCircle },
-
-  // Contact/Assignment Statuses
-  pending: { label: "Pending", variant: "secondary", icon: CircleDashed },
-  sent: { label: "Sent", variant: "default", icon: Send },
-  replied: { label: "Replied", variant: "success", icon: CheckCircle2 },
-  bounced: { label: "Bounced", variant: "destructive", icon: XCircle },
-  unsubscribed: { label: "Unsubscribed", variant: "outline", icon: AlertCircle },
-
-  // Mailbox Statuses
-  active: { label: "Active", variant: "success", icon: CheckCircle2 },
-  disconnected: { label: "Disconnected", variant: "destructive", icon: AlertCircle },
+type StatusConfig = {
+  label: string;
+  tone: StatusTone;
+  icon: React.ComponentType<{ className?: string }>;
 };
 
-// Add success and warning variants to standard Tailwind config mentally,
-// For now we map them to standard Tailwind classes in the component.
+// Every tone has its own glyph, so status still reads for colour-blind people.
+const STATUSES: Record<string, StatusConfig> = {
+  // Campaigns
+  draft: { label: "Draft", tone: "neutral", icon: CircleDashed },
+  scheduled: { label: "Scheduled", tone: "warning", icon: Clock },
+  running: { label: "Running", tone: "info", icon: PlayCircle },
+  paused: { label: "Paused", tone: "warning", icon: PauseCircle },
+  completed: { label: "Completed", tone: "success", icon: CheckCircle2 },
+  error: { label: "Error", tone: "error", icon: AlertCircle },
+
+  // Contacts and assignments
+  pending: { label: "Pending", tone: "neutral", icon: CircleDashed },
+  sent: { label: "Sent", tone: "info", icon: Send },
+  replied: { label: "Replied", tone: "success", icon: CheckCircle2 },
+  bounced: { label: "Bounced", tone: "error", icon: XCircle },
+  unsubscribed: { label: "Unsubscribed", tone: "neutral", icon: AlertCircle },
+
+  // Mailboxes (and active campaigns)
+  active: { label: "Active", tone: "success", icon: CheckCircle2 },
+  disconnected: { label: "Disconnected", tone: "error", icon: AlertCircle },
+};
+
+const TONE_CLASSES: Record<StatusTone, string> = {
+  success: "bg-success-muted text-success",
+  warning: "bg-warning-muted text-warning",
+  error: "bg-error-muted text-error",
+  info: "bg-accent-muted text-accent",
+  neutral: "bg-muted text-secondary",
+};
+
+const TONE_ICONS: Record<StatusTone, StatusConfig["icon"]> = {
+  success: CheckCircle2,
+  warning: AlertCircle,
+  error: XCircle,
+  info: Info,
+  neutral: CircleDashed,
+};
+
+function readable(status: string) {
+  const words = status.replace(/[_-]+/g, " ").trim().toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** A tone as a pill: icon plus a word. Colour never stands alone. */
+export function StatusPill({
+  tone,
+  label,
+  icon,
+  showIcon = true,
+  className,
+}: {
+  tone: StatusTone;
+  label: string;
+  icon?: StatusConfig["icon"];
+  showIcon?: boolean;
+  className?: string;
+}) {
+  const Icon = icon ?? TONE_ICONS[tone];
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full px-2 text-sm font-medium whitespace-nowrap",
+        TONE_CLASSES[tone],
+        className
+      )}
+    >
+      {showIcon && <Icon className="size-3.5" aria-hidden />}
+      {label}
+    </span>
+  );
+}
 
 interface StatusBadgeProps {
   status: string;
@@ -52,47 +99,19 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className, showIcon = true }: StatusBadgeProps) {
-  const normalizedStatus = status.toLowerCase();
-  const config = statusConfig[normalizedStatus] || {
-    label: status,
-    variant: "outline",
+  const config = STATUSES[status.toLowerCase()] ?? {
+    label: readable(status),
+    tone: "neutral" as const,
     icon: CircleDashed,
   };
 
-  const Icon = config.icon;
-
-  // Map our semantic variants to specific accessible color combinations
-  let colorClasses = "";
-  switch (config.variant) {
-    case "success":
-      colorClasses =
-        "bg-green-500/15 text-green-700 dark:text-green-400 dark:bg-green-500/10 border-green-500/20";
-      break;
-    case "warning":
-      colorClasses =
-        "bg-amber-500/15 text-amber-700 dark:text-amber-400 dark:bg-amber-500/10 border-amber-500/20";
-      break;
-    case "destructive":
-      colorClasses =
-        "bg-destructive/15 text-destructive dark:text-red-400 dark:bg-destructive/10 border-destructive/20";
-      break;
-    case "secondary":
-      colorClasses = "bg-secondary text-secondary-foreground border-transparent";
-      break;
-    case "default":
-      colorClasses = "bg-primary/15 text-primary dark:bg-primary/10 border-primary/20";
-      break;
-    default:
-      colorClasses = "text-muted-foreground border-border";
-  }
-
   return (
-    <Badge
-      variant="outline"
-      className={`font-medium shadow-none h-6 px-2 flex items-center gap-1.5 ${colorClasses} ${className}`}
-    >
-      {showIcon && <Icon className="h-3 w-3" />}
-      {config.label}
-    </Badge>
+    <StatusPill
+      tone={config.tone}
+      label={config.label}
+      icon={config.icon}
+      showIcon={showIcon}
+      className={className}
+    />
   );
 }

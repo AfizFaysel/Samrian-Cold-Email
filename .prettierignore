@@ -13,6 +13,7 @@ dist/
 # Generated files
 drizzle/meta/*.json
 *.tsbuildinfo
+src/themes/samrian/samrian.*
 
 # Logs
 *.log

@@ -57,23 +57,24 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="overflow-hidden rounded-lg border bg-card text-primary">
       {searchKey && (
-        <div className="flex items-center relative max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="relative border-b p-3">
+          <Search className="pointer-events-none absolute top-1/2 left-5.5 size-4 -translate-y-1/2 text-secondary" />
           <Input
             placeholder={searchPlaceholder}
             value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
             onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
-            className="pl-9"
+            className="pl-8 sm:max-w-xs"
+            aria-label={searchPlaceholder}
           />
         </div>
       )}
-      <div className="rounded-md border bg-card text-card-foreground shadow-sm overflow-hidden">
+      <div>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-muted/50 hover:bg-muted/50">
+              <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id}>
@@ -91,7 +92,7 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-3">
+                    <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -99,11 +100,8 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No results found.
+                <TableCell colSpan={columns.length} className="h-24 text-center text-secondary">
+                  Nothing matches your search.
                 </TableCell>
               </TableRow>
             )}
@@ -112,28 +110,30 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between px-2">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredRowModel().rows.length} row(s) total.
+      <div className="flex items-center justify-between border-t px-4 py-2.5">
+        <div className="flex-1 text-sm text-secondary tabular-nums">
+          {table.getFilteredRowModel().rows.length} total
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
-            className="h-8 w-8 p-0"
+            className="size-7 p-0"
+            aria-label="Previous page"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="size-4" />
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
-            className="h-8 w-8 p-0"
+            className="size-7 p-0"
+            aria-label="Next page"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="size-4" />
           </Button>
         </div>
       </div>

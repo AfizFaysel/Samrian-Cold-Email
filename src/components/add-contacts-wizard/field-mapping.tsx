@@ -83,11 +83,11 @@ export function FieldMapping({ rawData, onNext, onBack, onCancel }: FieldMapping
         {headers.map((header) => (
           <div
             key={header}
-            className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4"
+            className="flex items-center gap-4 rounded-lg border border-border bg-card p-4"
           >
             <div className="flex-1">
-              <p className="font-semibold text-slate-900">{header}</p>
-              <p className="text-sm text-slate-600">
+              <p className="font-semibold text-primary">{header}</p>
+              <p className="text-base text-secondary">
                 Sample: {rawData[1]?.[headers.indexOf(header)]}
               </p>
             </div>
@@ -95,7 +95,7 @@ export function FieldMapping({ rawData, onNext, onBack, onCancel }: FieldMapping
               <select
                 value={mapping[header] || "skip"}
                 onChange={(e) => setMapping({ ...mapping, [header]: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/20"
+                className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
               >
                 {FIELD_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
