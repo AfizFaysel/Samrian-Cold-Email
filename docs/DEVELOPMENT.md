@@ -118,3 +118,20 @@ Useful checks:
 bun run test --project unit -- tests/unit/modules/ramp.test.ts tests/unit/jobs/ramp.test.ts
 bun run test --project components -- tests/components/ramp.test.tsx
 ```
+
+## Design system
+
+The app is built on Astryx with the Samrian theme (`src/themes/samrian`). `/design` shows the
+foundations read live from the theme, every component in its states, and every screen and flow.
+
+To browse screens without a database, run the dev server and the design preview, which proxies the
+app and answers `/api/*` with sample data:
+
+```powershell
+bun run dev
+bun run design:preview
+```
+
+Open `http://localhost:3101/design`. **Export HTML** builds one self-contained file with the
+screens captured as live HTML; through the preview it is also saved to `docs/design-system.html`
+(gitignored). States: `/__mock/data`, `/__mock/empty`, `/__mock/error`.

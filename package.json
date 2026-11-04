@@ -39,6 +39,7 @@
     "ops:betterstack": "bun scripts/betterstack.ts",
     "ops:betterstack:apply": "bun scripts/betterstack.ts --apply",
     "smoke": "bun scripts/smoke.ts",
+    "design:preview": "bun scripts/design/preview.ts",
     "cli:build": "bun build packages/cli/src/bin.ts --outdir dist/cli --target bun",
     "cli:smoke": "bun packages/cli/src/bin.ts --help",
     "mcp:build": "bun build packages/mcp/src/server.ts packages/mcp/src/stdio.ts --outdir packages/mcp/dist --target bun",
