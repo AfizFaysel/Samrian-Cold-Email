@@ -1,22 +1,11 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Activity, Gauge, MoreHorizontal, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/status-badge";
-import { toast } from "sonner";
 import { Icon } from "@astryxdesign/core/Icon";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Text } from "@astryxdesign/core/Text";
+import { MailboxActions } from "./mailbox-actions";
 
 export type MailboxListItem = {
   _id: string;
@@ -54,7 +43,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   puzzle: "Puzzle",
 };
 
-export const columns: ColumnDef<MailboxListItem>[] = [
+export const mailboxColumns = (onChanged: () => void): ColumnDef<MailboxListItem>[] => [
   {
     accessorKey: "name",
     header: () => <div className="text-sm font-medium text-secondary">Mailbox</div>,
@@ -100,7 +89,10 @@ export const columns: ColumnDef<MailboxListItem>[] = [
             hasValueLabel
             formatValueLabel={(value, max) => `${value} / ${max} a day`}
           />
-          {mailbox.rampReason ? <Text type="supporting">{mailbox.rampReason}</Text> : null}
+          {mailbox.rampReason &&
+          mailbox.rampReason.toLowerCase() !== mailbox.rampStatus.toLowerCase() ? (
+            <Text type="supporting">{mailbox.rampReason}</Text>
+          ) : null}
           {mailbox.rampNextCheckAt ? (
             <Text type="supporting">
               Next step {new Date(mailbox.rampNextCheckAt).toLocaleDateString()}
@@ -159,172 +151,6 @@ export const columns: ColumnDef<MailboxListItem>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => {
-      const mailbox = row.original;
-      const checkMailbox = async () => {
-        const response = await fetch(`/api/mailboxes/${mailbox._id}/check`, { method: "POST" });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error ?? "Mailbox check failed");
-        toast.success(result.status === "healthy" ? "Mailbox healthy" : result.issue);
-        window.location.reload();
-      };
-      const reconnectMailbox = async () => {
-        const response = await fetch(`/api/mailboxes/${mailbox._id}/reconnect`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error ?? "Reconnect failed");
-        if (result.reconnectUrl) {
-          window.location.href = result.reconnectUrl;
-          return;
-        }
-        toast.success("Mailbox reconnected");
-        window.location.reload();
-      };
-      const deleteMailbox = async () => {
-        let response = await fetch(`/api/mailboxes/${mailbox._id}`, { method: "DELETE" });
-        if (
-          response.status === 409 &&
-          window.confirm("Mailbox has active links. Archive anyway?")
-        ) {
-          response = await fetch(`/api/mailboxes/${mailbox._id}?force=true`, { method: "DELETE" });
-        }
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error ?? "Delete failed");
-        toast.success("Mailbox archived");
-        window.location.reload();
-      };
-      const changeRamp = async (
-        action: "enable" | "disable" | "pause" | "resume" | "reset" | "update",
-        targetLimit = mailbox.rampTargetLimit || 30
-      ) => {
-        const response = await fetch(`/api/mailboxes/${mailbox._id}/ramp`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, targetLimit }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error ?? "Ramp update failed");
-        toast.success(
-          action === "enable"
-            ? "Mailbox ramp enabled"
-            : action === "disable"
-              ? "Mailbox ramp disabled"
-              : action === "pause"
-                ? "Mailbox ramp paused"
-                : action === "resume"
-                  ? "Mailbox ramp resumed"
-                  : action === "reset"
-                    ? "Mailbox ramp reset"
-                    : "Ramp target updated"
-        );
-        window.location.reload();
-      };
-      const setRampTarget = async () => {
-        const value = window.prompt("Ramp target per day", String(mailbox.rampTargetLimit || 30));
-        if (value === null) return;
-        const target = Number(value);
-        if (!Number.isInteger(target) || target < 5 || target > 100) {
-          throw new Error("Ramp target must be between 5 and 100");
-        }
-        await changeRamp("update", target);
-      };
-      const evaluateRamp = async () => {
-        const response = await fetch(`/api/mailboxes/${mailbox._id}/ramp/evaluate`, {
-          method: "POST",
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error ?? "Ramp evaluation failed");
-        toast.success(`Ramp ${result.decision.status}: ${result.decision.reason}`);
-        window.location.reload();
-      };
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-sm p-0 text-base font-medium transition-colors hover:bg-muted hover:text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50">
-            <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="h-4 w-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(mailbox._id)}>
-                Copy Mailbox ID
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => void checkMailbox().catch((error) => toast.error(error.message))}
-            >
-              <Activity className="mr-2 h-4 w-4" />
-              Test connection
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => void reconnectMailbox().catch((error) => toast.error(error.message))}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Reconnect
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => void evaluateRamp().catch((error) => toast.error(error.message))}
-            >
-              <Gauge className="mr-2 h-4 w-4" />
-              Evaluate ramp
-            </DropdownMenuItem>
-            {mailbox.rampEnabled ? (
-              <>
-                <DropdownMenuItem
-                  onClick={() =>
-                    void changeRamp(mailbox.rampStatus === "paused" ? "resume" : "pause").catch(
-                      (error) => toast.error(error.message)
-                    )
-                  }
-                >
-                  {mailbox.rampStatus === "paused" ? (
-                    <Play className="mr-2 h-4 w-4" />
-                  ) : (
-                    <Pause className="mr-2 h-4 w-4" />
-                  )}
-                  {mailbox.rampStatus === "paused" ? "Resume ramp" : "Pause ramp"}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => void setRampTarget().catch((error) => toast.error(error.message))}
-                >
-                  <Gauge className="mr-2 h-4 w-4" />
-                  Set ramp target
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (!window.confirm("Reset ramp progress to 5 sends per day?")) return;
-                    void changeRamp("reset").catch((error) => toast.error(error.message));
-                  }}
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Reset ramp
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <DropdownMenuItem
-                onClick={() =>
-                  void changeRamp("enable").catch((error) => toast.error(error.message))
-                }
-              >
-                <Play className="mr-2 h-4 w-4" />
-                Enable ramp
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              className="text-error focus:bg-error-muted focus:text-error"
-              onClick={() => void deleteMailbox().catch((error) => toast.error(error.message))}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
+    cell: ({ row }) => <MailboxActions mailbox={row.original} onChanged={onChanged} />,
   },
 ];

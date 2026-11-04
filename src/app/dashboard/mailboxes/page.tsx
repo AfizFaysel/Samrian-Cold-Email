@@ -8,12 +8,13 @@ import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
 import { AddMailboxDialog } from "./add-mailbox-dialog";
-import { columns, type MailboxListItem } from "./columns";
+import { mailboxColumns, type MailboxListItem } from "./columns";
 
 export default function MailboxesPage() {
   const { data, error, refetch } = useApi<{ mailboxes: MailboxListItem[] }>("/api/mailboxes");
   const mailboxes = data?.mailboxes;
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const columns = React.useMemo(() => mailboxColumns(refetch), [refetch]);
 
   return (
     <Page
