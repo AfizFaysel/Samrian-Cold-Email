@@ -2,11 +2,12 @@
 import { cva } from "class-variance-authority";
 
 export const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-base font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-error aria-invalid:ring-3 aria-invalid:ring-error/20 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-base font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:text-disabled aria-invalid:border-error aria-invalid:ring-3 aria-invalid:ring-error/20 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-accent-bg text-on-accent hover:bg-accent-bg/90 aria-expanded:bg-accent-bg/90",
+        default:
+          "bg-accent-bg text-on-accent hover:bg-accent-bg/90 disabled:bg-muted aria-expanded:bg-accent-bg/90",
         outline: "border-border bg-card text-primary hover:bg-muted aria-expanded:bg-muted",
         secondary:
           "bg-muted text-primary hover:bg-[color-mix(in_oklab,var(--color-background-muted),var(--color-text-primary)_7%)] aria-expanded:bg-[color-mix(in_oklab,var(--color-background-muted),var(--color-text-primary)_7%)]",

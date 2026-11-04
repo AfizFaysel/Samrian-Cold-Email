@@ -2,18 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Eye,
-  Mailbox,
-  Megaphone,
-  Plus,
-  Reply,
-  Send,
-} from "lucide-react";
+import { AlertTriangle, Eye, Mailbox, Megaphone, Plus, Reply, Send } from "lucide-react";
 import { Page, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
@@ -187,11 +179,9 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-md bg-success-muted text-success">
-                    <CheckCircle2 className="size-4" />
-                  </span>
-                  <div className="flex flex-col">
+                <div className="flex items-start gap-2.5">
+                  <StatusDot variant="success" label="Sending" />
+                  <div className="-mt-1 flex flex-col">
                     <span className="text-base font-medium tabular-nums">
                       {activeMailboxCount} of {mailboxList.length} active
                     </span>

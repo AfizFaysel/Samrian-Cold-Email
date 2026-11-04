@@ -121,7 +121,7 @@ export function ContactActivity({ campaignId }: ContactActivityProps) {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <StatusPill tone={config.tone} label={config.label} icon={config.icon} />
+                        <StatusPill tone={config.tone} label={config.label} />
                       </td>
                       <td className="px-4 py-3 tabular-nums text-secondary">
                         Step {assignment.currentStep}

@@ -71,9 +71,7 @@ export function AuthShell({
           <ul className="flex flex-col gap-6">
             {POINTS.map(({ icon: Icon, title, body }) => (
               <li key={title} className="flex gap-4">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-card">
-                  <Icon className="size-4" />
-                </span>
+                <Icon className="mt-0.5 size-5 shrink-0 text-secondary" />
                 <div className="flex flex-col gap-0.5">
                   <span className="text-base font-medium">{title}</span>
                   <span className="text-base text-secondary">{body}</span>

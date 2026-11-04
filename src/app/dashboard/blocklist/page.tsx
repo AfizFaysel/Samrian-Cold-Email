@@ -34,7 +34,7 @@ type DoNotContactEntry = {
 };
 
 const REASONS: Record<DoNotContactEntry["reason"], { label: string; tone: StatusTone }> = {
-  unsubscribed: { label: "Unsubscribed", tone: "warning" },
+  unsubscribed: { label: "Unsubscribed", tone: "neutral" },
   bounced_hard: { label: "Hard bounce", tone: "error" },
   manual: { label: "Added by hand", tone: "neutral" },
 };

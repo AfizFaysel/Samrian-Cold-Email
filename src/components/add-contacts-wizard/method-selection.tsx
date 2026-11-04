@@ -61,13 +61,7 @@ export function MethodSelection({ onSelect, onCancel }: MethodSelectionProps) {
                 </div>
               )}
 
-              <div
-                className={`mb-4 flex size-9 items-center justify-center rounded-md transition-colors ${
-                  isSelected ? "bg-accent-bg text-on-accent" : "bg-muted text-primary"
-                }`}
-              >
-                <Icon className="size-4" />
-              </div>
+              <Icon className={`mb-3 size-5 ${isSelected ? "text-accent" : "text-secondary"}`} />
 
               <h3 className="mb-1 text-base font-semibold">{method.title}</h3>
               <p className="text-base leading-relaxed text-secondary">{method.description}</p>

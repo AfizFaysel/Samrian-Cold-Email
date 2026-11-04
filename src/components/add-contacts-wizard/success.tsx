@@ -13,9 +13,7 @@ interface SuccessProps {
 export function Success({ contactCount, onClose }: SuccessProps) {
   return (
     <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
-      <span className="mb-2 flex size-11 items-center justify-center rounded-full bg-success-muted text-success">
-        <CheckCircle2 className="size-5" />
-      </span>
+      <CheckCircle2 className="mb-2 size-6 text-success" />
       <h2 className="text-xl font-semibold tracking-tight">
         {contactCount} {contactCount === 1 ? "contact" : "contacts"} added
       </h2>

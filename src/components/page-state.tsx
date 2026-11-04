@@ -1,13 +1,16 @@
 import * as React from "react";
-import { AlertCircle, Loader2, RotateCw } from "lucide-react";
+import { EmptyState as AstryxEmptyState } from "@astryxdesign/core/EmptyState";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-type IconType = React.ComponentType<{ className?: string }>;
+type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 
+/** Astryx EmptyState with a plain icon: no tinted tile, the design system draws none. */
 export function EmptyState({
-  icon: Icon,
+  icon,
   title,
   description,
   action,
@@ -15,27 +18,18 @@ export function EmptyState({
 }: {
   icon?: IconType;
   title: string;
-  description?: React.ReactNode;
+  description?: string;
   action?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center justify-center gap-1 px-6 py-14 text-center",
-        className
-      )}
-    >
-      {Icon && (
-        <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-muted text-secondary">
-          <Icon className="size-5" />
-        </div>
-      )}
-      <h3 className="text-lg font-semibold">{title}</h3>
-      {description && (
-        <p className="max-w-sm text-base text-pretty text-secondary">{description}</p>
-      )}
-      {action && <div className="mt-4 flex items-center gap-2">{action}</div>}
+    <div className={cn("px-6 py-12", className)}>
+      <AstryxEmptyState
+        title={title}
+        description={description}
+        icon={icon ? <Icon icon={icon} size="lg" color="secondary" /> : undefined}
+        actions={action}
+      />
     </div>
   );
 }
@@ -47,29 +41,25 @@ export function ErrorState({
   className,
 }: {
   title?: string;
-  description?: React.ReactNode;
+  description?: string;
   onRetry?: () => void;
   className?: string;
 }) {
   return (
-    <div
-      role="alert"
-      className={cn(
-        "flex flex-col items-center justify-center gap-1 px-6 py-14 text-center",
-        className
-      )}
-    >
-      <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-error-muted text-error">
-        <AlertCircle className="size-5" />
-      </div>
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <p className="max-w-sm text-base text-pretty text-secondary">{description}</p>
-      {onRetry && (
-        <Button variant="outline" className="mt-4" onClick={onRetry}>
-          <RotateCw data-icon="inline-start" />
-          Try again
-        </Button>
-      )}
+    <div role="alert" className={cn("px-6 py-12", className)}>
+      <AstryxEmptyState
+        title={title}
+        description={description}
+        icon={<Icon icon="error" size="lg" color="error" />}
+        actions={
+          onRetry ? (
+            <Button variant="outline" onClick={onRetry}>
+              <RotateCw data-icon="inline-start" />
+              Try again
+            </Button>
+          ) : undefined
+        }
+      />
     </div>
   );
 }

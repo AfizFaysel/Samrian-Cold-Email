@@ -1,6 +1,7 @@
 "use client";
 
 import { scopes, type Scope } from "@samrian/contracts";
+import { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -82,25 +83,16 @@ export function ApiKeys() {
         <Input id="api-key-name" value={name} onChange={(event) => setName(event.target.value)} />
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <CheckboxList
+        label="Scopes"
+        density="compact"
+        value={selected}
+        onChange={(values) => setSelected(values as Scope[])}
+      >
         {scopes.map((scope) => (
-          <label key={scope} className="flex items-center gap-2 text-base text-primary">
-            <input
-              type="checkbox"
-              aria-label={scope}
-              checked={selected.includes(scope)}
-              onChange={(event) =>
-                setSelected((current) =>
-                  event.target.checked
-                    ? [...current, scope]
-                    : current.filter((value) => value !== scope)
-                )
-              }
-            />
-            {scope}
-          </label>
+          <CheckboxListItem key={scope} value={scope} label={scope} />
         ))}
-      </div>
+      </CheckboxList>
 
       <div>
         <Button disabled={!name.trim() || selected.length === 0} onClick={create}>

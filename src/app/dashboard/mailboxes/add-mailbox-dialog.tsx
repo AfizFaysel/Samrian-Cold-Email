@@ -125,15 +125,13 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
                 onClick={() => handleProviderSelect("google")}
                 className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
               >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-white">
-                  <Image
-                    src="/logos/google.svg"
-                    alt="Google"
-                    width={32}
-                    height={32}
-                    className="size-5"
-                  />
-                </div>
+                <Image
+                  src="/logos/google.svg"
+                  alt="Google"
+                  width={32}
+                  height={32}
+                  className="size-6 shrink-0"
+                />
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-semibold">Google Workspace</h3>
                   <p className="text-sm text-secondary">Sign in with OAuth. Recommended.</p>
@@ -155,15 +153,13 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
                 onClick={() => handleProviderSelect("microsoft")}
                 className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
               >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-white">
-                  <Image
-                    src="/logos/microsoft.svg"
-                    alt="Microsoft"
-                    width={32}
-                    height={32}
-                    className="size-5"
-                  />
-                </div>
+                <Image
+                  src="/logos/microsoft.svg"
+                  alt="Microsoft"
+                  width={32}
+                  height={32}
+                  className="size-6 shrink-0"
+                />
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-semibold">Microsoft 365</h3>
                   <p className="text-sm text-secondary">Sign in with OAuth. Recommended.</p>
@@ -185,21 +181,19 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
                 onClick={() => handleProviderSelect("smtp")}
                 className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
               >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted">
-                  <svg
-                    className="size-5 text-secondary"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
+                <svg
+                  className="size-6 shrink-0 text-secondary"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
+                </svg>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-semibold">SMTP / IMAP</h3>
                   <p className="text-sm text-secondary">

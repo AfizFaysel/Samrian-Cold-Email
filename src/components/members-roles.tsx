@@ -1,5 +1,7 @@
 "use client";
 
+import { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
+import { Selector } from "@astryxdesign/core/Selector";
 import { Pencil, Trash2 } from "lucide-react";
 import * as React from "react";
 
@@ -111,6 +113,7 @@ export function MembersRoles() {
     setStatus("Invitation sent");
   }
 
+  const roleOptions = roles.map((role) => ({ value: role.slug, label: role.name }));
   const builtIn = roles.filter((role) => role.builtIn);
   const custom = roles.filter((role) => !role.builtIn);
 
@@ -133,21 +136,13 @@ export function MembersRoles() {
             onChange={(event) => setEmail(event.target.value)}
           />
         </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="invite-role">Invite role</Label>
-          <select
-            id="invite-role"
-            className="h-9 rounded-sm border border-border-strong bg-card px-3 text-base"
-            value={inviteRole}
-            onChange={(event) => setInviteRole(event.target.value)}
-          >
-            {roles.map((role) => (
-              <option key={role.id} value={role.slug}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Selector
+          label="Invite role"
+          width="100%"
+          value={inviteRole}
+          onChange={setInviteRole}
+          options={roleOptions}
+        />
         <Button onClick={invite} disabled={!email.trim()}>
           Send invite
         </Button>
@@ -167,18 +162,14 @@ export function MembersRoles() {
                 </p>
                 {member.email && <p className="truncate text-sm text-secondary">{member.email}</p>}
               </div>
-              <select
-                aria-label={`Role for ${member.email || member.userId}`}
-                className="h-9 rounded-sm border border-border-strong bg-card px-3 text-base"
+              <Selector
+                label={`Role for ${member.email || member.userId}`}
+                isLabelHidden
+                width="100%"
                 value={member.role}
-                onChange={(event) => changeMember(member, event.target.value)}
-              >
-                {roles.map((role) => (
-                  <option key={role.id} value={role.slug}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(role) => changeMember(member, role)}
+                options={roleOptions}
+              />
             </div>
           ))}
           {!members.length && !status && (
@@ -197,28 +188,11 @@ export function MembersRoles() {
           <Label htmlFor="role-name">Role name</Label>
           <Input id="role-name" value={name} onChange={(event) => setName(event.target.value)} />
         </div>
-        <fieldset>
-          <legend className="text-base font-medium text-primary">Permissions</legend>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {permissions.map((permission) => (
-              <label key={permission} className="flex items-center gap-2 text-base text-primary">
-                <input
-                  type="checkbox"
-                  aria-label={permission}
-                  checked={selected.includes(permission)}
-                  onChange={(event) =>
-                    setSelected((current) =>
-                      event.target.checked
-                        ? [...current, permission]
-                        : current.filter((value) => value !== permission)
-                    )
-                  }
-                />
-                <span className="font-mono text-sm">{permission}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <CheckboxList label="Permissions" density="compact" value={selected} onChange={setSelected}>
+          {permissions.map((permission) => (
+            <CheckboxListItem key={permission} value={permission} label={permission} />
+          ))}
+        </CheckboxList>
         <div className="flex gap-2">
           <Button onClick={saveRole} disabled={!name.trim()}>
             {editing ? "Update role" : "Create role"}

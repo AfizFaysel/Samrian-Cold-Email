@@ -43,7 +43,8 @@ describe("LoadingState", () => {
   test("announces loading to assistive tech", () => {
     render(<LoadingState label="Loading campaigns" />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("Loading campaigns");
+    // Astryx mounts its own live region, so find ours by its text.
+    expect(screen.getByText("Loading campaigns").closest('[role="status"]')).toBeInTheDocument();
   });
 });
 

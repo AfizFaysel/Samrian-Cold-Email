@@ -177,9 +177,7 @@ export function Landing({ signedIn = false }: { signedIn?: boolean }) {
             <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map(({ icon: Icon, title, body }) => (
                 <div key={title} className="flex flex-col gap-3 bg-card p-6">
-                  <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-                    <Icon className="size-4" />
-                  </span>
+                  <Icon className="size-5 text-secondary" />
                   <h3 className="text-base font-semibold">{title}</h3>
                   <p className="text-base text-secondary">{body}</p>
                 </div>
@@ -191,9 +189,7 @@ export function Landing({ signedIn = false }: { signedIn?: boolean }) {
         <section id="self-host" className="border-t">
           <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-4 py-20 sm:px-6 lg:grid-cols-2">
             <div className="flex flex-col gap-4">
-              <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-                <Server className="size-4" />
-              </span>
+              <Server className="size-5 text-secondary" />
               <h2 className="text-3xl font-semibold tracking-tight">Up in one command</h2>
               <p className="text-lg text-secondary">
                 The Docker quickstart starts the app, PostgreSQL, Redis and the delivery worker.

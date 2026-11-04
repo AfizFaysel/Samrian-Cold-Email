@@ -87,15 +87,12 @@ describe("members and roles", () => {
       .mockResolvedValueOnce(Response.json({ invited: true }));
 
     render(<MembersRoles />);
-    await waitFor(() =>
-      expect(screen.getByLabelText("Invite role").querySelectorAll("option")).toHaveLength(2)
-    );
+    await screen.findByRole("button", { name: "Edit Campaign operator" });
     fireEvent.change(screen.getByLabelText("Invite email"), {
       target: { value: "new@example.com" },
     });
-    fireEvent.change(screen.getByLabelText("Invite role"), {
-      target: { value: "campaign-operator" },
-    });
+    fireEvent.click(screen.getByRole("combobox", { name: "Invite role" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Campaign operator" }));
     fireEvent.click(screen.getByRole("button", { name: "Send invite" }));
 
     await waitFor(() =>

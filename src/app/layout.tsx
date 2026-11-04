@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Providers } from "@/components/providers";
 import { themeScript } from "@/components/theme";
-import { Toaster } from "@/components/toaster";
 import "./globals.css";
 
 const figtree = localFont({
@@ -38,8 +38,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="antialiased">
-        {children}
-        <Toaster />
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

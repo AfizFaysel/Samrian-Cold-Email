@@ -105,9 +105,7 @@ export function CsvUpload({ onNext, onBack, onCancel }: CsvUploadProps) {
                 : "border-border-strong bg-muted/50 hover:border-accent hover:bg-accent-muted/60"
             }`}
           >
-            <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-md border bg-card">
-              <Upload className="size-4" />
-            </div>
+            <Upload className="mx-auto mb-3 size-6 text-secondary" />
             <h3 className="mb-1 text-base font-semibold">Drop your CSV here</h3>
             <p className="mb-3 text-base text-secondary">or click to choose a file</p>
             <p className="text-sm text-secondary">Supports .csv files up to 10MB</p>

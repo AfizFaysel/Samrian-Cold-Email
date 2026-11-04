@@ -12,8 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/status-badge";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { Icon } from "@astryxdesign/core/Icon";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { Text } from "@astryxdesign/core/Text";
 
 export type MailboxListItem = {
   _id: string;
@@ -36,6 +38,11 @@ export type MailboxListItem = {
   rampReason?: string;
   effectiveDailyLimit: number;
   availableToday: number;
+};
+
+const readable = (value: string) => {
+  const words = value.replace(/[_-]+/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -81,24 +88,22 @@ export const columns: ColumnDef<MailboxListItem>[] = [
     header: () => <div className="text-sm font-medium text-secondary">Ramp</div>,
     cell: ({ row }) => {
       const mailbox = row.original;
-      if (!mailbox.rampEnabled) return <span className="text-sm text-secondary">Off</span>;
+      if (!mailbox.rampEnabled) return <Text type="supporting">Off</Text>;
+      const current = mailbox.rampCurrentLimit ?? 5;
       return (
-        <div className="min-w-[120px] text-sm">
-          <p className="font-medium capitalize text-primary">
-            {mailbox.rampStatus.replace("-", " ")}
-          </p>
-          <p className="mt-1 text-secondary">
-            {mailbox.rampCurrentLimit ?? 5} / {mailbox.rampTargetLimit} daily
-          </p>
-          <Progress
-            value={((mailbox.rampCurrentLimit ?? 5) / mailbox.rampTargetLimit) * 100}
-            className="mt-1.5 h-1.5"
+        <div className="flex w-36 flex-col gap-1">
+          <ProgressBar
+            label={readable(mailbox.rampStatus)}
+            value={current}
+            max={mailbox.rampTargetLimit}
+            hasValueLabel
+            formatValueLabel={(value, max) => `${value} / ${max} a day`}
           />
-          {mailbox.rampReason ? <p className="mt-1 text-secondary">{mailbox.rampReason}</p> : null}
+          {mailbox.rampReason ? <Text type="supporting">{mailbox.rampReason}</Text> : null}
           {mailbox.rampNextCheckAt ? (
-            <p className="mt-1 text-secondary">
-              Next {new Date(mailbox.rampNextCheckAt).toLocaleDateString()}
-            </p>
+            <Text type="supporting">
+              Next step {new Date(mailbox.rampNextCheckAt).toLocaleDateString()}
+            </Text>
           ) : null}
         </div>
       );
@@ -110,15 +115,17 @@ export const columns: ColumnDef<MailboxListItem>[] = [
     cell: ({ row }) => {
       const limit = row.original.effectiveDailyLimit;
       const sent = row.original.emailsSentToday;
-      const percentage = limit > 0 ? (sent / limit) * 100 : 0;
-
       return (
-        <div className="w-[120px] flex flex-col gap-1.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-primary">{sent}</span>
-            <span className="text-secondary">/ {limit}</span>
-          </div>
-          <Progress value={percentage} className="h-1.5" />
+        <div className="w-28">
+          <ProgressBar
+            label="Sent today"
+            isLabelHidden
+            value={Math.min(sent, limit)}
+            max={limit}
+            hasValueLabel
+            formatValueLabel={() => `${sent} / ${limit}`}
+            variant={sent >= limit ? "warning" : "accent"}
+          />
         </div>
       );
     },
@@ -132,18 +139,20 @@ export const columns: ColumnDef<MailboxListItem>[] = [
         mailbox.lastConnectionError ||
         mailbox.lastTokenRefreshError ||
         (mailbox.providerLimitCode ? `Provider limit: ${mailbox.providerLimitCode}` : undefined);
+      if (error) {
+        return (
+          <div className="flex max-w-48 items-start gap-1.5">
+            <Icon icon="error" color="error" size="sm" label="Problem" />
+            <Text type="supporting">{error}</Text>
+          </div>
+        );
+      }
       return (
-        <div className="max-w-[220px] text-sm">
-          {error ? (
-            <span className="text-error">{error}</span>
-          ) : mailbox.lastConnectionTestAt ? (
-            <span className="text-secondary">
-              Checked {new Date(mailbox.lastConnectionTestAt).toLocaleDateString()}
-            </span>
-          ) : (
-            <span className="text-secondary">Not checked</span>
-          )}
-        </div>
+        <Text type="supporting">
+          {mailbox.lastConnectionTestAt
+            ? `Checked ${new Date(mailbox.lastConnectionTestAt).toLocaleDateString()}`
+            : "Not checked"}
+        </Text>
       );
     },
   },

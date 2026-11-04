@@ -1,92 +1,68 @@
+"use client";
+
 import * as React from "react";
-import {
-  AlertCircle,
-  CheckCircle2,
-  CircleDashed,
-  Clock,
-  Info,
-  PauseCircle,
-  PlayCircle,
-  Send,
-  XCircle,
-} from "lucide-react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Icon } from "@astryxdesign/core/Icon";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { cn } from "@/lib/utils";
 
 export type StatusTone = "success" | "warning" | "error" | "info" | "neutral";
 
-type StatusConfig = {
-  label: string;
-  tone: StatusTone;
-  icon: React.ComponentType<{ className?: string }>;
-};
-
-// Every tone has its own glyph, so status still reads for colour-blind people.
-const STATUSES: Record<string, StatusConfig> = {
+const STATUSES: Record<string, { label: string; tone: StatusTone }> = {
   // Campaigns
-  draft: { label: "Draft", tone: "neutral", icon: CircleDashed },
-  scheduled: { label: "Scheduled", tone: "warning", icon: Clock },
-  running: { label: "Running", tone: "info", icon: PlayCircle },
-  paused: { label: "Paused", tone: "warning", icon: PauseCircle },
-  completed: { label: "Completed", tone: "success", icon: CheckCircle2 },
-  error: { label: "Error", tone: "error", icon: AlertCircle },
+  draft: { label: "Draft", tone: "neutral" },
+  scheduled: { label: "Scheduled", tone: "info" },
+  running: { label: "Running", tone: "info" },
+  paused: { label: "Paused", tone: "warning" },
+  completed: { label: "Completed", tone: "success" },
+  error: { label: "Error", tone: "error" },
 
   // Contacts and assignments
-  pending: { label: "Pending", tone: "neutral", icon: CircleDashed },
-  sent: { label: "Sent", tone: "info", icon: Send },
-  replied: { label: "Replied", tone: "success", icon: CheckCircle2 },
-  bounced: { label: "Bounced", tone: "error", icon: XCircle },
-  unsubscribed: { label: "Unsubscribed", tone: "neutral", icon: AlertCircle },
+  pending: { label: "Pending", tone: "neutral" },
+  sent: { label: "Sent", tone: "info" },
+  replied: { label: "Replied", tone: "success" },
+  bounced: { label: "Bounced", tone: "error" },
+  unsubscribed: { label: "Unsubscribed", tone: "neutral" },
 
   // Mailboxes (and active campaigns)
-  active: { label: "Active", tone: "success", icon: CheckCircle2 },
-  disconnected: { label: "Disconnected", tone: "error", icon: AlertCircle },
+  active: { label: "Active", tone: "success" },
+  disconnected: { label: "Disconnected", tone: "error" },
 };
 
-const TONE_CLASSES: Record<StatusTone, string> = {
-  success: "bg-success-muted text-success",
-  warning: "bg-warning-muted text-warning",
-  error: "bg-error-muted text-error",
-  info: "bg-accent-muted text-accent",
-  neutral: "bg-muted text-secondary",
-};
-
-const TONE_ICONS: Record<StatusTone, StatusConfig["icon"]> = {
-  success: CheckCircle2,
-  warning: AlertCircle,
-  error: XCircle,
-  info: Info,
-  neutral: CircleDashed,
-};
+const DOT_VARIANT = {
+  success: "success",
+  info: "accent",
+  neutral: "neutral",
+} as const;
 
 function readable(status: string) {
   const words = status.replace(/[_-]+/g, " ").trim().toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** A tone as a pill: icon plus a word. Colour never stands alone. */
+/**
+ * Astryx status rules: states that need action (warning, error) get a solid Badge with a
+ * status icon; everything else is a StatusDot plus the word, so healthy rows stay quiet.
+ */
 export function StatusPill({
   tone,
   label,
-  icon,
-  showIcon = true,
   className,
 }: {
   tone: StatusTone;
   label: string;
-  icon?: StatusConfig["icon"];
-  showIcon?: boolean;
   className?: string;
 }) {
-  const Icon = icon ?? TONE_ICONS[tone];
+  if (tone === "error" || tone === "warning") {
+    return (
+      <span className={cn("inline-flex", className)}>
+        <Badge variant={tone} label={label} icon={<Icon icon={tone} size="xsm" />} />
+      </span>
+    );
+  }
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full px-2 text-sm font-medium whitespace-nowrap",
-        TONE_CLASSES[tone],
-        className
-      )}
-    >
-      {showIcon && <Icon className="size-3.5" aria-hidden />}
+    <span className={cn("inline-flex items-center gap-2 text-base whitespace-nowrap", className)}>
+      <StatusDot variant={DOT_VARIANT[tone]} label={label} />
       {label}
     </span>
   );
@@ -95,23 +71,12 @@ export function StatusPill({
 interface StatusBadgeProps {
   status: string;
   className?: string;
-  showIcon?: boolean;
 }
 
-export function StatusBadge({ status, className, showIcon = true }: StatusBadgeProps) {
+export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config = STATUSES[status.toLowerCase()] ?? {
     label: readable(status),
     tone: "neutral" as const,
-    icon: CircleDashed,
   };
-
-  return (
-    <StatusPill
-      tone={config.tone}
-      label={config.label}
-      icon={config.icon}
-      showIcon={showIcon}
-      className={className}
-    />
-  );
+  return <StatusPill tone={config.tone} label={config.label} className={className} />;
 }
