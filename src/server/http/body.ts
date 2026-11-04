@@ -32,7 +32,13 @@ export async function boundRequest(
   const body = await readBody(request.body, maxBytes, mode);
   const headers = new Headers(request.headers);
   headers.set("content-length", String(body.byteLength));
-  return new Request(request, { body, headers });
+  // Next.js route requests are Proxies, so `new Request(request)` cannot read their private state.
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    body,
+    signal: request.signal,
+  });
 }
 
 export async function readJsonResponse<T>(response: Response, maxBytes: number): Promise<T> {

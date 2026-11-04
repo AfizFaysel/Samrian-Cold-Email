@@ -1,8 +1,31 @@
+import { NextRequest } from "next/server";
 import { describe, expect, test } from "vitest";
 
 import { boundRequest, readJsonResponse } from "../../../src/server/http/body";
 
 describe("bounded request bodies", () => {
+  test("rebuilds a Next.js route request with its body", async () => {
+    const original = new NextRequest("https://app.example.com/api/mailboxes/m1/check", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: "session=s1" },
+      body: JSON.stringify({ name: "Campaign" }),
+    });
+    // Next.js hands route handlers a Proxy around the request, which hides its private fields.
+    const request = new Proxy(original, {
+      get(target, property) {
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+    const bounded = await boundRequest(request, 1024);
+
+    expect(bounded.method).toBe("POST");
+    expect(bounded.url).toBe("https://app.example.com/api/mailboxes/m1/check");
+    expect(bounded.headers.get("cookie")).toBe("session=s1");
+    await expect(bounded.json()).resolves.toEqual({ name: "Campaign" });
+  });
+
   test("preserves a JSON body within the byte limit", async () => {
     const request = new Request("https://app.example.com/api", {
       method: "POST",
