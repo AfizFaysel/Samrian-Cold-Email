@@ -1,7 +1,13 @@
 import * as React from "react";
-import { Mail, AlertCircle } from "lucide-react";
-import type { CampaignDraft } from "../page";
+import Link from "next/link";
+import { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
+import { Mailbox } from "lucide-react";
+import { EmptyState, RowsSkeleton } from "@/components/page-state";
+import { StatusBadge } from "@/components/status-badge";
+import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
+import type { CampaignDraft } from "../page";
+import { StepIntro } from "./step-intro";
 
 type MailboxItem = {
   _id: string;
@@ -24,82 +30,44 @@ type MailboxesStepProps = {
 export function MailboxesStep({ draft, setDraft }: MailboxesStepProps) {
   const { data } = useApi<{ mailboxes: MailboxItem[] }>("/api/mailboxes");
   const mailboxes = data?.mailboxes;
-  const selected = new Set(draft.mailboxIds ?? []);
-
-  const toggleMailbox = (id: string) => {
-    setDraft((current) => {
-      const next = new Set(current.mailboxIds ?? []);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return { ...current, mailboxIds: Array.from(next) };
-    });
-  };
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-primary">Select Mailboxes</h2>
-        <p className="mt-2 text-base text-secondary">
-          Choose active sending accounts for this campaign.
-        </p>
-      </div>
-
+    <div className="flex max-w-2xl flex-col gap-6">
+      <StepIntro
+        title="Send from"
+        description="Sends rotate across these mailboxes and stay inside each one's daily limit."
+      />
       {!mailboxes ? (
-        <div className="rounded-lg border border-border bg-card p-6 text-base text-secondary">
-          Loading mailboxes...
-        </div>
+        <RowsSkeleton rows={3} />
       ) : mailboxes.length === 0 ? (
-        <div className="rounded-lg border border-warning/30 bg-warning-muted p-6">
-          <div className="flex gap-3">
-            <AlertCircle className="h-5 w-5 text-warning" />
-            <p className="text-base text-warning">
-              Connect an email account before launching a campaign.
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          icon={Mailbox}
+          title="No mailboxes connected"
+          description="Connect a mailbox before you launch this campaign."
+          action={
+            <Link href="/dashboard/mailboxes" className={buttonVariants({ variant: "outline" })}>
+              Connect a mailbox
+            </Link>
+          }
+        />
       ) : (
-        <div className="space-y-3">
-          {mailboxes.map((mailbox) => {
-            const active = mailbox.status === "active";
-            const checked = selected.has(mailbox._id);
-            return (
-              <button
-                key={mailbox._id}
-                type="button"
-                disabled={!active}
-                onClick={() => toggleMailbox(mailbox._id)}
-                className={`w-full rounded-md border-2 p-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
-                  checked
-                    ? "border-accent bg-accent-muted"
-                    : "border-border bg-card hover:border-accent/30"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                      checked ? "bg-accent-bg text-on-accent" : "bg-muted text-secondary"
-                    }`}
-                  >
-                    <Mail className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="font-semibold text-primary">{mailbox.name}</h3>
-                      <span className="text-sm font-medium text-secondary">{mailbox.status}</span>
-                    </div>
-                    <p className="mt-1 text-base text-secondary">
-                      {mailbox.userEmail ?? mailbox.username ?? "No sender email"}
-                    </p>
-                    <p className="mt-1 text-sm text-secondary">
-                      {mailbox.availableToday} available today · {mailbox.emailsSentToday}/
-                      {mailbox.effectiveDailyLimit} used
-                    </p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <CheckboxList
+          label="Mailboxes"
+          value={draft.mailboxIds ?? []}
+          onChange={(mailboxIds) => setDraft((current) => ({ ...current, mailboxIds }))}
+          hasDividers
+        >
+          {mailboxes.map((mailbox) => (
+            <CheckboxListItem
+              key={mailbox._id}
+              value={mailbox._id}
+              isDisabled={mailbox.status !== "active"}
+              label={mailbox.name}
+              description={`${mailbox.userEmail ?? mailbox.username ?? "No sender email"} · ${mailbox.availableToday} of ${mailbox.effectiveDailyLimit} left today`}
+              endContent={<StatusBadge status={mailbox.status} />}
+            />
+          ))}
+        </CheckboxList>
       )}
     </div>
   );

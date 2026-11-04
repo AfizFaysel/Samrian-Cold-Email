@@ -1,6 +1,11 @@
 import * as React from "react";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
+import { TimeInput } from "@astryxdesign/core/TimeInput";
+import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
+import { createISOTimeString } from "@astryxdesign/core/utils";
 import type { CampaignDraft } from "../page";
-import { Clock, Calendar } from "lucide-react";
+import { StepIntro } from "./step-intro";
 
 interface ScheduleStepProps {
   draft: CampaignDraft;
@@ -30,150 +35,53 @@ const TIMEZONES = [
 ];
 
 export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {
-  const toggleDay = (day: string) => {
-    setDraft((prev) => {
-      const daysAllowed = prev.schedule.daysAllowed.includes(day)
-        ? prev.schedule.daysAllowed.filter((d) => d !== day)
-        : [...prev.schedule.daysAllowed, day];
-
-      return {
-        ...prev,
-        schedule: { ...prev.schedule, daysAllowed },
-      };
-    });
-  };
+  const setSchedule = (patch: Partial<CampaignDraft["schedule"]>) =>
+    setDraft((prev) => ({ ...prev, schedule: { ...prev.schedule, ...patch } }));
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-primary">Schedule Configuration</h2>
-        <p className="mt-2 text-base text-secondary">
-          Define when emails should be sent to respect your contacts' time zones and working hours.
-        </p>
+    <div className="flex max-w-2xl flex-col gap-6">
+      <StepIntro
+        title="When to send"
+        description="Emails go out on these days, inside this window, in each contact's time zone."
+      />
+
+      <Selector
+        label="Default time zone"
+        description="For contacts without a time zone of their own."
+        width="100%"
+        value={draft.schedule.defaultTimezone}
+        onChange={(defaultTimezone) => setSchedule({ defaultTimezone })}
+        options={TIMEZONES}
+      />
+
+      <div className="flex flex-col gap-2">
+        <span className="text-base font-medium">Days</span>
+        <ToggleButtonGroup
+          label="Days"
+          type="multiple"
+          value={draft.schedule.daysAllowed}
+          onChange={(value) => setSchedule({ daysAllowed: (value as string[]) ?? [] })}
+        >
+          {DAYS.map((day) => (
+            <ToggleButton key={day.value} value={day.value} label={day.label} />
+          ))}
+        </ToggleButtonGroup>
+        <Text type="supporting">Weekdays work best for B2B outreach.</Text>
       </div>
 
-      <div className="space-y-8">
-        {/* Default Timezone */}
-        <div>
-          <label className="mb-2 flex items-center gap-2 text-base font-medium text-primary">
-            <Clock className="h-4 w-4" />
-            Default Timezone <span className="text-error">*</span>
-          </label>
-          <select
-            value={draft.schedule.defaultTimezone}
-            onChange={(e) =>
-              setDraft((prev) => ({
-                ...prev,
-                schedule: { ...prev.schedule, defaultTimezone: e.target.value },
-              }))
-            }
-            className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
-          >
-            {TIMEZONES.map((tz) => (
-              <option key={tz.value} value={tz.value}>
-                {tz.label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-sm text-secondary">
-            Used for contacts without a specific timezone set
-          </p>
-        </div>
-
-        {/* Days Allowed */}
-        <div>
-          <label className="mb-3 flex items-center gap-2 text-base font-medium text-primary">
-            <Calendar className="h-4 w-4" />
-            Allowed Days <span className="text-error">*</span>
-          </label>
-          <div className="grid grid-cols-7 gap-2">
-            {DAYS.map((day) => {
-              const isSelected = draft.schedule.daysAllowed.includes(day.value);
-              return (
-                <button
-                  key={day.value}
-                  onClick={() => toggleDay(day.value)}
-                  className={`rounded-md border-2 py-3 text-base font-medium transition-all ${
-                    isSelected
-                      ? "border-accent bg-accent-bg text-on-accent"
-                      : "border-border bg-card text-secondary hover:border-accent/30"
-                  }`}
-                >
-                  {day.label}
-                </button>
-              );
-            })}
-          </div>
-          <p className="mt-2 text-sm text-secondary">Emails will only be sent on selected days</p>
-        </div>
-
-        {/* Send Window */}
-        <div>
-          <label className="mb-3 text-base font-medium text-primary">
-            Send Window <span className="text-error">*</span>
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-secondary">Start Time</label>
-              <input
-                type="time"
-                value={draft.schedule.startTime}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    schedule: { ...prev.schedule, startTime: e.target.value },
-                  }))
-                }
-                className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-secondary">End Time</label>
-              <input
-                type="time"
-                value={draft.schedule.endTime}
-                onChange={(e) =>
-                  setDraft((prev) => ({
-                    ...prev,
-                    schedule: { ...prev.schedule, endTime: e.target.value },
-                  }))
-                }
-                className="w-full rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
-              />
-            </div>
-          </div>
-          <p className="mt-2 text-sm text-secondary">
-            Emails will only be sent during this time window (in contact's timezone)
-          </p>
-        </div>
-
-        {/* Info Box */}
-        <div className="rounded-lg border border-success/15 bg-success-muted/30 p-6">
-          <div className="flex gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success-muted">
-              <svg
-                className="h-5 w-5 text-success"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="mb-1 text-base font-medium text-success">Best Practice</h3>
-              <p className="text-base leading-relaxed text-success/70">
-                For B2B outreach, we recommend Monday-Friday, 9 AM - 5 PM in the contact's local
-                timezone. This maximizes open rates and response rates.
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TimeInput
+          label="Start"
+          width="100%"
+          value={createISOTimeString(draft.schedule.startTime) ?? undefined}
+          onChange={(startTime) => startTime && setSchedule({ startTime })}
+        />
+        <TimeInput
+          label="End"
+          width="100%"
+          value={createISOTimeString(draft.schedule.endTime) ?? undefined}
+          onChange={(endTime) => endTime && setSchedule({ endTime })}
+        />
       </div>
     </div>
   );

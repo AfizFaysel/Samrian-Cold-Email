@@ -1,7 +1,18 @@
 import * as React from "react";
 import type { CampaignDraft } from "../page";
-import { Plus, Trash2, Mail, Eye, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
+import { Mail, Plus, Trash2 } from "lucide-react";
+import { Panel } from "@/components/page-header";
+import { EmptyState } from "@/components/page-state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
+import { cn } from "@/lib/utils";
+import { StepIntro } from "./step-intro";
 
 interface EmailSequenceStepProps {
   draft: CampaignDraft;
@@ -34,10 +45,7 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
   };
 
   const removeStep = (index: number) => {
-    if (draft.steps.length === 1) {
-      alert("Campaign must have at least one step");
-      return;
-    }
+    if (draft.steps.length === 1) return;
     setDraft((prev) => ({
       ...prev,
       steps: prev.steps.filter((_, i) => i !== index),
@@ -70,7 +78,7 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
 
   const renderPreview = () => {
     if (!activeStep || previewContacts.length === 0) {
-      return <p className="text-base text-secondary">No preview available</p>;
+      return <Text type="supporting">Add a subject or body to see a preview.</Text>;
     }
 
     const contact = previewContacts[previewContactIndex];
@@ -89,13 +97,12 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
     body = body.replace(/{([^}]+)}/g, (_, options) => options.split("|")[0]);
 
     return (
-      <div className="rounded-md border border-border bg-card p-4">
-        <div className="mb-4 border-b border-border pb-4">
-          <p className="text-sm text-secondary">From: you@company.com</p>
-          <p className="text-sm text-secondary">To: {contact.email}</p>
-          <p className="mt-2 font-semibold text-primary">{subject}</p>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-0.5 border-b pb-3">
+          <Text type="supporting">To {contact.email}</Text>
+          <span className="font-semibold">{subject || "No subject"}</span>
         </div>
-        <div className="whitespace-pre-wrap text-base text-primary">{body}</div>
+        <p className="text-base whitespace-pre-wrap">{body}</p>
       </div>
     );
   };
@@ -103,181 +110,134 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
   const subjectValid = activeStep ? validateSpintax(activeStep.subject) : true;
   const bodyValid = activeStep ? validateSpintax(activeStep.body) : true;
 
-  return (
-    <div className="grid grid-cols-12 gap-6">
-      {/* Left: Timeline */}
-      <div className="col-span-3">
-        <h3 className="mb-4 text-base font-medium text-primary">Sequence Timeline</h3>
-        <div className="relative space-y-4">
-          {/* Vertical line */}
-          <div className="absolute left-4 top-8 bottom-8 w-0.5 bg-muted" />
+  const spintaxOk = subjectValid && bodyValid;
 
+  return (
+    <div className="flex flex-col gap-6">
+      <StepIntro
+        title="Write the sequence"
+        description="Each step goes out after the one before. Replies stop the sequence for that contact."
+      />
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)_300px]">
+        <nav aria-label="Sequence steps" className="flex flex-col gap-1">
           {draft.steps.map((step, index) => (
             <button
               key={index}
+              type="button"
               onClick={() => setActiveStepIndex(index)}
-              className={`relative w-full rounded-md border-2 p-4 text-left transition-all ${
-                activeStepIndex === index
-                  ? "border-accent bg-accent-muted ring-2 ring-accent/15"
-                  : "border-border bg-card hover:border-accent/30"
-              }`}
+              aria-current={activeStepIndex === index ? "step" : undefined}
+              className={cn(
+                "flex items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-muted",
+                activeStepIndex === index && "bg-muted"
+              )}
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                    activeStepIndex === index
-                      ? "bg-accent-bg text-on-accent"
-                      : "bg-muted text-secondary"
-                  }`}
-                >
-                  <Mail className="h-4 w-4" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-primary">Step {index + 1}</p>
-                  <p className="mt-0.5 truncate text-xs text-secondary">
-                    {step.subject || "No subject"}
-                  </p>
-                </div>
-              </div>
+              <Mail className="mt-0.5 size-4 shrink-0 text-secondary" />
+              <span className="flex min-w-0 flex-col">
+                <span className="text-base font-medium">Step {index + 1}</span>
+                <span className="truncate text-sm text-secondary">
+                  {step.subject || "No subject"}
+                </span>
+              </span>
             </button>
           ))}
+          <Button variant="ghost" className="justify-start" onClick={addStep}>
+            <Plus data-icon="inline-start" />
+            Add step
+          </Button>
+        </nav>
 
-          {/* Add Step Button */}
-          <button
-            onClick={addStep}
-            className="w-full rounded-md border-2 border-dashed border-border bg-card p-4 text-base font-medium text-secondary transition-colors hover:border-accent/30 hover:text-accent"
-          >
-            <Plus className="mx-auto h-5 w-5" />
-            Add Step
-          </button>
-        </div>
-      </div>
-
-      {/* Center: Editor */}
-      <div className="col-span-6">
         {activeStep ? (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-medium text-primary">
-                Edit Step {activeStepIndex + 1}
-              </h3>
+          <div className="flex min-w-0 flex-col gap-5">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold">Step {activeStepIndex + 1}</h3>
               {draft.steps.length > 1 && (
-                <button
-                  onClick={() => removeStep(activeStepIndex)}
-                  className="flex items-center gap-2 rounded-md border border-error/30 bg-card px-3 py-1.5 text-sm font-semibold text-error transition-colors hover:bg-error-muted"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete Step
-                </button>
+                <Button variant="destructive" size="sm" onClick={() => removeStep(activeStepIndex)}>
+                  <Trash2 data-icon="inline-start" />
+                  Delete step
+                </Button>
               )}
             </div>
 
-            {/* Variable Picker */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-secondary">
-                Insert Variable:
-              </label>
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2">
+              <span className="text-base font-medium">Merge fields</span>
+              <div className="flex flex-wrap gap-1.5">
                 {VARIABLES.map((v) => (
-                  <button
+                  <Button
                     key={v.key}
+                    variant="outline"
+                    size="xs"
+                    className="font-mono"
                     onClick={() => insertVariable(v.key)}
-                    className="rounded-md border border-border bg-muted px-3 py-1.5 font-mono text-sm text-primary transition-colors hover:border-accent/30 hover:bg-accent-muted"
                   >
                     {`{{${v.key}}}`}
-                  </button>
+                  </Button>
                 ))}
               </div>
-              <p className="mt-2 text-sm text-secondary">
-                Use spintax for variations: {"{option1|option2|option3}"}
-              </p>
+              <Text type="supporting">
+                Vary wording with spintax: {"{Hi|Hello|Hey}"}. Fields are added to the end of the
+                body.
+              </Text>
             </div>
 
-            {/* Subject */}
-            <div>
-              <label className="mb-2 block text-base font-medium text-primary">
-                Subject Line <span className="text-error">*</span>
-              </label>
-              <input
-                type="text"
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="step-subject">Subject</Label>
+              <Input
+                id="step-subject"
                 value={activeStep.subject}
                 onChange={(e) => updateStep(activeStepIndex, "subject", e.target.value)}
-                placeholder="e.g., Quick question about {{company}}"
-                className="w-full font-mono rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
+                placeholder="Quick question about {{company}}"
+                aria-invalid={!subjectValid || undefined}
               />
-              {!subjectValid && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-warning">
-                  <AlertCircle className="h-4 w-4" />
-                  Unbalanced braces in spintax
-                </div>
-              )}
             </div>
 
-            {/* Body */}
-            <div>
-              <label className="mb-2 block text-base font-medium text-primary">
-                Email Body <span className="text-error">*</span>
-              </label>
-              <textarea
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="step-body">Body</Label>
+              <Textarea
+                id="step-body"
                 value={activeStep.body}
                 onChange={(e) => updateStep(activeStepIndex, "body", e.target.value)}
-                placeholder="Hi {{firstName}},&#10;&#10;I noticed {{company}} is..."
+                placeholder={"Hi {{firstName}},\n\nI noticed {{company}} is…"}
                 rows={12}
-                className="w-full font-mono rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 px-3 py-2"
+                className="min-h-56"
+                aria-invalid={!bodyValid || undefined}
               />
-              {!bodyValid && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-warning">
-                  <AlertCircle className="h-4 w-4" />
-                  Unbalanced braces in spintax
-                </div>
-              )}
-              {subjectValid && bodyValid && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-success">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Syntax valid
-                </div>
-              )}
+              <span className="flex items-center gap-1.5">
+                <Icon
+                  icon={spintaxOk ? "success" : "warning"}
+                  color={spintaxOk ? "success" : "warning"}
+                  size="sm"
+                />
+                <Text type="supporting">
+                  {spintaxOk ? "Spintax is balanced" : "Spintax has an unclosed { or }"}
+                </Text>
+              </span>
             </div>
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted p-12">
-            <div className="text-center">
-              <Mail className="mx-auto mb-4 h-12 w-12 text-secondary/70" />
-              <p className="text-base text-secondary">No steps yet. Click "Add Step" to begin.</p>
-            </div>
-          </div>
+          <EmptyState
+            icon={Mail}
+            title="No steps yet"
+            description="Add the first email of the sequence."
+          />
         )}
-      </div>
 
-      {/* Right: Preview */}
-      <div className="col-span-3">
-        <div className="sticky top-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-base font-medium text-primary">
-              <Eye className="h-4 w-4" />
-              Preview
-            </h3>
+        <Panel title="Preview" className="self-start lg:sticky lg:top-6">
+          <div className="flex flex-col gap-4 p-4">
+            {previewContacts.length > 0 && (
+              <Selector
+                label="Preview as"
+                width="100%"
+                value={String(previewContactIndex)}
+                onChange={(value) => setPreviewContactIndex(Number(value))}
+                options={previewContacts.map((contact: any, index: number) => ({
+                  value: String(index),
+                  label: contact.customVars?.name || contact.email,
+                }))}
+              />
+            )}
+            {renderPreview()}
           </div>
-
-          {previewContacts.length > 0 && (
-            <div className="mb-4">
-              <label className="mb-2 block text-sm font-medium text-secondary">Preview as:</label>
-              <select
-                value={previewContactIndex}
-                onChange={(e) => setPreviewContactIndex(Number(e.target.value))}
-                className="w-full text-sm rounded-md border border-border-strong bg-card text-base transition-colors outline-none placeholder:text-secondary focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/50 disabled:opacity-50 h-9 pl-3 pr-3"
-              >
-                {previewContacts.map((contact: any, index: any) => (
-                  <option key={contact._id} value={index}>
-                    {contact.customVars?.name || contact.email}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="rounded-lg border border-border bg-muted p-4">{renderPreview()}</div>
-        </div>
+        </Panel>
       </div>
     </div>
   );

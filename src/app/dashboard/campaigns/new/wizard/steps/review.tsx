@@ -1,7 +1,12 @@
 import * as React from "react";
 import type { CampaignDraft } from "../page";
-import { CheckCircle2, AlertCircle, Mail, Clock, Users, Calendar, Send } from "lucide-react";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Icon } from "@astryxdesign/core/Icon";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { Text } from "@astryxdesign/core/Text";
+import { Panel } from "@/components/page-header";
 import { useApi } from "@/hooks/use-api";
+import { StepIntro } from "./step-intro";
 
 interface ReviewStepProps {
   draft: CampaignDraft;
@@ -15,7 +20,7 @@ type MailboxCapacity = {
 
 export function ReviewStep({ draft }: ReviewStepProps) {
   const { data: groupData } = useApi<{ group: any | null; count: number }>(
-    draft.targetGroupId ? `/api/groups/${draft.targetGroupId}` : "/api/groups/__none__"
+    draft.targetGroupId ? `/api/groups/${draft.targetGroupId}` : null
   );
   const { data: mailboxData } = useApi<{ mailboxes: MailboxCapacity[] }>("/api/mailboxes");
   const contactGroup = draft.targetGroupId ? groupData?.group : null;
@@ -24,23 +29,23 @@ export function ReviewStep({ draft }: ReviewStepProps) {
   // Validation checks
   const validations = [
     {
-      label: "Campaign name set",
+      label: "Campaign has a name",
       valid: draft.name.trim().length > 0,
     },
     {
-      label: "Schedule configured",
+      label: "At least one sending day",
       valid: draft.schedule.daysAllowed.length > 0,
     },
     {
-      label: "At least one email step",
+      label: "At least one email",
       valid: draft.steps.length > 0,
     },
     {
-      label: "Contacts assigned",
+      label: "Recipients chosen",
       valid: !!draft.targetGroupId || (draft.targetContactIds && draft.targetContactIds.length > 0),
     },
     {
-      label: "At least one mailbox selected",
+      label: "At least one mailbox",
       valid: (draft.mailboxIds?.length ?? 0) > 0,
     },
   ];
@@ -56,184 +61,89 @@ export function ReviewStep({ draft }: ReviewStepProps) {
   const capacityKnown = mailboxData !== undefined;
   const capacityShortfall = capacityKnown && targetCount > availableToday;
 
+  const days = draft.schedule.daysAllowed.map((d) => d.charAt(0).toUpperCase() + d.slice(1, 3));
+
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-primary">Review & Launch</h2>
-        <p className="mt-2 text-base text-secondary">
-          Review your campaign settings before launching.
-        </p>
-      </div>
+    <div className="flex max-w-2xl flex-col gap-6">
+      <StepIntro
+        title="Review and launch"
+        description="Check everything once. You can pause a campaign at any time."
+      />
 
-      <div className="space-y-6">
-        {/* Validation Status */}
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-base font-medium text-primary">Validation Checks</h3>
-          <div className="space-y-3">
-            {validations.map((validation, index) => (
-              <div key={index} className="flex items-center gap-3">
-                {validation.valid ? (
-                  <CheckCircle2 className="h-5 w-5 text-success" />
-                ) : (
-                  <AlertCircle className="h-5 w-5 text-warning" />
-                )}
-                <span
-                  className={`text-base ${validation.valid ? "text-secondary" : "text-warning font-medium"}`}
-                >
-                  {validation.label}
-                </span>
-              </div>
+      {allValid ? (
+        <Banner
+          status="success"
+          title="Ready to launch"
+          description="Emails start on the schedule below."
+        />
+      ) : (
+        <Banner
+          status="warning"
+          title="A few things are missing"
+          description="Finish the steps marked below to launch."
+        />
+      )}
+
+      {capacityShortfall && (
+        <Banner
+          status="warning"
+          title="Not everyone can be emailed today"
+          description={`Selected mailboxes have ${availableToday} sends available today for ${targetCount} contacts. The rest stay queued for later send windows.`}
+        />
+      )}
+
+      <Panel title="Checklist">
+        <ul className="flex flex-col gap-2 p-4">
+          {validations.map((validation) => (
+            <li key={validation.label} className="flex items-center gap-2">
+              <Icon
+                icon={validation.valid ? "success" : "warning"}
+                color={validation.valid ? "success" : "warning"}
+                size="sm"
+              />
+              <span className="text-base">{validation.label}</span>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+
+      <Panel title="Summary">
+        <div className="p-4">
+          <MetadataList>
+            <MetadataListItem label="Name">{draft.name || "—"}</MetadataListItem>
+            <MetadataListItem label="Days">{days.length ? days.join(", ") : "—"}</MetadataListItem>
+            <MetadataListItem label="Window">
+              {draft.schedule.startTime}–{draft.schedule.endTime} · {draft.schedule.defaultTimezone}
+            </MetadataListItem>
+            <MetadataListItem label="Emails">
+              {draft.steps.length} step{draft.steps.length !== 1 ? "s" : ""}
+            </MetadataListItem>
+            <MetadataListItem label="Recipients">
+              {draft.targetGroupId
+                ? `${contactGroup?.name ?? "Group"} · ${targetCount} contact${targetCount !== 1 ? "s" : ""}`
+                : `${targetCount} contact${targetCount !== 1 ? "s" : ""}`}
+            </MetadataListItem>
+            <MetadataListItem label="Mailboxes">
+              {draft.mailboxIds?.length ?? 0} selected
+              {capacityKnown ? ` · ${availableToday} sends available today` : ""}
+            </MetadataListItem>
+          </MetadataList>
+        </div>
+      </Panel>
+
+      {draft.steps.length > 0 && (
+        <Panel title="Sequence">
+          <ol className="divide-y">
+            {draft.steps.map((step, index) => (
+              <li key={index} className="flex flex-col gap-0.5 px-4 py-3">
+                <Text type="supporting">Step {index + 1}</Text>
+                <span className="text-base font-medium">{step.subject || "No subject"}</span>
+                <span className="line-clamp-2 text-sm text-secondary">{step.body}</span>
+              </li>
             ))}
-          </div>
-          {!allValid && (
-            <div className="mt-4 rounded-md border border-warning/30 bg-warning-muted p-4">
-              <p className="text-base text-warning">
-                Please complete all required steps before launching.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Campaign Summary */}
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-base font-medium text-primary">Campaign Summary</h3>
-          <div className="space-y-4">
-            {/* Name */}
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-muted">
-                <Mail className="h-4 w-4 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-secondary">Campaign Name</p>
-                <p className="mt-1 font-medium text-primary">{draft.name || "—"}</p>
-              </div>
-            </div>
-
-            {/* Schedule */}
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-muted">
-                <Clock className="h-4 w-4 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-secondary">Schedule</p>
-                <p className="mt-1 text-base text-primary">
-                  {draft.schedule.daysAllowed.length > 0
-                    ? `${draft.schedule.daysAllowed.map((d) => d.slice(0, 3)).join(", ")}`
-                    : "—"}
-                </p>
-                <p className="text-base text-secondary">
-                  {draft.schedule.startTime} - {draft.schedule.endTime} (
-                  {draft.schedule.defaultTimezone})
-                </p>
-              </div>
-            </div>
-
-            {/* Email Steps */}
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-muted">
-                <Calendar className="h-4 w-4 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-secondary">Email Sequence</p>
-                <p className="mt-1 font-medium text-primary">
-                  {draft.steps.length} step{draft.steps.length !== 1 ? "s" : ""}
-                </p>
-              </div>
-            </div>
-
-            {/* Target Contacts */}
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-muted">
-                <Users className="h-4 w-4 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-secondary">Target Audience</p>
-                {draft.targetGroupId ? (
-                  <>
-                    <p className="mt-1 font-medium text-primary">
-                      {contactGroup?.name || "Loading..."}
-                    </p>
-                    <p className="text-base text-secondary">
-                      {targetCount} contact{targetCount !== 1 ? "s" : ""}
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-1 font-medium text-primary">
-                    {targetCount} specific contact{targetCount !== 1 ? "s" : ""}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Sending Mailboxes */}
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-muted">
-                <Send className="h-4 w-4 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-secondary">Sending Mailboxes</p>
-                <p className="mt-1 font-medium text-primary">
-                  {draft.mailboxIds?.length ?? 0} selected
-                </p>
-                {capacityKnown && (
-                  <p className="text-base text-secondary">{availableToday} sends available today</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {capacityShortfall && (
-          <div className="rounded-md border border-warning/30 bg-warning-muted p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 h-5 w-5 flex-none text-warning" />
-              <p className="text-base leading-6 text-warning">
-                Selected mailboxes have {availableToday} sends available today for {targetCount}{" "}
-                contacts. Remaining sends will stay queued for later send windows.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Email Steps Preview */}
-        {draft.steps.length > 0 && (
-          <div className="rounded-lg border border-border bg-card p-6">
-            <h3 className="mb-4 text-base font-medium text-primary">Email Sequence Preview</h3>
-            <div className="space-y-4">
-              {draft.steps.map((step, index) => (
-                <div key={index} className="rounded-md border border-border bg-muted p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-bg text-sm font-medium text-on-accent">
-                      {index + 1}
-                    </span>
-                    <span className="text-sm font-medium text-secondary">Step {index + 1}</span>
-                  </div>
-                  <p className="mb-1 text-base font-medium text-primary">{step.subject}</p>
-                  <p className="line-clamp-2 text-sm text-secondary">{step.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Launch Warning */}
-        {allValid && (
-          <div className="rounded-lg border border-success/30 bg-success-muted p-6">
-            <div className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success-muted">
-                <CheckCircle2 className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <h3 className="mb-1 text-base font-medium text-success">Ready to Launch</h3>
-                <p className="text-base leading-relaxed text-success/70">
-                  Your campaign is configured and ready. Click "Launch Campaign" below to activate
-                  it. Emails will be sent according to your schedule.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+          </ol>
+        </Panel>
+      )}
     </div>
   );
 }

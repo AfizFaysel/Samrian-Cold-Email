@@ -227,8 +227,19 @@ async function collectCss() {
 // Theme switch and CSS sharing for the static file: React does not run there.
 const RUNTIME = `
 const css = document.getElementById("ds-css").textContent;
-function paint(doc, mode) { doc.documentElement.dataset.theme = mode; }
+// Astryx's <Theme> picks the mode through a class React no longer updates here. Next compiles
+// light-dark() into a polyfill switched by --lightningcss-light/-dark, so pin those (and
+// color-scheme) inline on every theme root as well as on <html>.
+function paint(doc, mode) {
+  doc.documentElement.dataset.theme = mode;
+  doc.querySelectorAll("[data-astryx-theme]").forEach((el) => {
+    el.style.colorScheme = mode;
+    el.style.setProperty("--lightningcss-light", mode === "light" ? "initial" : " ");
+    el.style.setProperty("--lightningcss-dark", mode === "dark" ? "initial" : " ");
+  });
+}
 function mode() { return document.documentElement.dataset.theme || "light"; }
+paint(document, mode());
 function dress(frame) {
   const doc = frame.contentDocument;
   if (!doc || !doc.head || doc.getElementById("ds-css")) return;

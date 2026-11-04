@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Upload, Edit } from "lucide-react";
 import type { ImportMethod } from "./index";
-import { StepHeader, WizardFooter, WizardContainer, SecurityShieldIcon } from "./shared";
+import { StepHeader, WizardFooter, WizardContainer } from "./shared";
 
 interface MethodSelectionProps {
   onSelect: (method: ImportMethod) => void;
@@ -76,12 +76,6 @@ export function MethodSelection({ onSelect, onCancel }: MethodSelectionProps) {
         nextLabel="Continue"
         nextDisabled={!selected}
         showBackButton={false}
-        leftContent={
-          <div className="flex items-center gap-3 text-base text-secondary">
-            <SecurityShieldIcon />
-            <span>Contacts stay in your own database.</span>
-          </div>
-        }
       />
     </WizardContainer>
   );
