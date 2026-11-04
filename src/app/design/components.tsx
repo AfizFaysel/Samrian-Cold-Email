@@ -9,7 +9,7 @@ import { Selector } from "@astryxdesign/core/Selector";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { Megaphone, Plus, Send, Trash2 } from "lucide-react";
-import { Logo } from "@/components/logo";
+import { Logo, Wordmark } from "@/components/logo";
 import { PageHeader, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState, LoadingState, RowsSkeleton } from "@/components/page-state";
 import { StatCard } from "@/components/stat-card";
@@ -437,7 +437,22 @@ export const COMPONENTS: Entry[] = [
           </div>
         </Panel>,
       ],
-      ["logo", <Logo key="o" className="size-8" />],
+      ["mark", <Logo key="o" className="size-8" />],
+      ["mark small", <Logo key="os" className="size-6" />],
+      ["wordmark", <Wordmark key="w" className="h-8" />],
+      ["wordmark small", <Wordmark key="ws" className="h-5" />],
+      [
+        "on inverted",
+        <span key="i" className="inline-flex rounded-md bg-inverted p-3 text-body">
+          <Wordmark className="h-6" />
+        </span>,
+      ],
+      [
+        "app icon",
+        <span key="a" className="inline-flex size-12 rounded-md bg-inverted p-2.5 text-body">
+          <Logo className="size-full" />
+        </span>,
+      ],
     ],
   },
   {

@@ -5,7 +5,7 @@ import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { NotificationsBell } from "@/components/notifications";
-import { Logo } from "@/components/logo";
+import { Logo, Wordmark } from "@/components/logo";
 import { ensureActiveOrganization, useAuthSession } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
 
@@ -65,8 +65,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Phones only: the sidebar is a drawer there, so it needs an opener. */}
         <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 bg-body/85 px-3 backdrop-blur supports-backdrop-filter:bg-body/70 md:hidden">
           <SidebarTrigger className="text-secondary" />
-          <Logo className="size-6" />
-          <span className="text-base font-semibold">Samrian</span>
+          <Wordmark className="h-5" />
           <div className="ml-auto">
             <NotificationsBell />
           </div>

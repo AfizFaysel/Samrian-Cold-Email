@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Text } from "@astryxdesign/core/Text";
 import { Download, ExternalLink } from "lucide-react";
-import { Logo } from "@/components/logo";
+import { Wordmark } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ComponentsGallery, COMPONENTS, slug } from "./components";
@@ -136,12 +136,9 @@ export default function DesignSystemPage() {
   return (
     <div className="grid min-h-svh bg-body lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="border-b bg-body lg:sticky lg:top-0 lg:h-svh lg:overflow-y-auto lg:border-r lg:border-b-0">
-        <div className="flex items-center gap-2.5 px-5 pt-5 pb-4">
-          <Logo className="size-7" />
-          <div className="flex flex-col">
-            <span className="text-base font-semibold">Samrian</span>
-            <span className="text-sm text-secondary">Design system</span>
-          </div>
+        <div className="flex flex-col gap-2 px-5 pt-5 pb-4">
+          <Wordmark className="h-6" />
+          <span className="text-sm text-secondary">Design system</span>
         </div>
         <nav className="flex flex-col gap-4 px-3 pb-6">
           {NAV.map((group) => (

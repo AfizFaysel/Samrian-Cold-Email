@@ -41,7 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme";
-import { Logo } from "@/components/logo";
+import { Wordmark } from "@/components/logo";
 import { NotificationsBell } from "@/components/notifications";
 
 type NavItem = { title: string; url: string; icon: React.ComponentType };
@@ -94,10 +94,9 @@ export function AppSidebar() {
       <SidebarHeader className="flex-row items-center justify-between px-3 pt-4 pb-2">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2.5 rounded-md px-1.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex items-center rounded-md px-1.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          <Logo className="size-7" />
-          <span className="text-base font-semibold tracking-tight">Samrian</span>
+          <Wordmark className="h-6" />
         </Link>
         {/* On phones the bell lives in the top bar instead. */}
         <div className="max-md:hidden">

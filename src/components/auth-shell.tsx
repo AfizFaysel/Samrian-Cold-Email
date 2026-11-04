@@ -1,7 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { CalendarClock, Inbox, ShieldCheck } from "lucide-react";
-import { Logo } from "@/components/logo";
+import { Wordmark } from "@/components/logo";
 
 const POINTS = [
   {
@@ -36,9 +36,8 @@ export function AuthShell({
   return (
     <div className="grid min-h-svh bg-body lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
       <div className="flex flex-col bg-card px-6 py-6 sm:px-10">
-        <Link href="/" className="flex w-fit items-center gap-2.5">
-          <Logo className="size-7" />
-          <span className="text-base font-semibold tracking-tight">Samrian</span>
+        <Link href="/" className="flex w-fit items-center">
+          <Wordmark className="h-6" />
         </Link>
 
         <main className="flex flex-1 items-center justify-center py-12">

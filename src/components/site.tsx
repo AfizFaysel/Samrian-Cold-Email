@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "@/components/logo";
+import { Wordmark } from "@/components/logo";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
@@ -10,9 +10,8 @@ export function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <header className="sticky top-0 z-30 border-b bg-body/85 backdrop-blur supports-backdrop-filter:bg-body/70">
       <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-6 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5">
-          <Logo className="size-7" />
-          <span className="text-base font-semibold tracking-tight">Samrian</span>
+        <Link href="/" className="flex items-center">
+          <Wordmark className="h-6" />
         </Link>
         <nav className="hidden items-center gap-5 text-base text-secondary sm:flex">
           <Link href="/#features" className="transition-colors hover:text-primary">
@@ -50,9 +49,9 @@ export function SiteFooter({ className }: { className?: string }) {
   return (
     <footer className={cn("border-t", className)}>
       <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 py-8 text-base text-secondary sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="flex items-center gap-2.5">
-          <Logo className="size-6" />
-          <span>Samrian · Open source under AGPL-3.0-or-later</span>
+        <div className="flex items-center gap-3">
+          <Wordmark className="h-4 text-primary" />
+          <span>Open source under AGPL-3.0-or-later</span>
         </div>
         <div className="flex gap-5">
           {sourceUrl ? (
