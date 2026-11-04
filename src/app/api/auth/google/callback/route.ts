@@ -13,6 +13,7 @@ import {
 import { withPublicLimit } from "@/server/limits/http";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GMAIL_PROFILE_URL = "https://gmail.googleapis.com/gmail/v1/users/me/profile";
 
 export async function GET(request: NextRequest) {
   return withPublicLimit(request, "oauth.google.callback", (limitedRequest) =>
@@ -93,15 +94,16 @@ async function callback(request: NextRequest) {
     return errorRedirect(appUrl, "token_exchange_failed", "google");
   }
 
-  // Fetch user email from Google userinfo
+  // Gmail's profile works with the Gmail scopes; userinfo would need the extra email scope.
   let userEmail: string | undefined;
   try {
-    const userinfoResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    const profileResponse = await fetch(GMAIL_PROFILE_URL, {
       headers: { Authorization: `Bearer ${tokens.accessToken}` },
     });
-    if (userinfoResponse.ok) {
-      const userinfo = await userinfoResponse.json();
-      userEmail = userinfo.email as string | undefined;
+    if (profileResponse.ok) {
+      const profile: unknown = await profileResponse.json();
+      const emailAddress = (profile as { emailAddress?: unknown } | null)?.emailAddress;
+      if (typeof emailAddress === "string") userEmail = emailAddress;
     }
   } catch {
     // Non-fatal — proceed without email
