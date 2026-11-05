@@ -70,7 +70,6 @@ const eslintConfig = [
       "src/app/dashboard/layout.tsx",
       "src/app/dashboard/mailboxes/add-mailbox-dialog.tsx",
       "src/app/dashboard/mailboxes/page.tsx",
-      "src/app/dashboard/page.tsx",
       "src/app/dashboard/settings/page.tsx",
       "src/app/design/components.tsx",
       "src/app/design/page.tsx",

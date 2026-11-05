@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 
 export type TimePeriod = "7" | "30" | "90";
 
@@ -10,41 +10,21 @@ interface TimePeriodSelectorProps {
   onChange: (period: TimePeriod) => void;
 }
 
-const periodLabels: Record<TimePeriod, { short: string; long: string }> = {
-  "7": { short: "7d", long: "Last 7 days" },
-  "30": { short: "30d", long: "Last 30 days" },
-  "90": { short: "90d", long: "Last 90 days" },
-};
+const PERIODS: TimePeriod[] = ["7", "30", "90"];
 
 /** Segmented control for the reporting window. */
 export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps) {
   return (
-    <div
-      role="radiogroup"
-      aria-label="Time period"
-      className="inline-flex h-8 items-center gap-0.5 rounded-md bg-muted p-0.5"
+    <SegmentedControl
+      label="Time period"
+      size="sm"
+      value={value}
+      onChange={(period) => onChange(period as TimePeriod)}
     >
-      {(Object.keys(periodLabels) as TimePeriod[]).map((period) => {
-        const checked = value === period;
-        return (
-          <button
-            key={period}
-            type="button"
-            role="radio"
-            aria-checked={checked}
-            title={periodLabels[period].long}
-            onClick={() => onChange(period)}
-            className={cn(
-              "h-7 rounded-sm px-2.5 text-sm font-medium text-secondary transition-colors outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-accent",
-              checked && "bg-card text-primary shadow-sm"
-            )}
-          >
-            <span className="sr-only">{periodLabels[period].long}</span>
-            <span aria-hidden>{periodLabels[period].short}</span>
-          </button>
-        );
-      })}
-    </div>
+      {PERIODS.map((period) => (
+        <SegmentedControlItem key={period} value={period} label={`${period} days`} />
+      ))}
+    </SegmentedControl>
   );
 }
 

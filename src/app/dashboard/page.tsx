@@ -1,58 +1,175 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { AlertTriangle, Eye, Mailbox, Megaphone, Plus, Reply, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@astryxdesign/core/Button";
+import { Grid } from "@astryxdesign/core/Grid";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Link } from "@astryxdesign/core/Link";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { pixel, proportional, Table, type TableColumn } from "@astryxdesign/core/Table";
+import { Text } from "@astryxdesign/core/Text";
+import { AlertTriangle, Mailbox, Megaphone, Plus, Reply, Send, UserMinus } from "lucide-react";
 import { Page, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
-import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
 
 type OrgStats = {
   totalSent: number;
-  estimatedOpenRate: number | null;
-  openTrackingEnabled: boolean;
+  replies: number;
   replyRate: number;
+  bounceRate: number;
+  unsubscribeRate: number;
 };
 
-type CampaignSummary = {
+interface CampaignSummary extends Record<string, unknown> {
   _id: string;
   name: string;
   status: string;
   emailsSent: number;
   replyRate: number;
-};
+}
+
+type MailboxSummary = { status: string; availableToday: number };
+
+// Cold email rule of thumb: under 2% is healthy, 5% and up puts sending domains at risk.
+const BOUNCE_WARN = 2;
+const BOUNCE_DANGER = 5;
+
+const CAMPAIGN_COLUMNS: TableColumn<CampaignSummary>[] = [
+  {
+    key: "name",
+    header: "Campaign",
+    width: proportional(3, { minWidth: 180 }),
+    renderCell: (campaign) => (
+      <Link href={`/dashboard/campaigns/${campaign._id}`} isStandalone>
+        {campaign.name}
+      </Link>
+    ),
+  },
+  {
+    key: "status",
+    header: "Status",
+    renderCell: (campaign) => <StatusBadge status={campaign.status} />,
+  },
+  {
+    key: "emailsSent",
+    header: "Sent",
+    align: "end",
+    width: pixel(96),
+    renderCell: (campaign) => (
+      <Text className="tabular-nums">{campaign.emailsSent.toLocaleString()}</Text>
+    ),
+  },
+  {
+    key: "replyRate",
+    header: "Reply rate",
+    align: "end",
+    width: pixel(112),
+    renderCell: (campaign) => (
+      <Text className="tabular-nums">{campaign.replyRate.toFixed(1)}%</Text>
+    ),
+  },
+];
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [timePeriod, setTimePeriod] = React.useState<TimePeriod>("30");
 
   const stats = useApi<OrgStats>(`/api/analytics/org?days=${timePeriod}`);
   const campaigns = useApi<{ campaigns: CampaignSummary[] }>("/api/campaigns");
-  const mailboxes = useApi<{ mailboxes: Array<{ status: string }> }>("/api/mailboxes");
+  const mailboxes = useApi<{ mailboxes: MailboxSummary[] }>("/api/mailboxes");
+  const inbox = useApi<{ unreadCount: number }>("/api/inbox?limit=1");
 
   const active =
     campaigns.data?.campaigns?.filter((campaign) => campaign.status === "active").slice(0, 5) ?? [];
   const mailboxList = mailboxes.data?.mailboxes ?? [];
-  const activeMailboxCount = mailboxList.filter((mailbox) => mailbox.status === "active").length;
+  const activeMailboxes = mailboxList.filter((mailbox) => mailbox.status === "active");
+  const disconnected = mailboxList.filter((mailbox) => mailbox.status === "disconnected").length;
+  const sendsLeftToday = activeMailboxes.reduce(
+    (total, mailbox) => total + mailbox.availableToday,
+    0
+  );
   const statsLoading = stats.isLoading && !stats.data;
+  const bounceRate = stats.data?.bounceRate ?? 0;
+
+  // What to do next, most urgent first. Shown only when something needs the user.
+  const attention = [
+    mailboxes.data &&
+      mailboxList.length === 0 && {
+        key: "no-mailbox",
+        tone: "error" as const,
+        label: "No mailbox connected",
+        description: "Campaigns can't send until you connect one.",
+        action: { label: "Connect mailbox", href: "/dashboard/mailboxes" },
+      },
+    disconnected > 0 && {
+      key: "disconnected",
+      tone: "error" as const,
+      label: `${disconnected} mailbox${disconnected === 1 ? " is" : "es are"} disconnected`,
+      description: "Sends from it are paused until you reconnect.",
+      action: { label: "Reconnect", href: "/dashboard/mailboxes" },
+    },
+    stats.data &&
+      bounceRate >= BOUNCE_DANGER && {
+        key: "bounces",
+        tone: "error" as const,
+        label: `Bounce rate is ${bounceRate.toFixed(1)}%`,
+        description: "Above 5% risks your sending domains. Check the list behind recent campaigns.",
+        action: { label: "View campaigns", href: "/dashboard/campaigns" },
+      },
+    (inbox.data?.unreadCount ?? 0) > 0 && {
+      key: "replies",
+      tone: "accent" as const,
+      label: `${inbox.data!.unreadCount} unread repl${inbox.data!.unreadCount === 1 ? "y" : "ies"}`,
+      description: "Answer while the conversation is warm.",
+      action: { label: "Open inbox", href: "/dashboard/inbox" },
+    },
+  ].filter((item): item is Exclude<typeof item, false | undefined | null | 0> => Boolean(item));
 
   return (
     <Page
       title="Overview"
-      description="How your outreach is doing across every campaign and mailbox."
+      description="What needs you today, and how your outreach is doing."
       actions={<TimePeriodSelector value={timePeriod} onChange={setTimePeriod} />}
     >
+      {attention.length > 0 ? (
+        <Panel title="Needs your attention">
+          <List hasDividers>
+            {attention.map((item) => (
+              <ListItem
+                key={item.key}
+                startContent={<StatusDot variant={item.tone} label={item.label} />}
+                label={item.label}
+                description={item.description}
+                endContent={
+                  <Button
+                    label={item.action.label}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => router.push(item.action.href)}
+                  />
+                }
+              />
+            ))}
+          </List>
+        </Panel>
+      ) : null}
+
       {stats.error && !stats.data ? (
         <Panel>
           <ErrorState title="Couldn't load your numbers" onRetry={stats.refetch} />
         </Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Grid columns={{ minWidth: 200, repeat: "fit" }} gap={4}>
           <StatCard
             label="Emails sent"
             icon={Send}
@@ -61,34 +178,51 @@ export default function DashboardPage() {
             hint={`Last ${timePeriod} days`}
           />
           <StatCard
-            label="Open rate"
-            icon={Eye}
-            isLoading={statsLoading}
-            value={
-              stats.data?.estimatedOpenRate == null
-                ? "—"
-                : `${stats.data.estimatedOpenRate.toFixed(1)}%`
-            }
-            hint={stats.data?.estimatedOpenRate == null ? "Open tracking is off" : "Estimated"}
-          />
-          <StatCard
             label="Reply rate"
             icon={Reply}
             isLoading={statsLoading}
             value={`${stats.data?.replyRate.toFixed(1) ?? "0.0"}%`}
-            hint="Replies per email sent"
+            hint={`${(stats.data?.replies ?? 0).toLocaleString()} replies`}
           />
-        </div>
+          <StatCard
+            label="Bounce rate"
+            icon={AlertTriangle}
+            isLoading={statsLoading}
+            value={
+              <span
+                className={cn(
+                  bounceRate >= BOUNCE_DANGER
+                    ? "text-error"
+                    : bounceRate >= BOUNCE_WARN && "text-warning"
+                )}
+              >
+                {bounceRate.toFixed(1)}%
+              </span>
+            }
+            hint={
+              bounceRate >= BOUNCE_DANGER
+                ? "Too high: clean your list"
+                : bounceRate >= BOUNCE_WARN
+                  ? "Watch this: aim under 2%"
+                  : "Healthy: under 2%"
+            }
+          />
+          <StatCard
+            label="Unsubscribe rate"
+            icon={UserMinus}
+            isLoading={statsLoading}
+            value={`${stats.data?.unsubscribeRate.toFixed(1) ?? "0.0"}%`}
+            hint="People who opted out"
+          />
+        </Grid>
       )}
 
+      {/* Main column plus a narrow side column on wide screens, stacked on narrow ones. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Panel
           title="Active campaigns"
           actions={
-            <Link
-              href="/dashboard/campaigns"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-accent")}
-            >
+            <Link href="/dashboard/campaigns" isStandalone>
               View all
             </Link>
           }
@@ -103,101 +237,56 @@ export default function DashboardPage() {
               title="No active campaigns"
               description="Launch a campaign and its progress shows up here."
               action={
-                <Link href="/dashboard/campaigns/new" className={buttonVariants()}>
-                  <Plus data-icon="inline-start" />
-                  New campaign
-                </Link>
+                <Button
+                  label="New campaign"
+                  variant="primary"
+                  icon={<Icon icon={Plus} />}
+                  onClick={() => router.push("/dashboard/campaigns/new")}
+                />
               }
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-base">
-                <thead>
-                  <tr className="border-b text-left text-sm text-secondary">
-                    <th className="px-4 py-2.5 font-medium">Campaign</th>
-                    <th className="px-4 py-2.5 font-medium">Status</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Sent</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Reply rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {active.map((campaign) => (
-                    <tr
-                      key={campaign._id}
-                      className="border-b transition-colors last:border-0 hover:bg-muted/60"
-                    >
-                      <td className="px-4 py-3 font-medium">
-                        <Link
-                          href={`/dashboard/campaigns/${campaign._id}`}
-                          className="hover:text-accent"
-                        >
-                          {campaign.name}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={campaign.status} />
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {campaign.emailsSent.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {campaign.replyRate.toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table data={active} columns={CAMPAIGN_COLUMNS} idKey="_id" hasHover />
           )}
         </Panel>
 
-        <Panel title="Sending health">
-          <div className="flex flex-col gap-3 p-4">
-            {mailboxes.error && !mailboxes.data ? (
-              <ErrorState
-                className="py-6"
-                title="Couldn't check mailboxes"
-                onRetry={mailboxes.refetch}
-              />
-            ) : mailboxes.isLoading && !mailboxes.data ? (
-              <div className="h-20 animate-pulse rounded-md bg-muted" />
-            ) : activeMailboxCount === 0 ? (
-              <div className="flex gap-3 rounded-md bg-warning-muted p-3">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-                <div className="flex flex-col gap-1">
-                  <p className="text-base font-medium">No mailbox connected</p>
-                  <p className="text-sm text-secondary">
-                    Connect a mailbox before you launch a campaign.
-                  </p>
-                  <Link
-                    href="/dashboard/mailboxes"
-                    className="mt-1 text-sm font-medium text-accent hover:underline"
-                  >
-                    Connect a mailbox
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-start gap-2.5">
-                  <StatusDot variant="success" label="Sending" />
-                  <div className="-mt-1 flex flex-col">
-                    <span className="text-base font-medium tabular-nums">
-                      {activeMailboxCount} of {mailboxList.length} active
-                    </span>
-                    <span className="text-sm text-secondary">Mailboxes sending</span>
-                  </div>
-                </div>
-                <Link
-                  href="/dashboard/mailboxes"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  <Mailbox data-icon="inline-start" />
-                  Manage
-                </Link>
-              </div>
-            )}
-          </div>
+        <Panel
+          title="Sending health"
+          actions={
+            <Button
+              label="Manage"
+              variant="ghost"
+              size="sm"
+              icon={<Icon icon={Mailbox} />}
+              onClick={() => router.push("/dashboard/mailboxes")}
+            />
+          }
+          bodyClassName="p-4"
+        >
+          {mailboxes.error && !mailboxes.data ? (
+            <ErrorState title="Couldn't check mailboxes" onRetry={mailboxes.refetch} />
+          ) : mailboxes.isLoading && !mailboxes.data ? (
+            <Skeleton height={96} />
+          ) : (
+            <MetadataList label={{ position: "top" }}>
+              <MetadataListItem label="Mailboxes sending">
+                <HStack gap={2} vAlign="center">
+                  <StatusDot
+                    variant={activeMailboxes.length > 0 ? "success" : "error"}
+                    label={activeMailboxes.length > 0 ? "Sending" : "Not sending"}
+                  />
+                  <Text weight="medium" className="tabular-nums">
+                    {activeMailboxes.length} of {mailboxList.length}
+                  </Text>
+                </HStack>
+              </MetadataListItem>
+              <MetadataListItem label="Sends left today">
+                <Text weight="medium" className="tabular-nums">
+                  {sendsLeftToday.toLocaleString()}
+                </Text>
+              </MetadataListItem>
+            </MetadataList>
+          )}
         </Panel>
       </div>
     </Page>

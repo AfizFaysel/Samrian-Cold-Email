@@ -21,6 +21,7 @@ export const GET = createSessionRoute(
     });
     return NextResponse.json({
       totalSent: stats.sent,
+      replies: stats.replies,
       estimatedOpenRate: stats.estimatedOpenRate,
       openTrackingEnabled: stats.openTrackingEnabled,
       replyRate: stats.replyRate,
