@@ -252,12 +252,14 @@ export function createLimitGuard(input: {
       if (input.mode === "off") return unlimited();
       const operation = getOperationPolicy(request.operationId);
       const limit = scaled(policyLimit(operation, input.tier), multiplier);
+      // Dashboard user limits count requests. Machine organization budgets use weighted units.
+      const cost = request.subjectType === "user" ? 1 : operation.units;
       const decision = await input.limiter.consume({
         policyId: operation.id,
         subject: `${request.subjectType}:${request.subject}:${operation.id}`,
         limit,
         windowMs: 60_000,
-        cost: request.penalty ? Math.max(5, operation.units) : operation.units,
+        cost: request.penalty ? Math.max(5, cost) : cost,
       });
       const result = { ...decision, policyId: operation.id };
       if (!decision.allowed) {

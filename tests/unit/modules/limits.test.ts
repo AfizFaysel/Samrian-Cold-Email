@@ -131,6 +131,29 @@ describe("rate limits", () => {
     ).resolves.toMatchObject({ allowed: true, shadowed: true });
   });
 
+  it.each(["campaigns.launch", "mailboxes.check"])(
+    "allows ten %s requests per minute for a Starter user",
+    async (operationId) => {
+      const guard = createLimitGuard({
+        limiter: new MemoryRateLimiter(() => 1_000),
+        mode: "enforce",
+        tier: "starter",
+      });
+      const request = { operationId, subjectType: "user" as const, subject: "org_1:user_1" };
+
+      for (let remaining = 9; remaining >= 0; remaining -= 1) {
+        await expect(guard.checkSubject(request)).resolves.toMatchObject({
+          allowed: true,
+          remaining,
+        });
+      }
+      await expect(guard.checkSubject(request)).resolves.toMatchObject({
+        allowed: false,
+        retryAfterMs: 60_000,
+      });
+    }
+  );
+
   it("applies adaptive penalty units to abusive public failures", async () => {
     const calls: number[] = [];
     const guard = createLimitGuard({
