@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock, Layers, Plus, Search, Trash2, Upload, Users, X } from "lucide-react";
 import { toast } from "sonner";
+import { Avatar } from "@astryxdesign/core/Avatar";
 import { AddToGroupDialog } from "@/components/add-to-group-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Page, Panel } from "@/components/page-header";
@@ -278,9 +279,7 @@ export default function ContactsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-secondary">
-                            {(name || contact.email).charAt(0).toUpperCase()}
-                          </span>
+                          <Avatar name={name || contact.email} size={32} tooltip={false} />
                           <div className="min-w-0">
                             <p className="truncate font-medium">{name || "—"}</p>
                             <p className="truncate text-sm text-secondary">

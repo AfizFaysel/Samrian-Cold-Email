@@ -2,12 +2,17 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { Avatar } from "@astryxdesign/core/Avatar";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Text } from "@astryxdesign/core/Text";
+import { VStack } from "@astryxdesign/core/VStack";
 import { Mail, Reply, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Panel } from "@/components/page-header";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
 import { StatusPill, type StatusTone } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
+import { cn } from "@/lib/utils";
 
 interface ContactActivityProps {
   campaignId: string;
@@ -96,35 +101,47 @@ export function ContactActivity({ campaignId }: ContactActivityProps) {
                 <tr className="border-b text-sm text-secondary">
                   <th className="px-4 py-2.5 font-medium">Contact</th>
                   <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 font-medium">Step</th>
+                  <th className="px-4 py-2.5 font-medium">Progress</th>
                   <th className="px-4 py-2.5 font-medium">Last email</th>
                 </tr>
               </thead>
               <tbody>
                 {assignments.map((assignment: any) => {
                   const config = statusConfig[assignment.status] || statusConfig.active;
+                  const email: string | null = assignment.contactEmail;
+                  const title: string = assignment.contactName || email || "Deleted contact";
 
                   return (
                     <tr
                       key={assignment._id}
-                      onClick={() => router.push(`/dashboard/contacts/${assignment.contactId}`)}
-                      className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/60"
+                      onClick={
+                        email
+                          ? () => router.push(`/dashboard/contacts/${assignment.contactId}`)
+                          : undefined
+                      }
+                      className={cn(
+                        "border-b transition-colors last:border-0",
+                        email && "cursor-pointer hover:bg-muted/60"
+                      )}
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-8 items-center justify-center rounded-full bg-muted text-sm font-semibold text-secondary">
-                            {assignment.contactId.slice(0, 2).toUpperCase()}
-                          </div>
-                          <span className="font-mono text-sm text-secondary">
-                            {assignment.contactId}
-                          </span>
-                        </div>
+                        <HStack gap={3} vAlign="center">
+                          <Avatar name={title} size={32} tooltip={false} />
+                          <VStack gap={0}>
+                            <Text weight="medium">{title}</Text>
+                            {assignment.contactName && email && (
+                              <Text type="supporting">{email}</Text>
+                            )}
+                          </VStack>
+                        </HStack>
                       </td>
                       <td className="px-4 py-3">
                         <StatusPill tone={config.tone} label={config.label} />
                       </td>
                       <td className="px-4 py-3 tabular-nums text-secondary">
-                        Step {assignment.currentStep}
+                        {assignment.currentStep > 0
+                          ? `Step ${assignment.currentStep} sent`
+                          : "Not started"}
                       </td>
                       <td className="px-4 py-3 text-secondary">
                         {assignment.lastEmailSentAt

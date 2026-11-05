@@ -115,17 +115,27 @@ export class PostgresAssignmentRepo {
 
   async listByCampaign(campaignId: CampaignId, orgId: OrgId, limit = 50) {
     const rows = await this.db
-      .select()
+      .select({
+        assignment: contactAssignments,
+        email: contacts.email,
+        customVars: contacts.customVars,
+      })
       .from(contactAssignments)
+      .leftJoin(
+        contacts,
+        and(eq(contacts.id, contactAssignments.contactId), eq(contacts.orgId, orgId))
+      )
       .where(
         and(eq(contactAssignments.campaignId, campaignId), eq(contactAssignments.orgId, orgId))
       )
       .limit(limit);
 
-    return rows.map((row) => ({
+    return rows.map(({ assignment: row, email, customVars }) => ({
       _id: row.id,
       campaignId: row.campaignId,
       contactId: row.contactId,
+      contactEmail: email ?? null,
+      contactName: contactName(customVars),
       orgId: row.orgId,
       status: row.status,
       currentStep: row.currentStep,
@@ -322,4 +332,14 @@ function toAssignmentStatus(
     return status;
   }
   throw new Error(`Invalid assignment status: ${status}`);
+}
+
+/** The contact's full name, else first and last name; null when neither is set. */
+function contactName(customVars: unknown): string | null {
+  if (!customVars || typeof customVars !== "object") return null;
+  const vars = customVars as Record<string, unknown>;
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+  return (
+    text(vars.name) || [text(vars.firstName), text(vars.lastName)].filter(Boolean).join(" ") || null
+  );
 }
