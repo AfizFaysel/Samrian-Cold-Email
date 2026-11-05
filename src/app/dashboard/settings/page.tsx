@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { TrackingSettings } from "@/components/tracking-settings";
 import { errorMessage, requestJson } from "@/lib/request";
 import { cn } from "@/lib/utils";
 
@@ -98,7 +99,8 @@ export default function SettingsPage() {
     try {
       const saved = await requestJson<Partial<ComplianceSettings>>("/api/settings/compliance", {
         method: "PATCH",
-        body: JSON.stringify(settings),
+        // Tracking saves on its own switches; never resend the values loaded with this form.
+        body: JSON.stringify(withoutTracking(settings)),
       });
       setSettings({ ...fallbackSettings, ...saved });
       setStatus("Saved");
@@ -303,6 +305,7 @@ export default function SettingsPage() {
 
             <SaveBar status={status} onSave={save} />
           </section>
+          <TrackingSettings />
         </TabsContent>
 
         <TabsContent value="sending" className="flex max-w-3xl flex-col gap-6">
@@ -522,4 +525,16 @@ function SaveBar({ status, onSave }: { status: string; onSave: () => void }) {
       </Button>
     </div>
   );
+}
+
+function withoutTracking(settings: ComplianceSettings) {
+  const {
+    openTrackingEnabled: _open,
+    clickTrackingEnabled: _click,
+    ...rest
+  } = settings as ComplianceSettings & {
+    openTrackingEnabled?: boolean;
+    clickTrackingEnabled?: boolean;
+  };
+  return rest;
 }

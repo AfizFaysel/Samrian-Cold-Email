@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createSessionRoute } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
 import { buildStatsSummary } from "@/server/modules/stats";
-import { PostgresStatsRepo } from "@/server/repos";
+import { PostgresSettingsRepo, PostgresStatsRepo } from "@/server/repos";
 
 export const GET = createSessionRoute(
   sessionOperations.analyticsRead,
@@ -14,7 +14,11 @@ export const GET = createSessionRoute(
         ? { from: new Date(Date.now() - days * 24 * 60 * 60 * 1000) }
         : undefined;
     const counts = await new PostgresStatsRepo(db).getOrgStats(orgId, range);
-    const stats = buildStatsSummary({ ...counts, openTrackingEnabled: false });
+    const { openTrackingEnabled } = await new PostgresSettingsRepo(db).getCompliance(orgId);
+    const stats = buildStatsSummary({
+      ...counts,
+      openTrackingEnabled: openTrackingEnabled ?? false,
+    });
     return NextResponse.json({
       totalSent: stats.sent,
       estimatedOpenRate: stats.estimatedOpenRate,

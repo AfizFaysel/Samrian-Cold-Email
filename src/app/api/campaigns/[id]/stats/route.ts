@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createSessionRoute } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
 import { buildStatsSummary } from "@/server/modules/stats";
-import { PostgresAssignmentRepo, PostgresStatsRepo } from "@/server/repos";
+import { PostgresAssignmentRepo, PostgresSettingsRepo, PostgresStatsRepo } from "@/server/repos";
 
 export const GET = createSessionRoute(
   sessionOperations.campaignStats,
@@ -11,7 +11,11 @@ export const GET = createSessionRoute(
     const { id } = await params;
     const counts = await new PostgresStatsRepo(db).getCampaignStats({ orgId, campaignId: id });
     const assigned = await new PostgresAssignmentRepo(db).countByStatus(id, orgId);
-    const stats = buildStatsSummary({ ...counts, openTrackingEnabled: false });
+    const { openTrackingEnabled } = await new PostgresSettingsRepo(db).getCompliance(orgId);
+    const stats = buildStatsSummary({
+      ...counts,
+      openTrackingEnabled: openTrackingEnabled ?? false,
+    });
     return NextResponse.json({
       totalContacts: Object.values(assigned).reduce((total, count) => total + count, 0),
       emailsSent: stats.sent,
