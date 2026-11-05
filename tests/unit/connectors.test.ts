@@ -97,8 +97,19 @@ describe("mailbox connector headers", () => {
     expect(raw).toContain("List-Unsubscribe-Post: List-Unsubscribe=One-Click");
   });
 
-  test("Gmail Nodemailer fallback passes custom headers", async () => {
-    const fetch = vi.fn(async () => new Response("forbidden", { status: 403 }));
+  test("Gmail send reports the Gmail API reason instead of falling back to SMTP", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json(
+        {
+          error: {
+            code: 403,
+            message: "Request had insufficient authentication scopes.",
+            errors: [{ reason: "insufficientPermissions" }],
+          },
+        },
+        { status: 403 }
+      )
+    );
     vi.stubGlobal("fetch", fetch);
 
     const connector = new GmailApiConnector(
@@ -106,9 +117,10 @@ describe("mailbox connector headers", () => {
       { type: "oauth2", refreshToken: "refresh" }
     );
 
-    await connector.send(message);
-
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ headers: message.headers }));
+    await expect(connector.send(message)).rejects.toThrow(
+      "Gmail API send failed (403 insufficientPermissions): Request had insufficient authentication scopes."
+    );
+    expect(sendMail).not.toHaveBeenCalled();
   });
 
   test("Microsoft Graph uses MIME when standard unsubscribe headers are present", async () => {

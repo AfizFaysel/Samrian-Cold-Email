@@ -1,11 +1,10 @@
 /**
  * GmailApiConnector — Google Workspace mailboxes (OAuth2)
  *
- * Send:  Gmail API v1 users.messages.send (thread-aware), fallback to Nodemailer OAuth2
+ * Send:  Gmail API v1 users.messages.send (thread-aware)
  * Poll:  Gmail API v1 users.messages.list with q:"is:unread"; caller marks read after DB work.
  */
 
-import nodemailer from "nodemailer";
 import { MailboxConnectionError } from "./errors";
 import { buildMimeHeaders } from "./mime";
 import { refreshAccessToken } from "./oauth";
@@ -87,18 +86,7 @@ export class GmailApiConnector implements MailboxConnector {
       signal: deadlineSignal(),
     });
 
-    if (response.status === 403 || response.status === 404) {
-      // Fallback to Nodemailer OAuth2
-      return this.sendViaNodemailer(message, token);
-    }
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new MailboxConnectionError(
-        `Gmail API send failed (${response.status}): ${err}`,
-        "google"
-      );
-    }
+    if (!response.ok) throw await sendError(response);
 
     const data = await readJsonResponse<{ id: string; threadId: string }>(response, 64 * 1024);
     return {
@@ -316,43 +304,23 @@ export class GmailApiConnector implements MailboxConnector {
   async close(): Promise<void> {
     // Stateless HTTP — nothing to close
   }
-
-  // ── Private: Nodemailer fallback ─────────────────────────────────────────────
-
-  private async sendViaNodemailer(message: SendOptions, accessToken: string): Promise<SendResult> {
-    const from = this.mailbox.userEmail ?? message.from;
-
-    const transport = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        type: "OAuth2",
-        user: from,
-        accessToken,
-      },
-    });
-
-    const info = await transport.sendMail({
-      from: message.from,
-      to: message.to,
-      subject: message.subject,
-      html: message.html,
-      text: message.text,
-      headers: message.headers,
-      ...(message.inReplyTo && { inReplyTo: message.inReplyTo }),
-      ...(message.references?.length && {
-        references: message.references.join(" "),
-      }),
-    });
-
-    return {
-      messageId: info.messageId,
-      accepted: info.accepted as string[],
-      rejected: info.rejected as string[],
-    };
-  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+// Gmail's error body names the reason (for example insufficientPermissions); it holds no message
+// content, so it is safe to keep on the failed-send event.
+async function sendError(response: Response) {
+  const body = await readJsonResponse<{
+    error?: { message?: string; errors?: Array<{ reason?: string }> };
+  }>(response, 64 * 1024).catch(() => ({}) as { error?: undefined });
+  const reason = body.error?.errors?.[0]?.reason;
+  const status = reason ? `${response.status} ${reason}` : String(response.status);
+  return new MailboxConnectionError(
+    `Gmail API send failed (${status}): ${body.error?.message ?? response.statusText}`,
+    "google"
+  );
+}
 
 /**
  * Build an RFC 2822 email message string.
