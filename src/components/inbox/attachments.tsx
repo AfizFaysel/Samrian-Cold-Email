@@ -1,10 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Download, FileText, ShieldAlert } from "lucide-react";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Divider } from "@astryxdesign/core/Divider";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Text } from "@astryxdesign/core/Text";
+import { VStack } from "@astryxdesign/core/VStack";
+import { Download, FileText } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Button } from "@/components/ui/button";
 
 export type InboxAttachment = {
   id: string;
@@ -64,31 +70,27 @@ export function InboxAttachments({
   }
 
   return (
-    <div className="mt-3 border-t border-border pt-3">
-      <p className="mb-2 text-sm font-medium text-secondary">Attachments</p>
-      <div className="flex flex-wrap gap-2">
+    <VStack gap={2}>
+      <Divider />
+      <Text type="supporting" weight="medium">
+        Attachments
+      </Text>
+      <HStack gap={2} wrap="wrap">
         {attachments.map((attachment) => (
           <Button
             key={attachment.id}
-            type="button"
-            variant="outline"
+            label={`Download ${attachment.filename}`}
+            variant="secondary"
+            size="sm"
+            icon={<Icon icon={FileText} />}
+            endContent={<Icon icon={Download} />}
             onClick={() => void requestDownload(attachment)}
-            aria-label={`Download ${attachment.filename}`}
-            className="h-auto max-w-full justify-start gap-2 px-3 py-2"
           >
-            <FileText className="size-4 shrink-0" />
-            <span className="min-w-0 truncate">{attachment.filename}</span>
-            <span className="shrink-0 text-sm text-secondary">{formatBytes(attachment.size)}</span>
-            <Download className="size-3.5 shrink-0" />
+            {`${attachment.filename} · ${formatBytes(attachment.size)}`}
           </Button>
         ))}
-      </div>
-      {error ? (
-        <p className="mt-2 flex items-center gap-1.5 text-sm text-error">
-          <ShieldAlert className="size-3.5" />
-          {error}
-        </p>
-      ) : null}
+      </HStack>
+      {error ? <Banner status="error" title={error} /> : null}
       <ConfirmDialog
         title="Download attachment?"
         description="Attachments can contain harmful content. Gmail or Outlook may have screened this file, but no screening guarantees safety. Download only if you trust the sender."
@@ -105,7 +107,7 @@ export function InboxAttachments({
           void download(attachment);
         }}
       />
-    </div>
+    </VStack>
   );
 }
 

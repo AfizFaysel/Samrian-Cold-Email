@@ -2,20 +2,27 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  ExternalLink,
-  Inbox,
-  MailOpen,
-  RefreshCw,
-  Send,
-} from "lucide-react";
+import { Avatar } from "@astryxdesign/core/Avatar";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Heading } from "@astryxdesign/core/Heading";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Kbd } from "@astryxdesign/core/Kbd";
+import { Link } from "@astryxdesign/core/Link";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
+import { VStack } from "@astryxdesign/core/VStack";
+import { ArrowLeft, Inbox, MailOpen, RefreshCw, Send } from "lucide-react";
 
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
 import { InboxAttachments, type InboxAttachment } from "@/components/inbox/attachments";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
 import { responseError } from "@/lib/request";
 import { cn } from "@/lib/utils";
@@ -132,32 +139,31 @@ export default function InboxPage() {
   const senderLabel = (sender?: InboxSender) => sender?.name ?? sender?.address ?? "Unknown sender";
 
   return (
+    // Two panes on desktop and one at a time on phones, so the pane frame stays a CSS grid.
     <div className="flex h-[calc(100svh-3rem)] min-h-0 flex-col md:h-svh">
       <div className="grid min-h-0 flex-1 md:grid-cols-[340px_minmax(0,1fr)]">
-        <aside
-          className={cn(
-            "flex min-h-0 flex-col border-r bg-card",
-            selectedId && !mobileList && "max-md:hidden"
-          )}
+        <VStack
+          as="aside"
+          gap={0}
+          className={cn("min-h-0 border-r bg-card", selectedId && !mobileList && "max-md:hidden")}
         >
-          <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4">
-            <div>
-              <h1 className="text-lg font-semibold">Inbox</h1>
-              <p className="text-sm text-secondary tabular-nums">
+          <HStack gap={2} hAlign="between" vAlign="center" paddingInline={4} paddingBlock={3}>
+            <VStack gap={0}>
+              <Heading level={1}>Inbox</Heading>
+              <Text type="supporting" className="tabular-nums">
                 {data ? `${data.unreadCount} unread` : "Replies from every mailbox"}
-              </p>
-            </div>
-            <Button
-              type="button"
+              </Text>
+            </VStack>
+            <IconButton
+              label="Refresh replies"
+              tooltip="Refresh"
               variant="ghost"
-              size="icon-sm"
+              icon={<Icon icon={RefreshCw} />}
               onClick={refetch}
-              aria-label="Refresh"
-            >
-              <RefreshCw />
-            </Button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+            />
+          </HStack>
+          <Divider />
+          <VStack gap={0} isScrollable className="min-h-0 flex-1">
             {listError && !data ? (
               <ErrorState title="Couldn't load replies" onRetry={refetch} />
             ) : data === undefined ? (
@@ -169,75 +175,57 @@ export default function InboxPage() {
                 description="When someone answers a campaign email, the conversation lands here."
               />
             ) : (
-              threads.map((thread) => {
-                const active = selectedId === thread.id;
-                const name = senderLabel(thread.sender);
-                return (
-                  <button
-                    key={thread.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedId(thread.id);
-                      setMobileList(false);
-                      if (thread.unread) void markRead(thread.id);
-                    }}
-                    aria-current={active ? "true" : undefined}
-                    className={cn(
-                      "flex w-full gap-3 border-b px-4 py-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted",
-                      active && "bg-accent-muted hover:bg-accent-muted"
-                    )}
-                  >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-secondary">
-                      {name.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="flex items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            "truncate text-base",
-                            thread.unread ? "font-semibold" : "font-medium"
-                          )}
-                        >
+              <List hasDividers edge="flush">
+                {threads.map((thread) => {
+                  const name = senderLabel(thread.sender);
+                  return (
+                    <ListItem
+                      key={thread.id}
+                      align="start"
+                      isSelected={selectedId === thread.id}
+                      onClick={() => {
+                        setSelectedId(thread.id);
+                        setMobileList(false);
+                        if (thread.unread) void markRead(thread.id);
+                      }}
+                      startContent={<Avatar name={name} size={32} tooltip={false} />}
+                      label={
+                        <Text weight={thread.unread ? "semibold" : "medium"} maxLines={1}>
                           {name}
-                        </span>
-                        <span className="shrink-0 text-sm text-secondary tabular-nums">
-                          {shortTime(thread.receivedAt)}
-                        </span>
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "truncate text-base",
-                            thread.unread ? "text-primary" : "text-secondary"
-                          )}
-                        >
-                          {thread.subject}
-                        </span>
-                        {thread.unread ? (
-                          <span
-                            className="ml-auto size-2 shrink-0 rounded-full bg-accent-bg"
-                            aria-label="Unread"
-                          />
-                        ) : null}
-                      </span>
-                      {thread.excerpt ? (
-                        <span className="line-clamp-1 text-sm text-secondary">
-                          {thread.excerpt}
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
-                );
-              })
+                        </Text>
+                      }
+                      description={
+                        <VStack gap={0.5}>
+                          <Text color={thread.unread ? "primary" : "secondary"} maxLines={1}>
+                            {thread.subject}
+                          </Text>
+                          {thread.excerpt ? (
+                            <Text type="supporting" maxLines={1}>
+                              {thread.excerpt}
+                            </Text>
+                          ) : null}
+                        </VStack>
+                      }
+                      endContent={
+                        <VStack gap={1} hAlign="end">
+                          {thread.receivedAt ? (
+                            <Timestamp value={isoTime(thread.receivedAt)} format="relative_short" />
+                          ) : null}
+                          {thread.unread ? <StatusDot variant="accent" label="Unread" /> : null}
+                        </VStack>
+                      }
+                    />
+                  );
+                })}
+              </List>
             )}
-          </div>
-        </aside>
+          </VStack>
+        </VStack>
 
-        <section
-          className={cn(
-            "flex min-h-0 min-w-0 flex-col",
-            (!selectedId || mobileList) && "max-md:hidden"
-          )}
+        <VStack
+          as="section"
+          gap={0}
+          className={cn("min-h-0 min-w-0", (!selectedId || mobileList) && "max-md:hidden")}
         >
           {!selectedId ? (
             <EmptyState
@@ -254,139 +242,138 @@ export default function InboxPage() {
             />
           ) : (
             <>
-              <div className="flex shrink-0 items-start gap-2 border-b bg-card px-4 py-3 sm:px-6">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="-ml-2 md:hidden"
-                  onClick={() => setMobileList(true)}
-                  aria-label="Back to replies"
-                >
-                  <ArrowLeft />
-                </Button>
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-semibold">
-                    {selectedThread?.subject ?? "Conversation"}
-                  </h2>
-                  <p className="truncate text-base text-secondary">
-                    {selectedThread?.sender?.name
-                      ? `${selectedThread.sender.name} <${selectedThread.sender.address ?? "unknown"}>`
-                      : (selectedThread?.sender?.address ?? "Unknown sender")}
-                  </p>
-                  {selectedThread?.sender?.suspicious ? (
-                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-sm bg-warning-muted px-2 py-1 text-sm font-medium text-warning">
-                      <AlertTriangle className="size-3.5" />
-                      The sender&apos;s domain looks unusual. Check it before you reply.
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-body px-4 py-5 sm:px-6">
+              <VStack gap={3} paddingInline={6} paddingBlock={3} className="bg-card">
+                <HStack gap={2} vAlign="start">
+                  <HStack className="md:hidden">
+                    <IconButton
+                      label="Back to replies"
+                      variant="ghost"
+                      icon={<Icon icon={ArrowLeft} />}
+                      onClick={() => setMobileList(true)}
+                    />
+                  </HStack>
+                  <VStack gap={0} className="min-w-0">
+                    <Heading level={2}>{selectedThread?.subject ?? "Conversation"}</Heading>
+                    <Text type="supporting" maxLines={1}>
+                      {selectedThread?.sender?.name
+                        ? `${selectedThread.sender.name} <${selectedThread.sender.address ?? "unknown"}>`
+                        : (selectedThread?.sender?.address ?? "Unknown sender")}
+                    </Text>
+                  </VStack>
+                </HStack>
+                {selectedThread?.sender?.suspicious ? (
+                  <Banner
+                    status="warning"
+                    title="Check this sender before you reply"
+                    description="Their domain looks unusual for the name they use."
+                  />
+                ) : null}
+              </VStack>
+              <Divider />
+              <VStack
+                gap={3}
+                isScrollable
+                paddingInline={6}
+                paddingBlock={5}
+                className="min-h-0 flex-1"
+              >
                 {threadData === undefined ? (
                   <RowsSkeleton rows={3} />
                 ) : (
                   threadData.messages.map((message) => {
                     const sent = message.direction === "sent";
+                    const time = message.receivedAt ?? message.sentAt;
                     return (
-                      <article
+                      <Card
                         key={message.id}
-                        className={cn(
-                          "max-w-3xl rounded-lg border px-4 py-3",
-                          sent ? "ml-auto border-accent/20 bg-accent-muted" : "bg-card"
-                        )}
+                        variant={sent ? "blue" : "default"}
+                        maxWidth={768}
+                        className={cn("w-full min-w-0 shrink-0", sent && "ml-auto")}
                       >
-                        <header className="mb-2 flex items-center justify-between gap-4 text-sm text-secondary">
-                          <span className="font-medium text-primary">
-                            {sent ? "You" : (message.from ?? "Sender")}
-                          </span>
-                          <time className="tabular-nums">
-                            {formatTime(message.receivedAt ?? message.sentAt)}
-                          </time>
-                        </header>
-                        <p className="text-base leading-6 whitespace-pre-wrap">
-                          {message.displayText}
-                        </p>
-                        {message.links?.length ? (
-                          <div className="mt-3 border-t pt-3">
-                            <p className="mb-2 text-sm text-secondary">
-                              Links can report clicks to the sender. Check where they go first.
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {message.links.map((link) => (
-                                <a
-                                  key={link.url}
-                                  href={link.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex max-w-full items-center gap-1.5 rounded-sm border bg-card px-2 py-1 text-sm font-medium hover:bg-muted"
-                                  title={link.url}
-                                >
-                                  <span className="truncate">{link.hostname}</span>
-                                  <ExternalLink className="size-3 shrink-0" />
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-                        <InboxAttachments threadId={message.id} attachments={message.attachments} />
-                      </article>
+                        <VStack as="article" gap={2}>
+                          <HStack gap={4} hAlign="between" vAlign="center">
+                            <Text weight="medium" maxLines={1}>
+                              {sent ? "You" : (message.from ?? "Sender")}
+                            </Text>
+                            {time ? <Timestamp value={isoTime(time)} format="date_time" /> : null}
+                          </HStack>
+                          {/* Emails carry long unbroken URLs and tokens: wrap anywhere, never overflow. */}
+                          <Text className="whitespace-pre-wrap wrap-anywhere">
+                            {message.displayText}
+                          </Text>
+                          {message.links?.length ? (
+                            <VStack gap={2}>
+                              <Divider />
+                              <Text type="supporting">
+                                Links can report clicks to the sender. Check where they go first.
+                              </Text>
+                              <HStack gap={3} wrap="wrap">
+                                {message.links.map((link) => (
+                                  <Link key={link.url} href={link.url} isExternalLink isStandalone>
+                                    {link.hostname}
+                                  </Link>
+                                ))}
+                              </HStack>
+                            </VStack>
+                          ) : null}
+                          <InboxAttachments
+                            threadId={message.id}
+                            attachments={message.attachments}
+                          />
+                        </VStack>
+                      </Card>
                     );
                   })
                 )}
-              </div>
-              <div className="shrink-0 border-t bg-card p-3 sm:p-4">
-                {error ? (
-                  <p role="alert" className="mb-2 text-base text-error">
-                    {error}
-                  </p>
-                ) : null}
-                <div className="rounded-lg border bg-card focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/50">
-                  <Textarea
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && (event.metaKey || event.ctrlKey))
-                        void sendReply();
-                    }}
-                    placeholder="Write a reply…"
-                    aria-label="Reply"
-                    className="min-h-24 resize-none border-0 bg-transparent focus-visible:ring-0 dark:bg-transparent"
+              </VStack>
+              <Divider />
+              <VStack
+                as="form"
+                gap={2}
+                padding={4}
+                className="bg-card"
+                onSubmit={(event: React.FormEvent) => {
+                  event.preventDefault();
+                  void sendReply();
+                }}
+                onKeyDown={(event: React.KeyboardEvent) => {
+                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void sendReply();
+                }}
+              >
+                {error ? <Banner status="error" title={error} /> : null}
+                <TextArea
+                  label="Reply"
+                  isLabelHidden
+                  width="100%"
+                  rows={4}
+                  value={draft}
+                  onChange={setDraft}
+                  placeholder="Write a reply…"
+                />
+                <HStack gap={2} hAlign="between" vAlign="center">
+                  <HStack gap={1.5} vAlign="center" className="max-sm:hidden">
+                    <Kbd keys="mod+enter" />
+                    <Text type="supporting">to send</Text>
+                  </HStack>
+                  <Button
+                    label="Send reply"
+                    variant="primary"
+                    size="sm"
+                    icon={<Icon icon={Send} />}
+                    isLoading={sending}
+                    isDisabled={!draft.trim()}
+                    type="submit"
                   />
-                  <div className="flex items-center justify-between gap-2 px-3 pb-2">
-                    <span className="text-sm text-secondary max-sm:hidden">
-                      Ctrl + Enter to send
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="ml-auto"
-                      onClick={sendReply}
-                      disabled={sending || !draft.trim()}
-                    >
-                      <Send data-icon="inline-start" />
-                      {sending ? "Sending…" : "Send reply"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
+                </HStack>
+              </VStack>
             </>
           )}
-        </section>
+        </VStack>
       </div>
     </div>
   );
 }
 
-function shortTime(value?: number) {
-  if (!value) return "";
-  const date = new Date(value);
-  const sameDay = date.toDateString() === new Date().toDateString();
-  return sameDay
-    ? date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
-    : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function formatTime(value?: number) {
-  return value ? new Date(value).toLocaleString() : "";
+function isoTime(value: number) {
+  return new Date(value).toISOString();
 }
