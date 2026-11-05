@@ -55,7 +55,12 @@ export function replyEvent(input: {
   return {
     ...input,
     type: "reply",
-    dedupeKey: `reply:${input.threadId}`,
+    // One reply per person per campaign: a contact replying again, or in a split thread,
+    // still counts once, so reply rate cannot pass 100%.
+    dedupeKey:
+      input.campaignId && input.contactId
+        ? `reply:${input.campaignId}:${input.contactId}`
+        : `reply:${input.threadId}`,
   };
 }
 

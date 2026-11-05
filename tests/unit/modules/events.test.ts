@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { recordEvent, sentEvent } from "../../../src/server/modules/events";
+import { recordEvent, replyEvent, sentEvent } from "../../../src/server/modules/events";
 import type { EventRepo } from "../../../src/server/ports";
 
 describe("events module", () => {
@@ -31,5 +31,18 @@ describe("events module", () => {
         dedupeKey: "sent:assignment_1:0",
       })
     );
+  });
+
+  test("counts one reply per contact per campaign, however many threads they reply in", () => {
+    const reply = (threadId: string) =>
+      replyEvent({
+        orgId: "org_1",
+        campaignId: "campaign_1",
+        contactId: "contact_1",
+        threadId,
+        occurredAt: 1000,
+      }).dedupeKey;
+
+    expect(reply("thread_1")).toBe(reply("thread_2"));
   });
 });
