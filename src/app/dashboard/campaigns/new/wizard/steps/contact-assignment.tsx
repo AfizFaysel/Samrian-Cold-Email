@@ -85,14 +85,14 @@ export function ContactAssignmentStep({ draft, setDraft }: ContactAssignmentStep
           <EmptyState
             icon={Layers}
             title="No groups yet"
-            description="Create a group from your contacts first, or pick contacts one by one."
+            description="On Contacts, select people and choose Add to group, or pick contacts one by one."
           />
         ) : (
           <RadioList label="Group" value={draft.targetGroupId ?? ""} onChange={handleGroupSelect}>
             {contactGroups.map((group: any) => (
               <RadioListItem
-                key={group._id}
-                value={group._id}
+                key={group.id}
+                value={group.id}
                 label={group.name}
                 description={group.description}
                 endContent={<Text type="supporting">{group.isDynamic ? "Dynamic" : "Static"}</Text>}

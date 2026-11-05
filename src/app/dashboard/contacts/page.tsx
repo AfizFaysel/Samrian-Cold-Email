@@ -3,8 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, Plus, Search, Trash2, Upload, Users, X } from "lucide-react";
+import { Clock, Layers, Plus, Search, Trash2, Upload, Users, X } from "lucide-react";
 import { toast } from "sonner";
+import { AddToGroupDialog } from "@/components/add-to-group-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Page, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
@@ -54,6 +55,7 @@ export default function ContactsPage() {
   const [debouncedQuery, setDebouncedQuery] = React.useState("");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [showTimezoneModal, setShowTimezoneModal] = React.useState(false);
+  const [showGroupModal, setShowGroupModal] = React.useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<string[] | null>(null);
   const [timezone, setTimezone] = React.useState("America/New_York");
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -153,6 +155,10 @@ export default function ContactsPage() {
               <span className="mr-auto text-base font-medium tabular-nums">
                 {selectedIds.size} selected
               </span>
+              <Button variant="outline" size="sm" onClick={() => setShowGroupModal(true)}>
+                <Layers data-icon="inline-start" />
+                Add to group
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setShowTimezoneModal(true)}>
                 <Clock data-icon="inline-start" />
                 Set time zone
@@ -327,6 +333,13 @@ export default function ContactsPage() {
         variant="destructive"
         isLoading={isDeleting}
         onConfirm={() => (pendingDelete ? handleDelete(pendingDelete) : undefined)}
+      />
+
+      <AddToGroupDialog
+        contactIds={Array.from(selectedIds)}
+        isOpen={showGroupModal}
+        onOpenChange={setShowGroupModal}
+        onAdded={() => setSelectedIds(new Set())}
       />
 
       <Dialog open={showTimezoneModal} onOpenChange={setShowTimezoneModal}>
