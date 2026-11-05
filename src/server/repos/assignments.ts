@@ -133,6 +133,17 @@ export class PostgresAssignmentRepo {
     }));
   }
 
+  async countByStatus(campaignId: CampaignId, orgId: OrgId): Promise<Record<string, number>> {
+    const rows = await this.db
+      .select({ status: contactAssignments.status, count: sql<number>`count(*)::int` })
+      .from(contactAssignments)
+      .where(
+        and(eq(contactAssignments.campaignId, campaignId), eq(contactAssignments.orgId, orgId))
+      )
+      .groupBy(contactAssignments.status);
+    return Object.fromEntries(rows.map((row) => [row.status, Number(row.count)]));
+  }
+
   async listByContact(contactId: ContactId, orgId: OrgId, limit = 50) {
     const rows = await this.db
       .select()
