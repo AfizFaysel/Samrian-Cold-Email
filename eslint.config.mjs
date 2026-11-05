@@ -59,7 +59,6 @@ const eslintConfig = [
     // Shrink-only list: remove a file once it no longer imports @/components/ui/*.
     files: [
       "src/components/ui/**",
-      "src/app/dashboard/analytics/page.tsx",
       "src/app/dashboard/blocklist/page.tsx",
       "src/app/dashboard/campaigns/new/wizard/page.tsx",
       "src/app/dashboard/campaigns/new/wizard/steps/basic-info.tsx",

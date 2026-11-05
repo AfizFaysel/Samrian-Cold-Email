@@ -1,42 +1,64 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { BarChart3, MousePointerClick, Reply, Send, ShieldAlert, UserMinus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@astryxdesign/core/Button";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Link } from "@astryxdesign/core/Link";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { pixel, proportional, Table, type TableColumn } from "@astryxdesign/core/Table";
+import { Text } from "@astryxdesign/core/Text";
+import {
+  BarChart3,
+  Eye,
+  MousePointerClick,
+  Reply,
+  Send,
+  ShieldAlert,
+  UserMinus,
+} from "lucide-react";
 import { Page, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
 import { TimePeriodSelector, type TimePeriod } from "@/components/time-period-selector";
-import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
 
 type OrgAnalytics = {
   totalSent: number;
+  replies: number;
   estimatedOpenRate: number | null;
   replyRate: number;
-  bounceRate?: number;
-  unsubscribeRate?: number;
-  clickRate?: number | null;
+  bounceRate: number;
+  unsubscribeRate: number;
+  clickRate: number | null;
 };
 
-type CampaignRow = {
+interface CampaignRow extends Record<string, unknown> {
   _id: string;
   name: string;
   status: string;
   emailsSent: number;
   replyRate: number;
   bounceRate: number;
-};
+}
+
+// Same thresholds as Overview: under 2% is healthy, 5% and up puts sending domains at risk.
+const BOUNCE_WARN = 2;
+const BOUNCE_DANGER = 5;
 
 const pct = (value?: number | null) => (value == null ? "—" : `${value.toFixed(1)}%`);
+const bounceTone = (rate: number) =>
+  rate >= BOUNCE_DANGER ? "text-error" : rate >= BOUNCE_WARN ? "text-warning" : undefined;
 
 export default function AnalyticsPage() {
+  const router = useRouter();
   const [period, setPeriod] = React.useState<TimePeriod>("30");
   const stats = useApi<OrgAnalytics>(`/api/analytics/org?days=${period}`);
   const campaigns = useApi<{ campaigns: CampaignRow[] }>("/api/campaigns");
   const loading = stats.isLoading && !stats.data;
+  const bounceRate = stats.data?.bounceRate ?? 0;
 
   const ranked = React.useMemo(
     () =>
@@ -47,10 +69,67 @@ export default function AnalyticsPage() {
   );
   const bestReplyRate = Math.max(1, ...ranked.map((campaign) => campaign.replyRate));
 
+  const columns = React.useMemo<TableColumn<CampaignRow>[]>(
+    () => [
+      {
+        key: "name",
+        header: "Campaign",
+        width: proportional(2, { minWidth: 180 }),
+        renderCell: (campaign) => (
+          <Link href={`/dashboard/campaigns/${campaign._id}`} isStandalone>
+            {campaign.name}
+          </Link>
+        ),
+      },
+      {
+        key: "status",
+        header: "Status",
+        renderCell: (campaign) => <StatusBadge status={campaign.status} />,
+      },
+      {
+        key: "emailsSent",
+        header: "Sent",
+        align: "end",
+        width: pixel(80),
+        renderCell: (campaign) => (
+          <Text className="tabular-nums">{campaign.emailsSent.toLocaleString()}</Text>
+        ),
+      },
+      {
+        key: "replyRate",
+        header: "Reply rate",
+        width: proportional(2, { minWidth: 200 }),
+        renderCell: (campaign) => (
+          // Bar length is relative to the best campaign, so the ranking reads at a glance.
+          <ProgressBar
+            label={`${campaign.name} reply rate`}
+            isLabelHidden
+            hasValueLabel
+            formatValueLabel={() => pct(campaign.replyRate)}
+            value={campaign.replyRate}
+            max={bestReplyRate}
+          />
+        ),
+      },
+      {
+        key: "bounceRate",
+        header: "Bounce rate",
+        align: "end",
+        width: pixel(112),
+        renderCell: (campaign) => (
+          <Text className={cn("tabular-nums", bounceTone(campaign.bounceRate))}>
+            {pct(campaign.bounceRate)}
+          </Text>
+        ),
+      },
+    ],
+    [bestReplyRate]
+  );
+
   return (
     <Page
       title="Analytics"
-      description="Delivery and engagement across every campaign."
+      description="Which campaigns land replies, and whether your sending stays healthy."
       actions={<TimePeriodSelector value={period} onChange={setPeriod} />}
     >
       {stats.error && !stats.data ? (
@@ -58,7 +137,7 @@ export default function AnalyticsPage() {
           <ErrorState title="Couldn't load analytics" onRetry={stats.refetch} />
         </Panel>
       ) : (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <Grid columns={{ minWidth: 160, repeat: "fit" }} gap={4}>
           <StatCard
             label="Emails sent"
             icon={Send}
@@ -71,6 +150,14 @@ export default function AnalyticsPage() {
             icon={Reply}
             isLoading={loading}
             value={pct(stats.data?.replyRate)}
+            hint={`${(stats.data?.replies ?? 0).toLocaleString()} people replied`}
+          />
+          <StatCard
+            label="Open rate"
+            icon={Eye}
+            isLoading={loading}
+            value={pct(stats.data?.estimatedOpenRate)}
+            hint={stats.data?.estimatedOpenRate == null ? "Open tracking is off" : "Estimated"}
           />
           <StatCard
             label="Click rate"
@@ -82,12 +169,14 @@ export default function AnalyticsPage() {
             label="Bounce rate"
             icon={ShieldAlert}
             isLoading={loading}
-            value={
-              <span className={cn((stats.data?.bounceRate ?? 0) > 5 && "text-error")}>
-                {pct(stats.data?.bounceRate)}
-              </span>
+            value={<span className={bounceTone(bounceRate)}>{pct(bounceRate)}</span>}
+            hint={
+              bounceRate >= BOUNCE_DANGER
+                ? "Too high: clean your list"
+                : bounceRate >= BOUNCE_WARN
+                  ? "Watch this: aim under 2%"
+                  : "Healthy: under 2%"
             }
-            hint={(stats.data?.bounceRate ?? 0) > 5 ? "Above 5%: clean your list" : "Keep under 2%"}
           />
           <StatCard
             label="Unsubscribe rate"
@@ -95,7 +184,7 @@ export default function AnalyticsPage() {
             isLoading={loading}
             value={pct(stats.data?.unsubscribeRate)}
           />
-        </div>
+        </Grid>
       )}
 
       <Panel title="Campaigns by reply rate" description="All time, campaigns that have sent.">
@@ -109,69 +198,15 @@ export default function AnalyticsPage() {
             title="Nothing to compare yet"
             description="Once a campaign sends its first emails, its results show up here."
             action={
-              <Link href="/dashboard/campaigns" className={buttonVariants({ variant: "outline" })}>
-                Go to campaigns
-              </Link>
+              <Button
+                label="Go to campaigns"
+                variant="secondary"
+                onClick={() => router.push("/dashboard/campaigns")}
+              />
             }
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-base">
-              <thead>
-                <tr className="border-b text-sm text-secondary">
-                  <th className="px-4 py-2.5 font-medium">Campaign</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Sent</th>
-                  <th className="w-[38%] px-4 py-2.5 font-medium">Reply rate</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Bounce rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ranked.map((campaign) => (
-                  <tr
-                    key={campaign._id}
-                    className="border-b transition-colors last:border-0 hover:bg-muted/60"
-                  >
-                    <td className="px-4 py-3 font-medium">
-                      <Link
-                        href={`/dashboard/campaigns/${campaign._id}`}
-                        className="hover:text-accent"
-                      >
-                        {campaign.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={campaign.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {campaign.emailsSent.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-accent-bg"
-                            style={{ width: `${(campaign.replyRate / bestReplyRate) * 100}%` }}
-                          />
-                        </div>
-                        <span className="w-12 text-right tabular-nums">
-                          {campaign.replyRate.toFixed(1)}%
-                        </span>
-                      </div>
-                    </td>
-                    <td
-                      className={cn(
-                        "px-4 py-3 text-right tabular-nums",
-                        campaign.bounceRate > 5 && "text-error"
-                      )}
-                    >
-                      {campaign.bounceRate.toFixed(1)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table data={ranked} columns={columns} idKey="_id" hasHover />
         )}
       </Panel>
     </Page>
