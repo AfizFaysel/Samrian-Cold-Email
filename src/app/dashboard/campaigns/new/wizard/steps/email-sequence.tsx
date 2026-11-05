@@ -1,6 +1,8 @@
 import * as React from "react";
 import type { CampaignDraft } from "../page";
+import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { Mail, Plus, Trash2 } from "lucide-react";
@@ -18,6 +20,9 @@ interface EmailSequenceStepProps {
   draft: CampaignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CampaignDraft>>;
 }
+
+// Matches the worker's default when a step has no delay (src/server/jobs/schedule.ts).
+const DEFAULT_DELAY_DAYS = 3;
 
 const VARIABLES = [
   { key: "firstName", label: "First Name" },
@@ -53,6 +58,13 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
     if (activeStepIndex >= draft.steps.length - 1) {
       setActiveStepIndex(Math.max(0, draft.steps.length - 2));
     }
+  };
+
+  const updateDelay = (index: number, field: "delayDays" | "delayHours", value: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      steps: prev.steps.map((step, i) => (i === index ? { ...step, [field]: value } : step)),
+    }));
   };
 
   const updateStep = (index: number, field: "subject" | "body", value: string) => {
@@ -137,6 +149,7 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
                 <span className="truncate text-sm text-secondary">
                   {step.subject || "No subject"}
                 </span>
+                {index > 0 && <Text type="supporting">{formatDelay(step)}</Text>}
               </span>
             </button>
           ))}
@@ -157,6 +170,31 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
                 </Button>
               )}
             </div>
+
+            {activeStepIndex > 0 && (
+              <HStack gap={3} wrap="wrap">
+                <NumberInput
+                  label="Wait days"
+                  description="After the previous step"
+                  value={activeStep.delayDays ?? DEFAULT_DELAY_DAYS}
+                  onChange={(value) => updateDelay(activeStepIndex, "delayDays", value)}
+                  min={0}
+                  max={60}
+                  hasNumberSteppers
+                  isWheelEnabled={false}
+                />
+                <NumberInput
+                  label="Wait hours"
+                  description="Added to the days"
+                  value={activeStep.delayHours ?? 0}
+                  onChange={(value) => updateDelay(activeStepIndex, "delayHours", value)}
+                  min={0}
+                  max={23}
+                  hasNumberSteppers
+                  isWheelEnabled={false}
+                />
+              </HStack>
+            )}
 
             <div className="flex flex-col gap-2">
               <span className="text-base font-medium">Merge fields</span>
@@ -241,4 +279,11 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
       </div>
     </div>
   );
+}
+
+export function formatDelay(step: { delayDays?: number; delayHours?: number }) {
+  const days = step.delayDays ?? DEFAULT_DELAY_DAYS;
+  const hours = step.delayHours ?? 0;
+  const parts = [days > 0 && `${days}d`, hours > 0 && `${hours}h`].filter(Boolean);
+  return parts.length ? `Waits ${parts.join(" ")}` : "Sends right after the previous step";
 }

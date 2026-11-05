@@ -6,6 +6,7 @@ import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList"
 import { Text } from "@astryxdesign/core/Text";
 import { Panel } from "@/components/page-header";
 import { useApi } from "@/hooks/use-api";
+import { formatDelay } from "./email-sequence";
 import { StepIntro } from "./step-intro";
 
 interface ReviewStepProps {
@@ -143,7 +144,10 @@ export function ReviewStep({ draft }: ReviewStepProps) {
           <ol className="divide-y">
             {draft.steps.map((step, index) => (
               <li key={index} className="flex flex-col gap-0.5 px-4 py-3">
-                <Text type="supporting">Step {index + 1}</Text>
+                <Text type="supporting">
+                  Step {index + 1}
+                  {index > 0 ? ` · ${formatDelay(step)}` : ""}
+                </Text>
                 <span className="text-base font-medium">{step.subject || "No subject"}</span>
                 <span className="line-clamp-2 text-sm text-secondary">{step.body}</span>
               </li>

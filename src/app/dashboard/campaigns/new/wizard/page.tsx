@@ -37,7 +37,7 @@ export type CampaignDraft = {
     startTime: string;
     endTime: string;
   };
-  steps: Array<{ subject: string; body: string }>;
+  steps: Array<{ subject: string; body: string; delayDays?: number; delayHours?: number }>;
   targetGroupId?: string;
   targetContactIds?: string[];
   mailboxIds?: string[];
