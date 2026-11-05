@@ -50,6 +50,8 @@ UI / API routes / workers
 - Keep comments for non-obvious invariants only.
 - Do not modify generated Drizzle metadata manually.
 - Do not restore removed Convex code or dependencies.
+- Build UI from Astryx, not `@/components/ui/*` (legacy shadcn). Lint blocks new imports; when a
+  file stops importing it, remove the file from the allowlist in `eslint.config.mjs`.
 
 ## Naming
 
