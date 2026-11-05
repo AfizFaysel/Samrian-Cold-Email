@@ -127,15 +127,27 @@ export function createBetterMachineCredential(api: BetterApi): MachineCredential
   };
 }
 
+/** A provider configuration gap the person creating the key can act on. */
+export class CredentialSetupError extends Error {}
+
 export function createWorkosMachineCredential(api: WorkosApi): MachineCredential {
   return {
     async create(input) {
       if (!api.createOrganizationApiKey) throw new Error("Credential management unavailable");
-      const key = await api.createOrganizationApiKey({
-        organizationId: input.orgId,
-        name: input.name,
-        permissions: input.scopes,
-      });
+      const key = await api
+        .createOrganizationApiKey({
+          organizationId: input.orgId,
+          name: input.name,
+          permissions: input.scopes,
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : "";
+          const slug = /Invalid permission slug: (\S+)/.exec(message)?.[1];
+          if (!slug) throw error;
+          throw new CredentialSetupError(
+            `The "${slug}" permission isn't enabled for API keys in WorkOS. Enable it under Authorization → Configuration → API key permissions, then try again.`
+          );
+        });
       return { ...toWorkosMetadata(key), value: key.value };
     },
     async list(input) {

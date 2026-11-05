@@ -2,6 +2,7 @@ import { scopes } from "../../packages/contracts/src";
 import {
   createBetterMachineCredential,
   createWorkosMachineCredential,
+  CredentialSetupError,
 } from "../../src/server/auth/machine-provider";
 import { describe, expect, it, vi } from "vitest";
 
@@ -163,6 +164,28 @@ describe("machine credential providers", () => {
       permissions: ["contacts:read"],
     });
     expect(deleteApiKey).toHaveBeenCalledWith("key_2");
+  });
+
+  it("explains a WorkOS permission that is not set up yet", async () => {
+    const credential = createWorkosMachineCredential({
+      createValidation: vi.fn(),
+      createOrganizationApiKey: vi
+        .fn()
+        .mockRejectedValue(
+          new Error(
+            "The following requirement must be met:\n\nInvalid permission slug: identity:read"
+          )
+        ),
+    });
+
+    const created = credential.create({
+      orgId: "org_2",
+      userId: "user_2",
+      name: "Agent",
+      scopes: ["identity:read"],
+    });
+    await expect(created).rejects.toBeInstanceOf(CredentialSetupError);
+    await expect(created).rejects.toThrow('"identity:read"');
   });
 
   it("reports Better Auth disable as reversible revocation", async () => {

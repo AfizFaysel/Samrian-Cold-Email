@@ -205,6 +205,11 @@ create the canonical `resource:action` permission slugs from `lib/permissions.ts
 Dashboard. Samrian sends only those canonical slugs to WorkOS and does not mirror custom roles in
 Postgres.
 
+API keys in WorkOS mode also need each API scope as a WorkOS permission slug, for example
+`identity:read` and `contacts:write`. Create every slug in `packages/contracts` `scopes` under
+Authorization → Permissions, then enable them for organizations under Authorization →
+Configuration → API key permissions. WorkOS rejects a key with any other permission slug.
+
 Role and permission changes are checked server-side on every Samrian operation. Existing WorkOS
 sessions may retain old claims until AuthKit refreshes the session; sign out and back in when
 testing changed access. Better Auth uses its server permission API so dynamic roles are not checked

@@ -2,7 +2,7 @@ import { scopes } from "@samrian/contracts";
 import { z } from "zod";
 
 import { createSessionAction } from "@/server/api/session-route";
-import { getMachineCredential } from "@/server/auth/machine-provider";
+import { CredentialSetupError, getMachineCredential } from "@/server/auth/machine-provider";
 import { sessionOperations } from "@/server/auth/policy";
 import { getAuthProvider } from "@/server/auth/provider";
 import { createApiKey, listApiKeys } from "@/server/modules/api-keys";
@@ -26,11 +26,18 @@ export const POST = createSessionAction(
     if (!parsed.success) return Response.json({ error: "Invalid API key" }, { status: 400 });
 
     const provider = await getMachineCredential(request.headers);
-    const key = await createApiKey(parsed.data, {
-      actor,
-      provider,
-      hasPermission: (permissions) => getAuthProvider().hasPermission(permissions),
-    });
-    return Response.json(key, { status: 201 });
+    try {
+      const key = await createApiKey(parsed.data, {
+        actor,
+        provider,
+        hasPermission: (permissions) => getAuthProvider().hasPermission(permissions),
+      });
+      return Response.json(key, { status: 201 });
+    } catch (error) {
+      if (error instanceof CredentialSetupError) {
+        return Response.json({ error: error.message }, { status: 422 });
+      }
+      throw error;
+    }
   }
 );
