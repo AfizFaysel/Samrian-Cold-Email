@@ -4,10 +4,14 @@ import * as React from "react";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import type { ContactData } from "./index";
 import { StepHeader, WizardFooter, WizardContainer } from "./shared";
+import { toast } from "sonner";
+import { requestJson } from "@/lib/request";
+
+export type ImportResult = { created: number; updated: number; skipped: number };
 
 interface ReviewValidationProps {
   contacts: ContactData[];
-  onImport: (validContacts: ContactData[]) => void;
+  onImport: (result: ImportResult) => void;
   onBack: () => void;
   onCancel: () => void;
 }
@@ -20,7 +24,18 @@ export function ReviewValidation({ contacts, onImport, onBack, onCancel }: Revie
   const [isImporting, setIsImporting] = React.useState(false);
   const [skipInvalid, setSkipInvalid] = React.useState(true);
 
-  const validContacts = contacts.filter((c) => isValidEmail(c.email));
+  const seen = new Set<string>();
+  const duplicateContacts: ContactData[] = [];
+  const validContacts = contacts.filter((c) => {
+    if (!isValidEmail(c.email)) return false;
+    const email = c.email.trim().toLowerCase();
+    if (seen.has(email)) {
+      duplicateContacts.push(c);
+      return false;
+    }
+    seen.add(email);
+    return true;
+  });
   const invalidContacts = contacts.filter((c) => !isValidEmail(c.email));
 
   const handleImport = async () => {
@@ -28,7 +43,7 @@ export function ReviewValidation({ contacts, onImport, onBack, onCancel }: Revie
     try {
       const contactsToImport = skipInvalid ? validContacts : contacts;
 
-      await requestJson("/api/contacts", {
+      const result = await requestJson<ImportResult>("/api/contacts", {
         method: "POST",
         body: JSON.stringify({
           contacts: contactsToImport.map((c) => ({
@@ -39,10 +54,9 @@ export function ReviewValidation({ contacts, onImport, onBack, onCancel }: Revie
         }),
       });
 
-      onImport(contactsToImport);
+      onImport(result);
     } catch (error) {
-      console.error("Import failed:", error);
-      alert("Failed to import contacts. Please try again.");
+      toast.error(error instanceof Error ? error.message : "Couldn't import contacts. Try again.");
     } finally {
       setIsImporting(false);
     }
@@ -58,7 +72,7 @@ export function ReviewValidation({ contacts, onImport, onBack, onCancel }: Revie
       />
 
       {/* Stats */}
-      <div className="mb-8 grid grid-cols-3 gap-4">
+      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-lg border border-border bg-card p-6">
           <p className="text-2xl font-semibold text-primary">{contacts.length}</p>
           <p className="text-base text-secondary">Total Contacts</p>
@@ -70,6 +84,10 @@ export function ReviewValidation({ contacts, onImport, onBack, onCancel }: Revie
         <div className="rounded-lg border border-error/30 bg-error-muted p-6">
           <p className="text-2xl font-semibold text-error">{invalidContacts.length}</p>
           <p className="text-base text-error">Invalid Emails</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-6">
+          <p className="text-2xl font-semibold text-primary">{duplicateContacts.length}</p>
+          <p className="text-base text-secondary">Duplicates skipped</p>
         </div>
       </div>
 
@@ -137,15 +155,4 @@ export function ReviewValidation({ contacts, onImport, onBack, onCancel }: Revie
       />
     </WizardContainer>
   );
-}
-
-async function requestJson(url: string, init: RequestInit) {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init.headers },
-  });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `Request failed: ${response.status}`);
-  }
 }

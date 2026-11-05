@@ -6,7 +6,7 @@ import { MethodSelection } from "./method-selection";
 import { CsvUpload } from "./csv-upload";
 import { ManualEntry } from "./manual-entry";
 import { FieldMapping } from "./field-mapping";
-import { ReviewValidation } from "./review-validation";
+import { ReviewValidation, type ImportResult } from "./review-validation";
 import { Success } from "./success";
 
 export type WizardStep = "method" | "upload" | "mapping" | "review" | "success";
@@ -36,6 +36,8 @@ interface AddContactsWizardProps {
   onSuccess?: () => void;
 }
 
+const emptyResult: ImportResult = { created: 0, updated: 0, skipped: 0 };
+
 export function AddContactsWizard({ open, onOpenChange, onSuccess }: AddContactsWizardProps) {
   const [state, setState] = React.useState<WizardState>({
     step: "method",
@@ -48,6 +50,7 @@ export function AddContactsWizard({ open, onOpenChange, onSuccess }: AddContacts
     invalidContacts: [],
     duplicates: [],
   });
+  const [importResult, setImportResult] = React.useState<ImportResult>(emptyResult);
 
   const updateState = (updates: Partial<WizardState>) => {
     setState((prev) => ({ ...prev, ...updates }));
@@ -70,6 +73,7 @@ export function AddContactsWizard({ open, onOpenChange, onSuccess }: AddContacts
       invalidContacts: [],
       duplicates: [],
     });
+    setImportResult(emptyResult);
     onOpenChange(false);
   };
 
@@ -128,8 +132,8 @@ export function AddContactsWizard({ open, onOpenChange, onSuccess }: AddContacts
         {state.step === "review" && (
           <ReviewValidation
             contacts={state.contacts}
-            onImport={(validContacts) => {
-              updateState({ validContacts });
+            onImport={(result) => {
+              setImportResult(result);
               goToStep("success");
             }}
             onBack={() => goToStep("mapping")}
@@ -137,9 +141,7 @@ export function AddContactsWizard({ open, onOpenChange, onSuccess }: AddContacts
           />
         )}
 
-        {state.step === "success" && (
-          <Success contactCount={state.validContacts.length} onClose={handleSuccess} />
-        )}
+        {state.step === "success" && <Success result={importResult} onClose={handleSuccess} />}
       </DialogContent>
     </Dialog>
   );

@@ -17,6 +17,7 @@ import { EmailSequenceStep } from "./steps/email-sequence";
 import { ContactAssignmentStep } from "./steps/contact-assignment";
 import { MailboxesStep } from "./steps/mailboxes";
 import { ReviewStep } from "./steps/review";
+import { requestJson } from "@/lib/request";
 
 const STEPS = [
   { id: 1, name: "Basics", component: BasicInfoStep },
@@ -236,21 +237,6 @@ export default function CampaignWizardPage() {
       />
     </Page>
   );
-}
-
-async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init.headers },
-  });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      issues?: string[];
-    };
-    throw new Error(body.issues?.join(". ") ?? body.error ?? `Request failed: ${response.status}`);
-  }
-  return response.json() as Promise<T>;
 }
 
 function formatRelativeTime(date: Date): string {

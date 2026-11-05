@@ -192,7 +192,7 @@ async function processContacts(
         const updated = await deps.contacts.update(existing.id, input.orgId, {
           email,
           domain,
-          customVars: row.customVars,
+          customVars: { ...existing.customVars, ...row.customVars },
           timezone,
           ...verificationPatch(verification),
         });

@@ -194,4 +194,31 @@ describe("contact hygiene module", () => {
       ])
     );
   });
+
+  test("keeps existing custom fields that a reimport leaves out", async () => {
+    const existing: ContactRecord = {
+      id: "contact_1",
+      orgId: "org_1",
+      email: "qa@example.com",
+      customVars: { name: "QA Primary", firstName: "QA", company: "Acme" },
+    };
+    let saved: Record<string, unknown> | undefined;
+
+    await importContacts(
+      { orgId: "org_1", rows: [{ email: "qa@example.com", customVars: { firstName: "Q" } }] },
+      {
+        contacts: {
+          getByEmail: async () => existing,
+          create: async () => existing,
+          async update(_id, _orgId, input) {
+            saved = input.customVars;
+            return existing;
+          },
+        },
+        blocklist: { isBlocked: async () => false },
+      }
+    );
+
+    expect(saved).toEqual({ name: "QA Primary", firstName: "Q", company: "Acme" });
+  });
 });

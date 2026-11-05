@@ -60,6 +60,8 @@ export function FieldMapping({ rawData, onNext, onBack, onCancel }: FieldMapping
           customVars[field] = row[j];
         }
       });
+      const name = [customVars.firstName, customVars.lastName].filter(Boolean).join(" ");
+      if (name) customVars.name = name;
 
       const timezoneIndex = headers.findIndex((h) => mapping[h] === "timezone");
       const timezone = timezoneIndex >= 0 ? row[timezoneIndex] : undefined;

@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
+import { requestJson } from "@/lib/request";
 
 type ReasonFilter = "all" | "unsubscribed" | "bounced_hard" | "manual";
 
@@ -258,16 +259,4 @@ export default function BlocklistPage() {
       </Dialog>
     </Page>
   );
-}
-
-async function requestJson(url: string, init: RequestInit) {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init.headers },
-  });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `Request failed: ${response.status}`);
-  }
-  return response.json();
 }

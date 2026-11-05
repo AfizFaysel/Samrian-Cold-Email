@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { responseError } from "@/lib/request";
 import { cn } from "@/lib/utils";
 
 type ComplianceSettings = {
@@ -103,8 +104,7 @@ export default function SettingsPage() {
       body: JSON.stringify(settings),
     });
     if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-      setStatus(body.error ?? "Could not save settings");
+      setStatus(await responseError(response, "Could not save settings"));
       return;
     }
     setSettings({ ...fallbackSettings, ...(await response.json()) });

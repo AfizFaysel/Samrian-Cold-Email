@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Upload, FileText, X, Download } from "lucide-react";
+import { toast } from "sonner";
 import { StepHeader, WizardFooter, WizardContainer } from "./shared";
 
 interface CsvUploadProps {
@@ -43,7 +44,7 @@ export function CsvUpload({ onNext, onBack, onCancel }: CsvUploadProps) {
 
   const handleFileSelect = async (selectedFile: File) => {
     if (!selectedFile.name.endsWith(".csv")) {
-      alert("Please upload a CSV file");
+      toast.error("That file isn't a CSV. Export your list as .csv and try again.");
       return;
     }
 

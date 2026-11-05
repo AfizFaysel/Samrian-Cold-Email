@@ -8,7 +8,10 @@ import { MethodSelection } from "@/components/add-contacts-wizard/method-selecti
 import { CsvUpload } from "@/components/add-contacts-wizard/csv-upload";
 import { ManualEntry } from "@/components/add-contacts-wizard/manual-entry";
 import { FieldMapping } from "@/components/add-contacts-wizard/field-mapping";
-import { ReviewValidation } from "@/components/add-contacts-wizard/review-validation";
+import {
+  ReviewValidation,
+  type ImportResult,
+} from "@/components/add-contacts-wizard/review-validation";
 import { Success } from "@/components/add-contacts-wizard/success";
 import type { WizardStep, ImportMethod, ContactData } from "@/components/add-contacts-wizard";
 
@@ -20,7 +23,11 @@ export default function ImportContactsPage() {
   const [rawData, setRawData] = React.useState<string[][]>([]);
   const [fieldMapping, setFieldMapping] = React.useState<Record<string, string>>({});
   const [contacts, setContacts] = React.useState<ContactData[]>([]);
-  const [validContacts, setValidContacts] = React.useState<ContactData[]>([]);
+  const [importResult, setImportResult] = React.useState<ImportResult>({
+    created: 0,
+    updated: 0,
+    skipped: 0,
+  });
 
   const handleCancel = () => {
     router.push("/dashboard/contacts");
@@ -113,8 +120,8 @@ export default function ImportContactsPage() {
         {step === "review" && (
           <ReviewValidation
             contacts={contacts}
-            onImport={(imported) => {
-              setValidContacts(imported);
+            onImport={(result) => {
+              setImportResult(result);
               setStep("success");
             }}
             onBack={() => setStep(method === "manual" ? "upload" : "mapping")}
@@ -122,9 +129,7 @@ export default function ImportContactsPage() {
           />
         )}
 
-        {step === "success" && (
-          <Success contactCount={validContacts.length} onClose={handleSuccess} />
-        )}
+        {step === "success" && <Success result={importResult} onClose={handleSuccess} />}
       </div>
     </Page>
   );

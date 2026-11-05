@@ -17,6 +17,7 @@ import { InboxAttachments, type InboxAttachment } from "@/components/inbox/attac
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
+import { responseError } from "@/lib/request";
 import { cn } from "@/lib/utils";
 
 type InboxThread = {
@@ -116,10 +117,7 @@ export default function InboxPage() {
           clientRequestId: (replyRequestId.current ??= crypto.randomUUID()),
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `Request failed: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(await responseError(response));
       replyRequestId.current = undefined;
       setDraft("");
       refetchThread();

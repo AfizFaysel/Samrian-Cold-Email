@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { CampaignAnalytics } from "@/components/campaigns/campaign-analytics";
 import { ContactActivity } from "@/components/campaigns/contact-activity";
 import { useApi } from "@/hooks/use-api";
+import { requestJson } from "@/lib/request";
 
 interface CampaignDetailPageProps {
   params: Promise<{
@@ -208,15 +209,4 @@ function formatDays(days: string[]) {
     return "Weekdays";
   if (short.length === 7) return "Every day";
   return DAY_ORDER.filter((day) => short.includes(day)).join(", ");
-}
-
-async function requestJson(url: string, init: RequestInit) {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init.headers },
-  });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `Request failed: ${response.status}`);
-  }
 }
