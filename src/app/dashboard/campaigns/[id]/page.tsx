@@ -1,14 +1,18 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Icon } from "@astryxdesign/core/Icon";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { VStack } from "@astryxdesign/core/VStack";
 import { ArrowLeft, CheckCircle, Megaphone, Pause, Play } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Page, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState } from "@/components/page-state";
-import { StatusBadge } from "@/components/status-badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge, StatusPill } from "@/components/status-badge";
 import { toast } from "sonner";
 import { CampaignAnalytics } from "@/components/campaigns/campaign-analytics";
 import { ContactActivity } from "@/components/campaigns/contact-activity";
@@ -24,17 +28,20 @@ interface CampaignDetailPageProps {
 export default function CampaignDetailPage({ params }: CampaignDetailPageProps) {
   // Unwrap params Promise (Next.js 15+ requirement)
   const { id: campaignId } = React.use(params);
+  const router = useRouter();
 
   const { data, error, refetch } = useApi<{ campaign: any | null }>(`/api/campaigns/${campaignId}`);
   const campaign = data?.campaign;
 
-  const [isUpdating, setIsUpdating] = React.useState(false);
+  // Which header action is running, so only that button shows a spinner.
+  const [pending, setPending] = React.useState<"pause" | "resume" | "complete" | null>(null);
+  const isUpdating = pending !== null;
   const [showCompleteConfirm, setShowCompleteConfirm] = React.useState(false);
 
   const isLoading = data === undefined;
 
   const handleResume = async () => {
-    setIsUpdating(true);
+    setPending("resume");
     try {
       await requestJson(`/api/campaigns/${campaignId}/resume`, { method: "POST" });
       refetch();
@@ -42,13 +49,13 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to resume campaign");
     } finally {
-      setIsUpdating(false);
+      setPending(null);
     }
   };
 
   // Reusable status update handler (DRY - single source of truth)
-  const handleStatusChange = async (newStatus: string, actionLabel: string) => {
-    setIsUpdating(true);
+  const handleStatusChange = async (newStatus: "paused" | "completed", actionLabel: string) => {
+    setPending(newStatus === "paused" ? "pause" : "complete");
     try {
       await requestJson(`/api/campaigns/${campaignId}`, {
         method: "PATCH",
@@ -61,7 +68,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
         error instanceof Error ? error.message : `Failed to ${actionLabel.toLowerCase()} campaign`
       );
     } finally {
-      setIsUpdating(false);
+      setPending(null);
     }
   };
 
@@ -83,12 +90,10 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   if (isLoading) {
     return (
       <Page title="Campaign" breadcrumbs={crumbs}>
-        <div className="grid gap-4 md:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-20 rounded-lg" />
-          ))}
-        </div>
-        <Skeleton className="h-72 rounded-lg" />
+        <VStack gap={4}>
+          <Skeleton height={80} />
+          <Skeleton height={288} index={1} />
+        </VStack>
       </Page>
     );
   }
@@ -102,10 +107,12 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
             title="Campaign not found"
             description="It may have been deleted, or it belongs to another workspace."
             action={
-              <Link href="/dashboard/campaigns" className={buttonVariants({ variant: "outline" })}>
-                <ArrowLeft data-icon="inline-start" />
-                Back to campaigns
-              </Link>
+              <Button
+                label="Back to campaigns"
+                variant="secondary"
+                icon={<Icon icon={ArrowLeft} />}
+                onClick={() => router.push("/dashboard/campaigns")}
+              />
             }
           />
         </Panel>
@@ -118,67 +125,60 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
   return (
     <Page
       title={campaign.name}
-      description={
-        <span className="inline-flex items-center gap-2">
-          <StatusBadge status={campaign.status} />
-        </span>
-      }
+      description={<StatusBadge status={campaign.status} />}
       breadcrumbs={crumbs}
       actions={
         <>
           {canStop && (
             <Button
-              variant="outline"
+              label="Mark complete"
+              variant="secondary"
+              icon={<Icon icon={CheckCircle} />}
+              isDisabled={isUpdating}
               onClick={() => setShowCompleteConfirm(true)}
-              disabled={isUpdating}
-            >
-              <CheckCircle data-icon="inline-start" />
-              Mark complete
-            </Button>
+            />
           )}
           {campaign.status === "active" && (
             <Button
+              label="Pause"
               variant="secondary"
+              icon={<Icon icon={Pause} />}
+              isLoading={pending === "pause"}
+              isDisabled={isUpdating && pending !== "pause"}
               onClick={() => handleStatusChange("paused", "Paused")}
-              disabled={isUpdating}
-            >
-              <Pause data-icon="inline-start" />
-              {isUpdating ? "Pausing…" : "Pause"}
-            </Button>
+            />
           )}
           {campaign.status === "paused" && (
-            <Button onClick={handleResume} disabled={isUpdating}>
-              <Play data-icon="inline-start" />
-              {isUpdating ? "Resuming…" : "Resume"}
-            </Button>
+            <Button
+              label="Resume"
+              variant="primary"
+              icon={<Icon icon={Play} />}
+              isLoading={pending === "resume"}
+              isDisabled={isUpdating && pending !== "resume"}
+              onClick={handleResume}
+            />
           )}
         </>
       }
     >
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-4">
-        {[
-          { label: "Time zone", value: campaign.schedule.defaultTimezone },
-          {
-            label: "Send window",
-            value: `${campaign.schedule.startTime} – ${campaign.schedule.endTime}`,
-          },
-          { label: "Days", value: formatDays(campaign.schedule.daysAllowed) },
-          {
-            label: "Mailboxes",
-            value:
-              (campaign.mailboxIds?.length ?? 0) === 0 ? (
-                <span className="text-warning">None linked</span>
-              ) : (
-                `${campaign.mailboxIds.length} linked`
-              ),
-          },
-        ].map((item) => (
-          <div key={item.label} className="flex flex-col gap-1 bg-card p-4">
-            <dt className="text-sm text-secondary">{item.label}</dt>
-            <dd className="text-base font-medium">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <Card>
+        <MetadataList orientation="horizontal">
+          <MetadataListItem label="Time zone">{campaign.schedule.defaultTimezone}</MetadataListItem>
+          <MetadataListItem label="Send window">
+            {`${campaign.schedule.startTime} – ${campaign.schedule.endTime}`}
+          </MetadataListItem>
+          <MetadataListItem label="Days">
+            {formatDays(campaign.schedule.daysAllowed)}
+          </MetadataListItem>
+          <MetadataListItem label="Mailboxes">
+            {(campaign.mailboxIds?.length ?? 0) === 0 ? (
+              <StatusPill tone="warning" label="None linked" />
+            ) : (
+              `${campaign.mailboxIds.length} linked`
+            )}
+          </MetadataListItem>
+        </MetadataList>
+      </Card>
 
       <CampaignAnalytics campaignId={campaignId} />
 
@@ -190,7 +190,7 @@ export default function CampaignDetailPage({ params }: CampaignDetailPageProps) 
         title="Mark this campaign complete?"
         description="Scheduled emails stop and the campaign moves to Completed. This can't be undone."
         confirmText="Mark complete"
-        isLoading={isUpdating}
+        isLoading={pending === "complete"}
         onConfirm={async () => {
           await handleStatusChange("completed", "Completed");
           setShowCompleteConfirm(false);
