@@ -1,7 +1,8 @@
 import * as React from "react";
 import type { CampaignDraft } from "../page";
 import { Banner } from "@astryxdesign/core/Banner";
-import { Icon } from "@astryxdesign/core/Icon";
+import { Button } from "@astryxdesign/core/Button";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { Text } from "@astryxdesign/core/Text";
 import { Panel } from "@/components/page-header";
@@ -12,14 +13,17 @@ import { StepIntro } from "./step-intro";
 interface ReviewStepProps {
   draft: CampaignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CampaignDraft>>;
+  goToStep?: (step: number) => void;
 }
+
+type Issue = { label: string; step?: number; href?: string };
 
 type MailboxCapacity = {
   _id: string;
   availableToday: number;
 };
 
-export function ReviewStep({ draft }: ReviewStepProps) {
+export function ReviewStep({ draft, goToStep }: ReviewStepProps) {
   const { data: groupData } = useApi<{ group: any | null; count: number }>(
     draft.targetGroupId ? `/api/groups/${draft.targetGroupId}` : null
   );
@@ -30,35 +34,34 @@ export function ReviewStep({ draft }: ReviewStepProps) {
   const contactGroup = draft.targetGroupId ? groupData?.group : null;
   const groupContactCount = draft.targetGroupId ? groupData?.count : 0;
 
-  // Validation checks
-  const validations = [
-    {
-      label: "Campaign has a name",
-      valid: draft.name.trim().length > 0,
-    },
-    {
-      label: "At least one sending day",
-      valid: draft.schedule.daysAllowed.length > 0,
-    },
-    {
-      label: "At least one email",
-      valid: draft.steps.length > 0,
-    },
-    {
-      label: "Recipients chosen",
-      valid: !!draft.targetGroupId || (draft.targetContactIds && draft.targetContactIds.length > 0),
-    },
-    {
-      label: "At least one mailbox",
-      valid: (draft.mailboxIds?.length ?? 0) > 0,
-    },
-    {
-      label: "Mailing address set in Settings → General",
-      valid: !!compliance?.physicalAddress?.trim(),
-    },
-  ];
+  const incompleteSteps = draft.steps.flatMap((step, index) =>
+    step.subject.trim() && step.body.trim() ? [] : [index + 1]
+  );
 
-  const allValid = validations.every((v) => v.valid);
+  // Each launch blocker names where it gets fixed: a wizard step, or Settings.
+  const issues = (
+    [
+      !draft.name.trim() && { label: "Name the campaign", step: 1 },
+      draft.schedule.daysAllowed.length === 0 && {
+        label: "Pick at least one sending day",
+        step: 2,
+      },
+      draft.steps.length === 0 && { label: "Write at least one email", step: 3 },
+      incompleteSteps.length > 0 && {
+        label: `Add a subject and body to ${incompleteSteps.length === 1 ? "step" : "steps"} ${new Intl.ListFormat("en").format(incompleteSteps.map(String))}`,
+        step: 3,
+      },
+      !draft.targetGroupId &&
+        !draft.targetContactIds?.length && { label: "Choose who gets it", step: 4 },
+      !draft.mailboxIds?.length && { label: "Pick at least one mailbox", step: 5 },
+      compliance !== undefined &&
+        !compliance?.physicalAddress?.trim() && {
+          label: "Add your mailing address in Settings",
+          href: "/dashboard/settings",
+        },
+    ] as Array<Issue | false>
+  ).filter((issue): issue is Issue => !!issue);
+
   const targetCount = draft.targetGroupId
     ? (groupContactCount ?? 0)
     : (draft.targetContactIds?.length ?? 0);
@@ -78,81 +81,86 @@ export function ReviewStep({ draft }: ReviewStepProps) {
         description="Check everything once. You can pause a campaign at any time."
       />
 
-      {allValid ? (
+      {issues.length > 0 ? (
+        <Banner
+          status="warning"
+          title={`Fix ${issues.length === 1 ? "1 thing" : `${issues.length} things`} to launch`}
+          collapsible={false}
+        >
+          <List hasDividers edge="flush" density="compact">
+            {issues.map((issue) => (
+              <ListItem
+                key={issue.label}
+                label={issue.label}
+                endContent={
+                  <Button
+                    label={issue.href ? "Open Settings" : "Fix"}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() =>
+                      issue.href
+                        ? window.location.assign(issue.href)
+                        : issue.step && goToStep?.(issue.step)
+                    }
+                  />
+                }
+              />
+            ))}
+          </List>
+        </Banner>
+      ) : (
         <Banner
           status="success"
           title="Ready to launch"
-          description="Emails start on the schedule below."
-        />
-      ) : (
-        <Banner
-          status="warning"
-          title="A few things are missing"
-          description="Finish the steps marked below to launch."
+          description={
+            capacityShortfall
+              ? `Selected mailboxes have ${availableToday} sends available today for ${targetCount} contacts. The rest go out in later send windows.`
+              : "Emails start on the schedule below."
+          }
         />
       )}
 
-      {capacityShortfall && (
-        <Banner
-          status="warning"
-          title="Not everyone can be emailed today"
-          description={`Selected mailboxes have ${availableToday} sends available today for ${targetCount} contacts. The rest stay queued for later send windows.`}
-        />
-      )}
-
-      <Panel title="Checklist">
-        <ul className="flex flex-col gap-2 p-4">
-          {validations.map((validation) => (
-            <li key={validation.label} className="flex items-center gap-2">
-              <Icon
-                icon={validation.valid ? "success" : "warning"}
-                color={validation.valid ? "success" : "warning"}
-                size="sm"
-              />
-              <span className="text-base">{validation.label}</span>
-            </li>
-          ))}
-        </ul>
-      </Panel>
-
-      <Panel title="Summary">
-        <div className="p-4">
-          <MetadataList>
-            <MetadataListItem label="Name">{draft.name || "—"}</MetadataListItem>
-            <MetadataListItem label="Days">{days.length ? days.join(", ") : "—"}</MetadataListItem>
-            <MetadataListItem label="Window">
-              {draft.schedule.startTime}–{draft.schedule.endTime} · {draft.schedule.defaultTimezone}
-            </MetadataListItem>
-            <MetadataListItem label="Emails">
-              {draft.steps.length} step{draft.steps.length !== 1 ? "s" : ""}
-            </MetadataListItem>
-            <MetadataListItem label="Recipients">
-              {draft.targetGroupId
-                ? `${contactGroup?.name ?? "Group"} · ${targetCount} contact${targetCount !== 1 ? "s" : ""}`
-                : `${targetCount} contact${targetCount !== 1 ? "s" : ""}`}
-            </MetadataListItem>
-            <MetadataListItem label="Mailboxes">
-              {draft.mailboxIds?.length ?? 0} selected
-              {capacityKnown ? ` · ${availableToday} sends available today` : ""}
-            </MetadataListItem>
-          </MetadataList>
-        </div>
+      <Panel title="Summary" bodyClassName="p-4">
+        <MetadataList>
+          <MetadataListItem label="Name">{draft.name || "—"}</MetadataListItem>
+          <MetadataListItem label="Days">{days.length ? days.join(", ") : "—"}</MetadataListItem>
+          <MetadataListItem label="Window">
+            {draft.schedule.startTime}–{draft.schedule.endTime} · {draft.schedule.defaultTimezone}
+          </MetadataListItem>
+          <MetadataListItem label="Emails">
+            {draft.steps.length} step{draft.steps.length !== 1 ? "s" : ""}
+          </MetadataListItem>
+          <MetadataListItem label="Recipients">
+            {draft.targetGroupId
+              ? `${contactGroup?.name ?? "Group"} · ${targetCount} contact${targetCount !== 1 ? "s" : ""}`
+              : `${targetCount} contact${targetCount !== 1 ? "s" : ""}`}
+          </MetadataListItem>
+          <MetadataListItem label="Mailboxes">
+            {draft.mailboxIds?.length ?? 0} selected
+            {capacityKnown ? ` · ${availableToday} sends available today` : ""}
+          </MetadataListItem>
+        </MetadataList>
       </Panel>
 
       {draft.steps.length > 0 && (
         <Panel title="Sequence">
-          <ol className="divide-y">
+          <List hasDividers listStyle="decimal">
             {draft.steps.map((step, index) => (
-              <li key={index} className="flex flex-col gap-0.5 px-4 py-3">
-                <Text type="supporting">
-                  Step {index + 1}
-                  {index > 0 ? ` · ${formatDelay(step)}` : ""}
-                </Text>
-                <span className="text-base font-medium">{step.subject || "No subject"}</span>
-                <span className="line-clamp-2 text-sm text-secondary">{step.body}</span>
-              </li>
+              <ListItem
+                key={index}
+                align="first-line"
+                label={step.subject || "No subject"}
+                description={
+                  <Text type="supporting" maxLines={2}>
+                    {step.body || "No body"}
+                  </Text>
+                }
+                endContent={
+                  <Text type="supporting">{index === 0 ? "Sends first" : formatDelay(step)}</Text>
+                }
+              />
             ))}
-          </ol>
+          </List>
         </Panel>
       )}
     </div>

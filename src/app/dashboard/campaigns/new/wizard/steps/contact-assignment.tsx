@@ -5,7 +5,7 @@ import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 import { Text } from "@astryxdesign/core/Text";
 import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
 import { Layers, Search, X } from "lucide-react";
-import { EmptyState } from "@/components/page-state";
+import { EmptyState, RowsSkeleton } from "@/components/page-state";
 import { Input } from "@/components/ui/input";
 import { useApi } from "@/hooks/use-api";
 import { StepIntro } from "./step-intro";
@@ -95,7 +95,7 @@ export function ContactAssignmentStep({ draft, setDraft }: ContactAssignmentStep
                 value={group.id}
                 label={group.name}
                 description={group.description}
-                endContent={<Text type="supporting">{group.isDynamic ? "Dynamic" : "Static"}</Text>}
+                endContent={<Text type="supporting">{groupSize(group)}</Text>}
               />
             ))}
           </RadioList>
@@ -123,8 +123,12 @@ export function ContactAssignmentStep({ draft, setDraft }: ContactAssignmentStep
               </button>
             )}
           </div>
-          {filteredContacts.length === 0 ? (
-            <Text type="supporting">No contacts match.</Text>
+          {contacts === undefined ? (
+            <RowsSkeleton rows={3} />
+          ) : filteredContacts.length === 0 ? (
+            <Text type="supporting">
+              {searchQuery.trim() ? "No contacts match." : "No contacts yet. Add some on Contacts."}
+            </Text>
           ) : (
             <div className="max-h-96 overflow-y-auto">
               <CheckboxList
@@ -148,4 +152,10 @@ export function ContactAssignmentStep({ draft, setDraft }: ContactAssignmentStep
       )}
     </div>
   );
+}
+
+function groupSize(group: { isDynamic: boolean; contactIds?: string[] }) {
+  if (group.isDynamic) return "Matches rules";
+  const count = group.contactIds?.length ?? 0;
+  return `${count} contact${count === 1 ? "" : "s"}`;
 }

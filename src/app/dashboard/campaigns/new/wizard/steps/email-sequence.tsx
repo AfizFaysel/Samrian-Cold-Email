@@ -1,17 +1,19 @@
 import * as React from "react";
 import type { CampaignDraft } from "../page";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { Heading } from "@astryxdesign/core/Heading";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/VStack";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import { Panel } from "@/components/page-header";
 import { EmptyState } from "@/components/page-state";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
 import { StepIntro } from "./step-intro";
@@ -90,7 +92,11 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
 
   const renderPreview = () => {
     if (!activeStep || previewContacts.length === 0) {
-      return <Text type="supporting">Add a subject or body to see a preview.</Text>;
+      return (
+        <Text type="supporting">
+          {activeStep ? "Add a contact to preview this step." : "Add a step to preview it."}
+        </Text>
+      );
     }
 
     const contact = previewContacts[previewContactIndex];
@@ -161,15 +167,18 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
 
         {activeStep ? (
           <div className="flex min-w-0 flex-col gap-5">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold">Step {activeStepIndex + 1}</h3>
+            <HStack gap={3} hAlign="between" vAlign="center">
+              <Heading level={3}>Step {activeStepIndex + 1}</Heading>
               {draft.steps.length > 1 && (
-                <Button variant="destructive" size="sm" onClick={() => removeStep(activeStepIndex)}>
-                  <Trash2 data-icon="inline-start" />
-                  Delete step
-                </Button>
+                <AstryxButton
+                  label="Delete step"
+                  variant="ghost"
+                  size="sm"
+                  icon={<Icon icon={Trash2} />}
+                  onClick={() => removeStep(activeStepIndex)}
+                />
               )}
-            </div>
+            </HStack>
 
             {activeStepIndex > 0 && (
               <HStack gap={3} wrap="wrap">
@@ -196,50 +205,46 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
               </HStack>
             )}
 
-            <div className="flex flex-col gap-2">
-              <span className="text-base font-medium">Merge fields</span>
-              <div className="flex flex-wrap gap-1.5">
+            <VStack gap={2}>
+              <Text type="label">Merge fields</Text>
+              <HStack gap={1.5} wrap="wrap">
                 {VARIABLES.map((v) => (
-                  <Button
+                  <AstryxButton
                     key={v.key}
-                    variant="outline"
-                    size="xs"
-                    className="font-mono"
+                    label={`{{${v.key}}}`}
+                    variant="secondary"
+                    size="sm"
+                    tooltip={`Add ${v.label} to the end of the body`}
                     onClick={() => insertVariable(v.key)}
-                  >
-                    {`{{${v.key}}}`}
-                  </Button>
+                  />
                 ))}
-              </div>
+              </HStack>
               <Text type="supporting">
                 Vary wording with spintax: {"{Hi|Hello|Hey}"}. Fields are added to the end of the
                 body.
               </Text>
-            </div>
+            </VStack>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="step-subject">Subject</Label>
-              <Input
-                id="step-subject"
-                value={activeStep.subject}
-                onChange={(e) => updateStep(activeStepIndex, "subject", e.target.value)}
-                placeholder="Quick question about {{company}}"
-                aria-invalid={!subjectValid || undefined}
-              />
-            </div>
+            <TextInput
+              label="Subject"
+              width="100%"
+              value={activeStep.subject}
+              onChange={(value) => updateStep(activeStepIndex, "subject", value)}
+              placeholder="Quick question about {{company}}"
+              status={subjectValid ? undefined : { type: "warning" }}
+            />
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="step-body">Body</Label>
-              <Textarea
-                id="step-body"
+            <VStack gap={2}>
+              <TextArea
+                label="Body"
+                width="100%"
                 value={activeStep.body}
-                onChange={(e) => updateStep(activeStepIndex, "body", e.target.value)}
+                onChange={(value) => updateStep(activeStepIndex, "body", value)}
                 placeholder={"Hi {{firstName}},\n\nI noticed {{company}} is…"}
                 rows={12}
-                className="min-h-56"
-                aria-invalid={!bodyValid || undefined}
+                status={bodyValid ? undefined : { type: "warning" }}
               />
-              <span className="flex items-center gap-1.5">
+              <HStack gap={1.5} vAlign="center">
                 <Icon
                   icon={spintaxOk ? "success" : "warning"}
                   color={spintaxOk ? "success" : "warning"}
@@ -248,8 +253,8 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
                 <Text type="supporting">
                   {spintaxOk ? "Spintax is balanced" : "Spintax has an unclosed { or }"}
                 </Text>
-              </span>
-            </div>
+              </HStack>
+            </VStack>
           </div>
         ) : (
           <EmptyState

@@ -202,7 +202,11 @@ export default function CampaignWizardPage() {
       <Stepper steps={STEPS} current={currentStep} onSelect={setCurrentStep} />
 
       <div className="min-h-[420px]">
-        <CurrentStepComponent draft={draft} setDraft={setDraft} />
+        {isLastStep ? (
+          <ReviewStep draft={draft} setDraft={setDraft} goToStep={setCurrentStep} />
+        ) : (
+          <CurrentStepComponent draft={draft} setDraft={setDraft} />
+        )}
       </div>
 
       <div className="sticky bottom-0 -mx-4 flex items-center justify-between gap-3 border-t bg-body/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
