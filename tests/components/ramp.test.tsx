@@ -34,9 +34,10 @@ describe("mailbox ramp settings", () => {
     expect(screen.getByDisplayValue("3")).toBeInTheDocument();
     expect(screen.getByText(/does not send synthetic warmup messages/i)).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Default target per day"), {
-      target: { value: "30" },
-    });
+    const target = screen.getByLabelText("Default target per day");
+    fireEvent.change(target, { target: { value: "30" } });
+    // Number fields commit a typed value on blur, as when the user moves to Save.
+    fireEvent.blur(target);
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() =>

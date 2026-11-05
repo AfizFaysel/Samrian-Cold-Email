@@ -1,13 +1,23 @@
 "use client";
 
+import { Button } from "@astryxdesign/core/Button";
 import { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Grid } from "@astryxdesign/core/Grid";
+import { Heading } from "@astryxdesign/core/Heading";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/VStack";
 import { Pencil, Trash2 } from "lucide-react";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SettingsCard } from "@/components/settings-card";
 import { errorMessage, requestJson, responseError } from "@/lib/request";
 
 type Role = {
@@ -33,9 +43,11 @@ export function MembersRoles() {
   const [name, setName] = React.useState("");
   const [selected, setSelected] = React.useState<string[]>([]);
   const [editing, setEditing] = React.useState<Role | null>(null);
+  const [pendingDelete, setPendingDelete] = React.useState<Role | null>(null);
   const [email, setEmail] = React.useState("");
   const [inviteRole, setInviteRole] = React.useState("member");
   const [status, setStatus] = React.useState("Loading members and roles...");
+  const [loaded, setLoaded] = React.useState(false);
 
   const loadRoles = React.useCallback(async () => {
     const data = await requestJson<{ roles: Role[]; permissions: string[] }>("/api/settings/roles");
@@ -49,7 +61,10 @@ export function MembersRoles() {
 
   React.useEffect(() => {
     Promise.all([loadRoles(), loadMembers()])
-      .then(() => setStatus(""))
+      .then(() => {
+        setStatus("");
+        setLoaded(true);
+      })
       .catch((error) => setStatus(errorMessage(error)));
   }, [loadMembers, loadRoles]);
 
@@ -64,11 +79,15 @@ export function MembersRoles() {
       }
     );
     if (!response.ok) return setStatus(await responseError(response));
-    setName("");
-    setSelected([]);
-    setEditing(null);
+    resetEditor();
     await loadRoles();
     setStatus(editing ? "Role updated" : "Role created");
+  }
+
+  function resetEditor() {
+    setEditing(null);
+    setName("");
+    setSelected([]);
   }
 
   function editRole(role: Role) {
@@ -78,9 +97,9 @@ export function MembersRoles() {
   }
 
   async function deleteRole(role: Role) {
-    if (!window.confirm(`Delete ${role.name}? Members using it will become members.`)) return;
     setStatus("Deleting role...");
     const response = await fetch(`/api/settings/roles/${role.id}`, { method: "DELETE" });
+    setPendingDelete(null);
     if (!response.ok) return setStatus(await responseError(response));
     await Promise.all([loadRoles(), loadMembers()]);
     setStatus("Role deleted");
@@ -115,106 +134,117 @@ export function MembersRoles() {
   const custom = roles.filter((role) => !role.builtIn);
 
   return (
-    <section className="flex flex-col gap-6 rounded-lg border bg-card p-5">
-      <div>
-        <h2 className="text-lg font-semibold">Members and roles</h2>
-        <p className="text-base text-secondary">
-          Control team access with provider-managed roles and permissions.
-        </p>
-      </div>
+    <SettingsCard
+      title="Members and roles"
+      description="Who can use this workspace, and what each role is allowed to do."
+    >
+      {status ? (
+        <Text role="status" type="supporting">
+          {status}
+        </Text>
+      ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-[1fr_180px_auto] sm:items-end">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="invite-email">Invite email</Label>
-          <Input
-            id="invite-email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </div>
+      <HStack gap={3} vAlign="end" wrap="wrap">
+        <TextInput
+          label="Invite email"
+          type="email"
+          width={280}
+          value={email}
+          onChange={setEmail}
+          placeholder="teammate@example.com"
+        />
         <Selector
           label="Invite role"
-          width="100%"
+          width={200}
           value={inviteRole}
           onChange={setInviteRole}
           options={roleOptions}
         />
-        <Button onClick={invite} disabled={!email.trim()}>
-          Send invite
-        </Button>
-      </div>
+        <Button
+          label="Send invite"
+          variant="primary"
+          isDisabled={!email.trim()}
+          onClick={() => void invite()}
+        />
+      </HStack>
 
-      <div>
-        <h3 className="text-base font-medium text-primary">Members</h3>
-        <div className="mt-2 divide-y divide-border border-y border-border">
-          {members.map((member) => (
-            <div
-              key={member.id}
-              className="grid gap-2 py-3 sm:grid-cols-[1fr_180px] sm:items-center"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-base font-medium text-primary">
-                  {member.name || member.email || member.userId}
-                </p>
-                {member.email && <p className="truncate text-sm text-secondary">{member.email}</p>}
-              </div>
-              <Selector
-                label={`Role for ${member.email || member.userId}`}
-                isLabelHidden
-                width="100%"
-                value={member.role}
-                onChange={(role) => changeMember(member, role)}
-                options={roleOptions}
-              />
-            </div>
-          ))}
-          {!members.length && !status && (
-            <p className="py-3 text-base text-secondary">No members found.</p>
-          )}
-        </div>
-      </div>
+      <VStack gap={2}>
+        <Heading level={4}>Members</Heading>
+        {members.length > 0 ? (
+          // Rows wrap so the role picker drops below the name on narrow screens.
+          <VStack gap={0}>
+            {members.map((member, index) => (
+              <VStack key={member.id} gap={0}>
+                {index > 0 ? <Divider /> : null}
+                <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap" paddingBlock={2}>
+                  <VStack gap={0} className="min-w-0">
+                    <Text weight="medium" maxLines={1}>
+                      {member.name || member.email || member.userId}
+                    </Text>
+                    {member.name && member.email ? (
+                      <Text type="supporting" maxLines={1}>
+                        {member.email}
+                      </Text>
+                    ) : null}
+                  </VStack>
+                  <Selector
+                    label={`Role for ${member.email || member.userId}`}
+                    isLabelHidden
+                    width={200}
+                    value={member.role}
+                    onChange={(role) => void changeMember(member, role)}
+                    options={roleOptions}
+                  />
+                </HStack>
+              </VStack>
+            ))}
+          </VStack>
+        ) : loaded ? (
+          <Text type="supporting">No members found.</Text>
+        ) : null}
+      </VStack>
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <Grid columns={{ minWidth: 200, repeat: "fit" }} gap={5}>
         <RoleList title="Built-in roles" roles={builtIn} />
-        <RoleList title="Custom roles" roles={custom} onDelete={deleteRole} onEdit={editRole} />
-      </div>
+        <RoleList
+          title="Custom roles"
+          roles={custom}
+          onDelete={setPendingDelete}
+          onEdit={editRole}
+        />
+      </Grid>
 
-      <div className="flex flex-col gap-4 border-t border-border pt-5">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="role-name">Role name</Label>
-          <Input id="role-name" value={name} onChange={(event) => setName(event.target.value)} />
-        </div>
+      <Divider />
+
+      <VStack gap={4}>
+        <Heading level={4}>{editing ? `Edit ${editing.name}` : "New custom role"}</Heading>
+        <TextInput label="Role name" width="100%" value={name} onChange={setName} />
         <CheckboxList label="Permissions" density="compact" value={selected} onChange={setSelected}>
           {permissions.map((permission) => (
             <CheckboxListItem key={permission} value={permission} label={permission} />
           ))}
         </CheckboxList>
-        <div className="flex gap-2">
-          <Button onClick={saveRole} disabled={!name.trim()}>
-            {editing ? "Update role" : "Create role"}
-          </Button>
-          {editing && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditing(null);
-                setName("");
-                setSelected([]);
-              }}
-            >
-              Cancel
-            </Button>
-          )}
-        </div>
-      </div>
+        <HStack gap={2}>
+          <Button
+            label={editing ? "Update role" : "Create role"}
+            variant="primary"
+            isDisabled={!name.trim()}
+            onClick={() => void saveRole()}
+          />
+          {editing ? <Button label="Cancel" variant="secondary" onClick={resetEditor} /> : null}
+        </HStack>
+      </VStack>
 
-      {status && (
-        <p role="status" className="text-base text-secondary">
-          {status}
-        </p>
-      )}
-    </section>
+      <ConfirmDialog
+        isOpen={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title={`Delete ${pendingDelete?.name ?? "this role"}?`}
+        description="Members with this role become members. This can't be undone."
+        confirmText="Delete role"
+        variant="destructive"
+        onConfirm={() => (pendingDelete ? deleteRole(pendingDelete) : undefined)}
+      />
+    </SettingsCard>
   );
 }
 
@@ -230,43 +260,47 @@ function RoleList({
   onEdit?: (role: Role) => void;
 }) {
   return (
-    <div>
-      <h3 className="text-base font-medium text-primary">{title}</h3>
-      <div className="mt-2 divide-y divide-border border-y border-border">
-        {roles.map((role) => (
-          <div key={role.id} className="flex min-h-12 items-center justify-between gap-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-base font-medium text-primary">{role.name}</p>
-              <p className="text-sm text-secondary">{role.permissions.length} permissions</p>
-            </div>
-            <div className="flex">
-              {onEdit && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Edit ${role.name}`}
-                  title={`Edit ${role.name}`}
-                  onClick={() => onEdit(role)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Delete ${role.name}`}
-                  title={`Delete ${role.name}`}
-                  onClick={() => onDelete(role)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-        ))}
-        {!roles.length && <p className="py-3 text-base text-secondary">None yet.</p>}
-      </div>
-    </div>
+    <VStack gap={2}>
+      <Heading level={4}>{title}</Heading>
+      {roles.length > 0 ? (
+        <List hasDividers edge="flush">
+          {roles.map((role) => (
+            <ListItem
+              key={role.id}
+              label={role.name}
+              description={`${role.permissions.length} permissions`}
+              endContent={
+                onEdit || onDelete ? (
+                  <HStack gap={1}>
+                    {onEdit ? (
+                      <IconButton
+                        label={`Edit ${role.name}`}
+                        tooltip="Edit"
+                        variant="ghost"
+                        size="sm"
+                        icon={<Icon icon={Pencil} />}
+                        onClick={() => onEdit(role)}
+                      />
+                    ) : null}
+                    {onDelete ? (
+                      <IconButton
+                        label={`Delete ${role.name}`}
+                        tooltip="Delete"
+                        variant="ghost"
+                        size="sm"
+                        icon={<Icon icon={Trash2} />}
+                        onClick={() => onDelete(role)}
+                      />
+                    ) : null}
+                  </HStack>
+                ) : undefined
+              }
+            />
+          ))}
+        </List>
+      ) : (
+        <Text type="supporting">None yet.</Text>
+      )}
+    </VStack>
   );
 }

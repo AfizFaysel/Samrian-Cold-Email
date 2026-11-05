@@ -109,7 +109,8 @@ describe("members and roles", () => {
 
     render(<MembersRoles />);
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Can't reach Samrian");
+    // Astryx controls add their own live regions, so find the message, then check its role.
+    expect(await screen.findByText(/Can't reach Samrian/)).toHaveAttribute("role", "status");
     expect(screen.getByRole("button", { name: "Create role" })).toBeDisabled();
   });
 

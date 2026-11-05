@@ -21,7 +21,14 @@ describe("API keys", () => {
     render(<ApiKeys />);
 
     fireEvent.change(screen.getByLabelText("Key name"), { target: { value: "CLI" } });
-    fireEvent.click(screen.getByLabelText("contacts:read"));
+    fireEvent.click(screen.getByRole("radio", { name: /Custom/ }));
+    // Custom starts from the Read only preset; narrow it to one scope.
+    for (const scope of ["identity:read", "groups:read", "campaigns:read", "mailboxes:read"]) {
+      fireEvent.click(screen.getByLabelText(scope));
+    }
+    for (const scope of ["inbox:read", "analytics:read", "domains:read"]) {
+      fireEvent.click(screen.getByLabelText(scope));
+    }
     fireEvent.click(screen.getByRole("button", { name: "Create key" }));
 
     expect(await screen.findByText("sam_secret")).toBeInTheDocument();
@@ -47,6 +54,8 @@ describe("API keys", () => {
 
     expect(await screen.findByText("CI")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Revoke CI" }));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    fireEvent.click(await screen.findByRole("button", { name: "Revoke key" }));
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
         "/api/settings/api-keys/key_1/revoke",

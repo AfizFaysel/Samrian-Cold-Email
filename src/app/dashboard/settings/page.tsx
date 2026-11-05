@@ -1,21 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2 } from "lucide-react";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Button } from "@astryxdesign/core/Button";
+import { Grid } from "@astryxdesign/core/Grid";
+import { HStack } from "@astryxdesign/core/HStack";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Switch } from "@astryxdesign/core/Switch";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { TextArea } from "@astryxdesign/core/TextArea";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/VStack";
 
 import { ApiKeys } from "@/components/api-keys";
 import { MembersRoles } from "@/components/members-roles";
 import { Page } from "@/components/page-header";
-import { StatusPill } from "@/components/status-badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { SaveBar, SettingsCard, type SaveState } from "@/components/settings-card";
 import { TrackingSettings } from "@/components/tracking-settings";
 import { errorMessage, requestJson } from "@/lib/request";
-import { cn } from "@/lib/utils";
 
 type ComplianceSettings = {
   listUnsubscribeEnabled: boolean;
@@ -48,6 +51,16 @@ type SendingSettings = {
   replyReserve: number;
 };
 
+type TabId = "general" | "sending" | "notifications" | "team" | "api";
+
+const TABS: Array<{ value: TabId; label: string }> = [
+  { value: "general", label: "General" },
+  { value: "sending", label: "Sending" },
+  { value: "notifications", label: "Notifications" },
+  { value: "team", label: "Team" },
+  { value: "api", label: "API keys" },
+];
+
 const fallbackSettings: ComplianceSettings = {
   listUnsubscribeEnabled: false,
   bouncePauseRate: 0.05,
@@ -68,34 +81,53 @@ const fallbackSendingSettings: SendingSettings = {
   replyReserve: 2,
 };
 
+const IDLE: SaveState = { kind: "idle" };
+
+// Pause rates are stored as fractions (0.05) but read and typed as percentages (5%).
+const toPercent = (fraction: number) => Math.round(fraction * 1000) / 10;
+const toFraction = (percent: number) => Math.round(percent * 10) / 1000;
+
 export default function SettingsPage() {
+  const [tab, setTab] = React.useState<TabId>("general");
   const [settings, setSettings] = React.useState<ComplianceSettings>(fallbackSettings);
-  const [status, setStatus] = React.useState("");
+  const [generalState, setGeneralState] = React.useState<SaveState>(IDLE);
+  const [pauseState, setPauseState] = React.useState<SaveState>(IDLE);
   const [domain, setDomain] = React.useState("");
   const [readiness, setReadiness] = React.useState<DomainReadiness | null>(null);
-  const [domainStatus, setDomainStatus] = React.useState("");
+  const [domainError, setDomainError] = React.useState("");
+  const [isChecking, setIsChecking] = React.useState(false);
   const [notificationPrefs, setNotificationPrefs] =
     React.useState<NotificationPrefs>(fallbackNotificationPrefs);
-  const [notificationStatus, setNotificationStatus] = React.useState("");
+  // Raw text so a trailing comma or new line survives typing; parsed into addresses on save.
+  const [forwardText, setForwardText] = React.useState("");
+  const [notificationState, setNotificationState] = React.useState<SaveState>(IDLE);
   const [sending, setSending] = React.useState<SendingSettings>(fallbackSendingSettings);
-  const [sendingStatus, setSendingStatus] = React.useState("");
+  const [sendingState, setSendingState] = React.useState<SaveState>(IDLE);
 
   React.useEffect(() => {
     requestJson<Partial<ComplianceSettings>>("/api/settings/compliance")
       .then((data) => setSettings({ ...fallbackSettings, ...data }))
-      .catch((error) => setStatus(errorMessage(error)));
+      .catch((error) => setGeneralState({ kind: "error", message: errorMessage(error) }));
 
     requestJson<Partial<NotificationPrefs>>("/api/settings/notifications")
-      .then((data) => setNotificationPrefs({ ...fallbackNotificationPrefs, ...data }))
-      .catch((error) => setNotificationStatus(errorMessage(error)));
+      .then((data) => {
+        const prefs = { ...fallbackNotificationPrefs, ...data };
+        setNotificationPrefs(prefs);
+        setForwardText(prefs.replyForwardEmails.join("\n"));
+      })
+      .catch((error) => setNotificationState({ kind: "error", message: errorMessage(error) }));
 
     requestJson<Partial<SendingSettings>>("/api/settings/sending")
       .then((data) => setSending({ ...fallbackSendingSettings, ...data }))
-      .catch((error) => setSendingStatus(errorMessage(error)));
+      .catch((error) => setSendingState({ kind: "error", message: errorMessage(error) }));
   }, []);
 
-  async function save() {
-    setStatus("Saving...");
+  const updateSettings = (patch: Partial<ComplianceSettings>) =>
+    setSettings((current) => ({ ...current, ...patch }));
+
+  // Both compliance cards save the same settings record; each shows its own result.
+  async function save(setState: (state: SaveState) => void) {
+    setState({ kind: "saving" });
     try {
       const saved = await requestJson<Partial<ComplianceSettings>>("/api/settings/compliance", {
         method: "PATCH",
@@ -103,427 +135,340 @@ export default function SettingsPage() {
         body: JSON.stringify(withoutTracking(settings)),
       });
       setSettings({ ...fallbackSettings, ...saved });
-      setStatus("Saved");
+      setState({ kind: "saved" });
     } catch (error) {
-      setStatus(errorMessage(error));
+      setState({ kind: "error", message: errorMessage(error) });
     }
   }
 
   async function checkDomain() {
     if (!domain.trim()) return;
-    setDomainStatus("Checking...");
+    setIsChecking(true);
+    setDomainError("");
     try {
       setReadiness(
         await requestJson(`/api/domains/check?domain=${encodeURIComponent(domain.trim())}`)
       );
-      setDomainStatus("");
     } catch (error) {
-      setDomainStatus(errorMessage(error));
+      setReadiness(null);
+      setDomainError(errorMessage(error));
+    } finally {
+      setIsChecking(false);
     }
   }
 
   async function saveNotificationPrefs() {
-    setNotificationStatus("Saving...");
+    setNotificationState({ kind: "saving" });
     try {
       const saved = await requestJson<Partial<NotificationPrefs>>("/api/settings/notifications", {
         method: "PATCH",
-        body: JSON.stringify(notificationPrefs),
+        body: JSON.stringify({
+          ...notificationPrefs,
+          replyForwardEmails: forwardText
+            .split(/\r?\n|,/)
+            .map((item) => item.trim())
+            .filter(Boolean),
+        }),
       });
-      setNotificationPrefs({ ...fallbackNotificationPrefs, ...saved });
-      setNotificationStatus("Saved");
+      const prefs = { ...fallbackNotificationPrefs, ...saved };
+      setNotificationPrefs(prefs);
+      setForwardText(prefs.replyForwardEmails.join("\n"));
+      setNotificationState({ kind: "saved" });
     } catch (error) {
-      setNotificationStatus(errorMessage(error));
+      setNotificationState({ kind: "error", message: errorMessage(error) });
     }
   }
 
   async function saveSending() {
-    setSendingStatus("Saving...");
+    setSendingState({ kind: "saving" });
     try {
       const saved = await requestJson<Partial<SendingSettings>>("/api/settings/sending", {
         method: "PATCH",
         body: JSON.stringify(sending),
       });
       setSending({ ...fallbackSendingSettings, ...saved });
-      setSendingStatus("Saved");
+      setSendingState({ kind: "saved" });
     } catch (error) {
-      setSendingStatus(errorMessage(error));
+      setSendingState({ kind: "error", message: errorMessage(error) });
     }
   }
 
+  const findings = readiness ? [...readiness.issues, ...readiness.warnings] : [];
+
   return (
     <Page title="Settings" description="Compliance, sending limits, notifications and your team.">
-      <Tabs defaultValue="general" className="gap-6">
-        <TabsList
-          variant="line"
-          className="h-auto w-full flex-wrap justify-start gap-x-5 rounded-none border-b p-0 pb-1"
-        >
-          <TabsTrigger value="general" className="flex-none px-0">
-            General
-          </TabsTrigger>
-          <TabsTrigger value="sending" className="flex-none px-0">
-            Sending
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex-none px-0">
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="team" className="flex-none px-0">
-            Team
-          </TabsTrigger>
-          <TabsTrigger value="api" className="flex-none px-0">
-            API keys
-          </TabsTrigger>
-        </TabsList>
+      <TabList role="tablist" value={tab} onChange={(value) => setTab(value as TabId)}>
+        {TABS.map((item) => (
+          <Tab
+            key={item.value}
+            value={item.value}
+            label={item.label}
+            panelId={`settings-${item.value}`}
+          />
+        ))}
+      </TabList>
 
-        <TabsContent value="general" className="flex max-w-3xl flex-col gap-6">
-          <section className="flex flex-col gap-5 rounded-lg border bg-card p-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">One-click unsubscribe</h2>
-                <p className="text-base text-secondary">
-                  Off by default for cold email. Enable for bulk or newsletter-style campaigns.
-                </p>
-              </div>
-              <Switch
-                checked={settings.listUnsubscribeEnabled}
-                onCheckedChange={(checked) =>
-                  setSettings((current) => ({ ...current, listUnsubscribeEnabled: checked }))
-                }
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="sender-name">Default sender name</Label>
-                <Input
-                  id="sender-name"
-                  value={settings.defaultSenderName ?? ""}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      defaultSenderName: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="mailto">Unsubscribe mailto</Label>
-                <Input
-                  id="mailto"
-                  value={settings.unsubscribeMailto ?? ""}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      unsubscribeMailto: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="address">Physical mailing address</Label>
-              <Textarea
-                id="address"
+      <VStack
+        id={`settings-${tab}`}
+        role="tabpanel"
+        gap={6}
+        maxWidth={tab === "team" ? undefined : 768}
+      >
+        {tab === "general" ? (
+          <>
+            <SettingsCard
+              title="Compliance"
+              description="What every campaign email carries so it stays legal and easy to opt out of."
+              footer={<SaveBar state={generalState} onSave={() => void save(setGeneralState)} />}
+            >
+              <TextArea
+                label="Physical mailing address"
+                description="Required to send. Added to the end of every campaign email."
+                width="100%"
+                rows={2}
                 value={settings.physicalAddress ?? ""}
-                onChange={(event) =>
-                  setSettings((current) => ({ ...current, physicalAddress: event.target.value }))
-                }
+                onChange={(value) => updateSettings({ physicalAddress: value })}
+                isRequired
               />
-              <p className="text-sm text-secondary">
-                Required to send. Added to the end of every campaign email.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="footer">Unsubscribe footer</Label>
-              <Textarea
-                id="footer"
+              <TextArea
+                label="Unsubscribe footer"
+                description="Must include {{unsubscribeUrl}}. Leave blank to use the example shown."
+                width="100%"
+                rows={2}
                 value={settings.unsubscribeFooter ?? ""}
-                onChange={(event) =>
-                  setSettings((current) => ({ ...current, unsubscribeFooter: event.target.value }))
-                }
+                onChange={(value) => updateSettings({ unsubscribeFooter: value })}
                 placeholder="Unsubscribe: {{unsubscribeUrl}}"
               />
-              <p className="text-sm text-secondary">
-                Must include {"{{unsubscribeUrl}}"}. Leave blank to use the example shown.
-              </p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="bounce-rate">Bounce pause rate</Label>
-                <Input
-                  id="bounce-rate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  value={settings.bouncePauseRate}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      bouncePauseRate: Number(event.target.value),
-                    }))
-                  }
+              <Grid columns={{ minWidth: 200, repeat: "fit" }} gap={4}>
+                <TextInput
+                  label="Default sender name"
+                  description="The From name when a mailbox has none."
+                  width="100%"
+                  value={settings.defaultSenderName ?? ""}
+                  onChange={(value) => updateSettings({ defaultSenderName: value })}
                 />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="unsubscribe-rate">Unsubscribe pause rate</Label>
-                <Input
-                  id="unsubscribe-rate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  value={settings.unsubscribePauseRate}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      unsubscribePauseRate: Number(event.target.value),
-                    }))
-                  }
+                <TextInput
+                  label="Unsubscribe mailto"
+                  description="Where emailed opt-outs go."
+                  type="email"
+                  width="100%"
+                  value={settings.unsubscribeMailto ?? ""}
+                  onChange={(value) => updateSettings({ unsubscribeMailto: value })}
                 />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="complaint-rate">Complaint pause rate</Label>
-                <Input
-                  id="complaint-rate"
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  max="1"
-                  value={settings.complaintPauseRate}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      complaintPauseRate: Number(event.target.value),
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <SaveBar status={status} onSave={save} />
-          </section>
-          <TrackingSettings />
-        </TabsContent>
-
-        <TabsContent value="sending" className="flex max-w-3xl flex-col gap-6">
-          <section className="flex flex-col gap-5 rounded-lg border bg-card p-5">
-            <div>
-              <h2 className="text-lg font-semibold">Mailbox ramp</h2>
-              <p className="text-base text-secondary">
-                Gradually raises real campaign volume. It does not send synthetic warmup messages.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="default-ramp">Enable for new mailboxes</Label>
-                <p className="text-base text-secondary">
-                  Starts new mailboxes at a conservative five campaign sends per day.
-                </p>
-              </div>
+              </Grid>
               <Switch
-                id="default-ramp"
-                checked={sending.defaultRampEnabled}
-                onCheckedChange={(checked) =>
+                label="One-click unsubscribe"
+                description="Off by default for cold email. Turn on for bulk or newsletter-style campaigns."
+                labelPosition="start"
+                labelSpacing="spread"
+                width="100%"
+                value={settings.listUnsubscribeEnabled}
+                onChange={(checked) => updateSettings({ listUnsubscribeEnabled: checked })}
+              />
+            </SettingsCard>
+
+            <SettingsCard
+              title="Auto-pause"
+              description="A campaign pauses itself when any of these rates is reached, to protect your sending domains."
+              footer={<SaveBar state={pauseState} onSave={() => void save(setPauseState)} />}
+            >
+              <Grid columns={{ minWidth: 180, repeat: "fit" }} gap={4}>
+                <NumberInput
+                  label="Bounce rate"
+                  width="100%"
+                  value={toPercent(settings.bouncePauseRate)}
+                  onChange={(value) => updateSettings({ bouncePauseRate: toFraction(value) })}
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  units="%"
+                />
+                <NumberInput
+                  label="Unsubscribe rate"
+                  width="100%"
+                  value={toPercent(settings.unsubscribePauseRate)}
+                  onChange={(value) => updateSettings({ unsubscribePauseRate: toFraction(value) })}
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  units="%"
+                />
+                <NumberInput
+                  label="Spam complaint rate"
+                  width="100%"
+                  value={toPercent(settings.complaintPauseRate)}
+                  onChange={(value) => updateSettings({ complaintPauseRate: toFraction(value) })}
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  units="%"
+                />
+              </Grid>
+            </SettingsCard>
+
+            <TrackingSettings />
+          </>
+        ) : null}
+
+        {tab === "sending" ? (
+          <>
+            <SettingsCard
+              title="Mailbox ramp"
+              description="Gradually raises real campaign volume. It does not send synthetic warmup messages."
+              footer={<SaveBar state={sendingState} onSave={saveSending} />}
+            >
+              <Switch
+                label="Enable for new mailboxes"
+                description="Starts new mailboxes at a conservative five campaign sends a day."
+                labelPosition="start"
+                labelSpacing="spread"
+                width="100%"
+                value={sending.defaultRampEnabled}
+                onChange={(checked) =>
                   setSending((current) => ({ ...current, defaultRampEnabled: checked }))
                 }
               />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="ramp-target">Default target per day</Label>
-                <Input
-                  id="ramp-target"
-                  type="number"
-                  min="5"
-                  max="100"
+              <Grid columns={{ minWidth: 200, repeat: "fit" }} gap={4}>
+                <NumberInput
+                  label="Default target per day"
+                  description="Where the ramp stops climbing."
+                  width="100%"
                   value={sending.defaultRampTarget}
-                  onChange={(event) =>
-                    setSending((current) => ({
-                      ...current,
-                      defaultRampTarget: Number(event.target.value),
-                    }))
+                  onChange={(value) =>
+                    setSending((current) => ({ ...current, defaultRampTarget: value }))
                   }
+                  min={5}
+                  max={100}
+                  isIntegerOnly
+                  units="a day"
                 />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="reply-reserve">Manual reply reserve</Label>
-                <Input
-                  id="reply-reserve"
-                  type="number"
-                  min="0"
-                  max="10"
+                <NumberInput
+                  label="Manual reply reserve"
+                  description="Sends kept free each day for your own replies."
+                  width="100%"
                   value={sending.replyReserve}
-                  onChange={(event) =>
-                    setSending((current) => ({
-                      ...current,
-                      replyReserve: Number(event.target.value),
-                    }))
+                  onChange={(value) =>
+                    setSending((current) => ({ ...current, replyReserve: value }))
                   }
+                  min={0}
+                  max={10}
+                  isIntegerOnly
                 />
-              </div>
-            </div>
+              </Grid>
+            </SettingsCard>
 
-            <SaveBar status={sendingStatus} onSave={saveSending} />
-          </section>
-          <section className="flex flex-col gap-4 rounded-lg border bg-card p-5">
-            <div>
-              <h2 className="text-lg font-semibold">Sender domain readiness</h2>
-              <p className="text-base text-secondary">
-                Checks are cached. Warnings do not block cold-email launches in this milestone.
-              </p>
-            </div>
+            <SettingsCard
+              title="Sender domain check"
+              description="Looks up the DNS records that decide whether your email lands in the inbox."
+            >
+              <HStack gap={2} vAlign="end" wrap="wrap">
+                <TextInput
+                  label="Domain"
+                  width={280}
+                  value={domain}
+                  onChange={setDomain}
+                  onEnter={() => void checkDomain()}
+                  placeholder="example.com"
+                />
+                <Button
+                  label="Check domain"
+                  variant="secondary"
+                  isLoading={isChecking}
+                  isDisabled={!domain.trim()}
+                  onClick={() => void checkDomain()}
+                />
+              </HStack>
+              {domainError ? <Banner status="error" title={domainError} /> : null}
+              {readiness ? (
+                <Banner
+                  status={
+                    readiness.status === "pass"
+                      ? "success"
+                      : readiness.status === "warn"
+                        ? "warning"
+                        : "info"
+                  }
+                  title={
+                    readiness.status === "pass"
+                      ? "No DNS problems found"
+                      : readiness.status === "warn"
+                        ? `${findings.length} thing${findings.length === 1 ? "" : "s"} to fix before sending at volume`
+                        : "Couldn't check every record"
+                  }
+                  description={
+                    readiness.cached ? "From a check in the last few minutes." : undefined
+                  }
+                  collapsible={false}
+                >
+                  {findings.length > 0 ? (
+                    <List density="compact">
+                      {findings.map((item) => (
+                        <ListItem key={item} label={item} />
+                      ))}
+                    </List>
+                  ) : undefined}
+                </Banner>
+              ) : null}
+            </SettingsCard>
+          </>
+        ) : null}
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Input
-                value={domain}
-                onChange={(event) => setDomain(event.target.value)}
-                placeholder="example.com"
-              />
-              <Button variant="outline" onClick={checkDomain}>
-                Check domain
-              </Button>
-            </div>
+        {tab === "notifications" ? (
+          <SettingsCard
+            title="Reply notifications"
+            description="How you hear about new replies."
+            footer={<SaveBar state={notificationState} onSave={saveNotificationPrefs} />}
+          >
+            <Switch
+              label="In-app notifications"
+              description="Show new replies in the bell at the top of the sidebar."
+              labelPosition="start"
+              labelSpacing="spread"
+              width="100%"
+              value={notificationPrefs.replyInAppEnabled}
+              onChange={(checked) =>
+                setNotificationPrefs((current) => ({ ...current, replyInAppEnabled: checked }))
+              }
+            />
+            <Switch
+              label="Email forwarding"
+              description="Send a summary of each new reply to the addresses below."
+              labelPosition="start"
+              labelSpacing="spread"
+              width="100%"
+              value={notificationPrefs.replyForwardEnabled}
+              onChange={(checked) =>
+                setNotificationPrefs((current) => ({ ...current, replyForwardEnabled: checked }))
+              }
+            />
+            <TextArea
+              label="Forwarding addresses"
+              description="One per line, or separated by commas."
+              width="100%"
+              rows={3}
+              value={forwardText}
+              onChange={setForwardText}
+              placeholder="owner@example.com"
+              isDisabled={!notificationPrefs.replyForwardEnabled}
+            />
+            <Switch
+              label="Browser notifications"
+              description="Not available yet. Your choice is kept for when it is."
+              labelPosition="start"
+              labelSpacing="spread"
+              width="100%"
+              value={notificationPrefs.browserPushEnabled}
+              onChange={(checked) =>
+                setNotificationPrefs((current) => ({ ...current, browserPushEnabled: checked }))
+              }
+            />
+          </SettingsCard>
+        ) : null}
 
-            {domainStatus ? <p className="text-base text-secondary">{domainStatus}</p> : null}
-            {readiness ? (
-              <div className="rounded-sm border border-border p-3 text-base text-primary">
-                <p className="font-medium text-primary">
-                  {readiness.status.toUpperCase()}
-                  {readiness.cached ? " cached" : ""}
-                </p>
-                {[...readiness.issues, ...readiness.warnings].length > 0 ? (
-                  <ul className="mt-2 list-disc pl-5">
-                    {[...readiness.issues, ...readiness.warnings].map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-2">No DNS issues found.</p>
-                )}
-              </div>
-            ) : null}
-          </section>
-        </TabsContent>
-
-        <TabsContent value="notifications" className="flex max-w-3xl flex-col gap-6">
-          <section className="flex flex-col gap-5 rounded-lg border bg-card p-5">
-            <div>
-              <h2 className="text-lg font-semibold">Reply notifications</h2>
-              <p className="text-base text-secondary">
-                Control how new inbox replies are surfaced. Browser push is stored as a preference
-                only.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="reply-in-app">In-app reply notifications</Label>
-                <p className="text-base text-secondary">
-                  Show new reply notifications in the header.
-                </p>
-              </div>
-              <Switch
-                id="reply-in-app"
-                checked={notificationPrefs.replyInAppEnabled}
-                onCheckedChange={(checked) =>
-                  setNotificationPrefs((current) => ({ ...current, replyInAppEnabled: checked }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="reply-forward">Email forwarding</Label>
-                <p className="text-base text-secondary">
-                  Forward new reply summaries to these addresses.
-                </p>
-              </div>
-              <Switch
-                id="reply-forward"
-                checked={notificationPrefs.replyForwardEnabled}
-                onCheckedChange={(checked) =>
-                  setNotificationPrefs((current) => ({ ...current, replyForwardEnabled: checked }))
-                }
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="forward-emails">Forwarding addresses</Label>
-              <Textarea
-                id="forward-emails"
-                value={notificationPrefs.replyForwardEmails.join("\n")}
-                onChange={(event) =>
-                  setNotificationPrefs((current) => ({
-                    ...current,
-                    replyForwardEmails: event.target.value
-                      .split(/\r?\n|,/)
-                      .map((item) => item.trim())
-                      .filter(Boolean),
-                  }))
-                }
-                placeholder="owner@example.com"
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="browser-push">Browser push</Label>
-                <p className="text-base text-secondary">
-                  Delivery adapter is deferred; preference is saved.
-                </p>
-              </div>
-              <Switch
-                id="browser-push"
-                checked={notificationPrefs.browserPushEnabled}
-                onCheckedChange={(checked) =>
-                  setNotificationPrefs((current) => ({ ...current, browserPushEnabled: checked }))
-                }
-              />
-            </div>
-
-            <SaveBar status={notificationStatus} onSave={saveNotificationPrefs} />
-          </section>
-        </TabsContent>
-
-        <TabsContent value="team" className="flex flex-col gap-6">
-          <MembersRoles />
-        </TabsContent>
-
-        <TabsContent value="api" className="flex max-w-3xl flex-col gap-6">
-          <ApiKeys />
-        </TabsContent>
-      </Tabs>
+        {tab === "team" ? <MembersRoles /> : null}
+        {tab === "api" ? <ApiKeys /> : null}
+      </VStack>
     </Page>
-  );
-}
-
-/** Save button with the last result beside it. */
-function SaveBar({ status, onSave }: { status: string; onSave: () => void }) {
-  const failed = /could not|error/i.test(status);
-  const busy = status.startsWith("Saving");
-  return (
-    <div className="-mx-5 -mb-5 flex items-center justify-end gap-3 border-t bg-muted/40 px-5 py-3">
-      {status ? (
-        <p
-          role="status"
-          className={cn(
-            "mr-auto flex items-center gap-1.5 text-base",
-            failed ? "text-error" : "text-secondary"
-          )}
-        >
-          {status === "Saved" ? <CheckCircle2 className="size-4 text-success" /> : null}
-          {status}
-        </p>
-      ) : null}
-      <Button onClick={onSave} disabled={busy}>
-        {busy ? "Saving…" : "Save changes"}
-      </Button>
-    </div>
   );
 }
 

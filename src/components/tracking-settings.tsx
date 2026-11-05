@@ -1,13 +1,12 @@
 "use client";
 
-import { Card } from "@astryxdesign/core/Card";
-import { Heading } from "@astryxdesign/core/Heading";
 import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { SettingsCard } from "@/components/settings-card";
 import { errorMessage, requestJson } from "@/lib/request";
 
 type Tracking = { openTrackingEnabled: boolean; clickTrackingEnabled: boolean };
@@ -43,41 +42,36 @@ export function TrackingSettings() {
   }
 
   return (
-    <Card padding={5}>
-      <VStack gap={5}>
-        <VStack gap={1}>
-          <Heading level={3}>Tracking</Heading>
-          <Text type="supporting">
-            Off by default: tracking pixels and rewritten links can hurt cold email delivery.
-          </Text>
+    <SettingsCard
+      title="Tracking"
+      description="Off by default: tracking pixels and rewritten links can hurt cold email delivery."
+    >
+      {error ? (
+        <Text type="supporting">{error}</Text>
+      ) : (
+        <VStack gap={4}>
+          <Switch
+            label="Open tracking"
+            description="Adds a tiny image to each email. Counts are estimates, since mail apps like Gmail load images through a proxy."
+            value={tracking?.openTrackingEnabled ?? false}
+            isDisabled={!tracking}
+            labelPosition="start"
+            labelSpacing="spread"
+            width="100%"
+            changeAction={(checked) => save("openTrackingEnabled", checked)}
+          />
+          <Switch
+            label="Click tracking"
+            description="Routes links through Samrian to count clicks before sending people on."
+            value={tracking?.clickTrackingEnabled ?? false}
+            isDisabled={!tracking}
+            labelPosition="start"
+            labelSpacing="spread"
+            width="100%"
+            changeAction={(checked) => save("clickTrackingEnabled", checked)}
+          />
         </VStack>
-        {error ? (
-          <Text type="supporting">{error}</Text>
-        ) : (
-          <VStack gap={4}>
-            <Switch
-              label="Open tracking"
-              description="Adds a tiny image to each email. Counts are estimates, since mail apps like Gmail load images through a proxy."
-              value={tracking?.openTrackingEnabled ?? false}
-              isDisabled={!tracking}
-              labelPosition="start"
-              labelSpacing="spread"
-              width="100%"
-              changeAction={(checked) => save("openTrackingEnabled", checked)}
-            />
-            <Switch
-              label="Click tracking"
-              description="Routes links through Samrian to count clicks before sending people on."
-              value={tracking?.clickTrackingEnabled ?? false}
-              isDisabled={!tracking}
-              labelPosition="start"
-              labelSpacing="spread"
-              width="100%"
-              changeAction={(checked) => save("clickTrackingEnabled", checked)}
-            />
-          </VStack>
-        )}
-      </VStack>
-    </Card>
+      )}
+    </SettingsCard>
   );
 }
