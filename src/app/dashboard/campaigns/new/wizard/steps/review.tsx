@@ -23,6 +23,9 @@ export function ReviewStep({ draft }: ReviewStepProps) {
     draft.targetGroupId ? `/api/groups/${draft.targetGroupId}` : null
   );
   const { data: mailboxData } = useApi<{ mailboxes: MailboxCapacity[] }>("/api/mailboxes");
+  const { data: compliance } = useApi<{ physicalAddress?: string | null }>(
+    "/api/settings/compliance"
+  );
   const contactGroup = draft.targetGroupId ? groupData?.group : null;
   const groupContactCount = draft.targetGroupId ? groupData?.count : 0;
 
@@ -47,6 +50,10 @@ export function ReviewStep({ draft }: ReviewStepProps) {
     {
       label: "At least one mailbox",
       valid: (draft.mailboxIds?.length ?? 0) > 0,
+    },
+    {
+      label: "Mailing address set in Settings → General",
+      valid: !!compliance?.physicalAddress?.trim(),
     },
   ];
 
