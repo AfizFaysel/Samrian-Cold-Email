@@ -1,40 +1,47 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, Layers, Plus, Search, Trash2, Upload, Users, X } from "lucide-react";
-import { toast } from "sonner";
 import { Avatar } from "@astryxdesign/core/Avatar";
+import { Button } from "@astryxdesign/core/Button";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { Divider } from "@astryxdesign/core/Divider";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
+import { Link } from "@astryxdesign/core/Link";
+import { Selector } from "@astryxdesign/core/Selector";
+import {
+  proportional,
+  Table,
+  TableSelectionToolbar,
+  type TableColumn,
+  useTableSelection,
+  useTableSelectionState,
+} from "@astryxdesign/core/Table";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/VStack";
+import { Clock, Layers, Plus, Search, Trash2, Upload, Users } from "lucide-react";
+import { toast } from "sonner";
 import { AddToGroupDialog } from "@/components/add-to-group-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Page, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
 import { StatusPill } from "@/components/status-badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { useApi } from "@/hooks/use-api";
-import { requestJson } from "@/lib/request";
+import { errorMessage, requestJson } from "@/lib/request";
 
-type ContactItem = {
+interface ContactItem extends Record<string, unknown> {
   _id: string;
   _creationTime: number;
   orgId: string;
   email: string;
-  customVars: any;
+  customVars: Record<string, unknown> | null;
   timezone?: string;
   bounceStatus?: string;
-};
+}
 
 const TIMEZONES = [
   ["America/New_York", "America/New_York (EST/EDT)"],
@@ -50,6 +57,9 @@ const TIMEZONES = [
 
 const PAGE_SIZE = 50;
 
+const nameOf = (contact: ContactItem) =>
+  typeof contact.customVars?.name === "string" ? contact.customVars.name : "";
+
 export default function ContactsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -58,9 +68,7 @@ export default function ContactsPage() {
   const [showTimezoneModal, setShowTimezoneModal] = React.useState(false);
   const [showGroupModal, setShowGroupModal] = React.useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<string[] | null>(null);
-  const [timezone, setTimezone] = React.useState("America/New_York");
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [isUpdating, setIsUpdating] = React.useState(false);
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
@@ -72,21 +80,88 @@ export default function ContactsPage() {
     ? `/api/contacts?query=${encodeURIComponent(debouncedQuery.trim())}&limit=${PAGE_SIZE}`
     : `/api/contacts?limit=${PAGE_SIZE}`;
   const { data, error, refetch } = useApi<{ contacts: ContactItem[] }>(contactsUrl);
+  const contacts = React.useMemo(() => data?.contacts ?? [], [data]);
 
-  const contacts = data?.contacts ?? [];
-  const allSelected = contacts.length > 0 && selectedIds.size === contacts.length;
-  const someSelected = selectedIds.size > 0 && !allSelected;
+  const { selectionConfig, selectionState } = useTableSelectionState({
+    data: contacts,
+    idKey: "_id",
+    selectedKeys: selectedIds,
+    setSelectedKeys: setSelectedIds,
+  });
+  const selection = useTableSelection<ContactItem>({
+    ...selectionConfig,
+    getRowLabel: (contact) => nameOf(contact) || contact.email,
+  });
 
-  const toggleSelectAll = () =>
-    setSelectedIds(allSelected ? new Set() : new Set(contacts.map((c) => c._id)));
-
-  const toggleSelect = (id: string) =>
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const columns = React.useMemo<TableColumn<ContactItem>[]>(
+    () => [
+      {
+        key: "contact",
+        header: "Contact",
+        width: proportional(2, { minWidth: 200 }),
+        renderCell: (contact) => {
+          const name = nameOf(contact);
+          const company = contact.customVars?.company;
+          return (
+            <HStack gap={3} vAlign="center">
+              <Avatar name={name || contact.email} size={32} tooltip={false} />
+              <VStack gap={0} className="min-w-0">
+                <Link href={`/dashboard/contacts/${contact._id}`} isStandalone>
+                  {name || contact.email}
+                </Link>
+                <Text type="supporting" maxLines={1}>
+                  {typeof company === "string" && company ? company : "No company"}
+                </Text>
+              </VStack>
+            </HStack>
+          );
+        },
+      },
+      {
+        key: "email",
+        header: "Email",
+        width: proportional(2, { minWidth: 200 }),
+        renderCell: (contact) => (
+          <Text color="secondary" maxLines={1}>
+            {contact.email}
+          </Text>
+        ),
+      },
+      {
+        key: "timezone",
+        header: "Time zone",
+        renderCell: (contact) => <Text color="secondary">{contact.timezone || "Not set"}</Text>,
+      },
+      {
+        key: "status",
+        header: "Status",
+        renderCell: (contact) =>
+          contact.bounceStatus === "hard" ? (
+            <StatusPill tone="error" label="Hard bounce" />
+          ) : contact.bounceStatus === "soft" ? (
+            <StatusPill tone="warning" label="Soft bounce" />
+          ) : (
+            <StatusPill tone="success" label="Deliverable" />
+          ),
+      },
+      {
+        key: "actions",
+        header: "",
+        align: "end",
+        renderCell: (contact) => (
+          <IconButton
+            label={`Delete ${nameOf(contact) || contact.email}`}
+            tooltip="Delete"
+            variant="ghost"
+            size="sm"
+            icon={<Icon icon={Trash2} />}
+            onClick={() => setPendingDelete([contact._id])}
+          />
+        ),
+      },
+    ],
+    []
+  );
 
   const handleDelete = async (ids: string[]) => {
     setIsDeleting(true);
@@ -95,123 +170,97 @@ export default function ContactsPage() {
         method: "DELETE",
         body: JSON.stringify({ ids }),
       });
-      if (result.errors.length > 0) {
-        toast.warning(
-          `Deleted ${result.success.length} contact${result.success.length === 1 ? "" : "s"}. ${result.errors.length} failed.`
-        );
-      } else {
-        toast.success(
-          `Deleted ${result.success.length} contact${result.success.length === 1 ? "" : "s"}`
-        );
-      }
+      const deleted = `Deleted ${result.success.length} contact${result.success.length === 1 ? "" : "s"}`;
+      if (result.errors.length > 0) toast.warning(`${deleted}. ${result.errors.length} failed.`);
+      else toast.success(deleted);
       setSelectedIds(new Set());
       refetch();
     } catch (cause: unknown) {
-      toast.error(cause instanceof Error ? cause.message : "Couldn't delete contacts");
+      toast.error(errorMessage(cause, "Couldn't delete contacts"));
     } finally {
       setIsDeleting(false);
       setPendingDelete(null);
     }
   };
 
-  const handleBulkUpdateTimezone = async () => {
-    setIsUpdating(true);
-    try {
-      const result = await requestJson<{ success: string[]; errors: unknown[] }>("/api/contacts", {
-        method: "PATCH",
-        body: JSON.stringify({ ids: Array.from(selectedIds), timezone }),
-      });
-      if (result.errors.length > 0) {
-        toast.warning(`Updated ${result.success.length} contacts. ${result.errors.length} failed.`);
-      } else {
-        toast.success(`Time zone set for ${result.success.length} contacts`);
-      }
-      setSelectedIds(new Set());
-      setShowTimezoneModal(false);
-      refetch();
-    } catch (cause: unknown) {
-      toast.error(cause instanceof Error ? cause.message : "Couldn't update contacts");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const openContact = (id: string) => router.push(`/dashboard/contacts/${id}`);
+  const countLabel = isSearching
+    ? `${contacts.length} result${contacts.length === 1 ? "" : "s"}`
+    : contacts.length >= PAGE_SIZE
+      ? `Showing the latest ${PAGE_SIZE}`
+      : `${contacts.length} contact${contacts.length === 1 ? "" : "s"}`;
 
   return (
     <Page
       title="Contacts"
       description="Everyone you can reach, with their time zone and delivery status."
       actions={
-        <Link href="/dashboard/contacts/import" className={buttonVariants()}>
-          <Plus data-icon="inline-start" />
-          Add contacts
-        </Link>
+        <Button
+          label="Add contacts"
+          variant="primary"
+          icon={<Icon icon={Plus} />}
+          onClick={() => router.push("/dashboard/contacts/import")}
+        />
       }
     >
       <Panel>
-        <div className="flex min-h-14 flex-col gap-3 border-b p-3 sm:flex-row sm:items-center sm:justify-between">
-          {selectedIds.size > 0 ? (
-            <div className="flex flex-1 flex-wrap items-center gap-2">
-              <span className="mr-auto text-base font-medium tabular-nums">
-                {selectedIds.size} selected
-              </span>
-              <Button variant="outline" size="sm" onClick={() => setShowGroupModal(true)}>
-                <Layers data-icon="inline-start" />
-                Add to group
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowTimezoneModal(true)}>
-                <Clock data-icon="inline-start" />
-                Set time zone
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={isDeleting}
-                onClick={() => setPendingDelete(Array.from(selectedIds))}
-              >
-                <Trash2 data-icon="inline-start" />
-                Delete
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-                <X data-icon="inline-start" />
-                Clear
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="relative sm:w-72">
-                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-secondary" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by email"
-                  aria-label="Search contacts"
-                  className="pr-8 pl-8"
+        {selectionState.hasSelection ? (
+          <TableSelectionToolbar
+            selection={selectionState}
+            clearLabel="Clear"
+            size="md"
+            startContent={
+              <>
+                <Button
+                  label="Add to group"
+                  variant="secondary"
+                  icon={<Icon icon={Layers} />}
+                  onClick={() => setShowGroupModal(true)}
                 />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    aria-label="Clear search"
-                    className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-secondary hover:text-primary"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
-              </div>
-              {data && (
-                <span className="text-sm text-secondary tabular-nums">
-                  {isSearching
-                    ? `${contacts.length} result${contacts.length === 1 ? "" : "s"}`
-                    : contacts.length >= PAGE_SIZE
-                      ? `Showing the latest ${PAGE_SIZE}`
-                      : `${contacts.length} contact${contacts.length === 1 ? "" : "s"}`}
-                </span>
-              )}
-            </>
-          )}
-        </div>
+                <Button
+                  label="Set time zone"
+                  variant="secondary"
+                  icon={<Icon icon={Clock} />}
+                  onClick={() => setShowTimezoneModal(true)}
+                />
+                <Button
+                  label="Delete"
+                  variant="secondary"
+                  icon={<Icon icon={Trash2} />}
+                  isDisabled={isDeleting}
+                  onClick={() => setPendingDelete(Array.from(selectedIds))}
+                />
+              </>
+            }
+          />
+        ) : (
+          // Same height as the selection toolbar, so selecting a row never shifts the table.
+          <HStack
+            gap={3}
+            hAlign="between"
+            vAlign="center"
+            wrap="wrap"
+            paddingInline={3}
+            paddingBlock={2}
+          >
+            <TextInput
+              label="Search contacts"
+              isLabelHidden
+              type="search"
+              width={288}
+              startIcon={Search}
+              hasClear
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search by email"
+            />
+            {data ? (
+              <Text type="supporting" className="tabular-nums">
+                {countLabel}
+              </Text>
+            ) : null}
+          </HStack>
+        )}
+        <Divider />
 
         {error && !data ? (
           <ErrorState title="Couldn't load contacts" onRetry={refetch} />
@@ -228,94 +277,23 @@ export default function ContactsPage() {
             }
             action={
               isSearching ? (
-                <Button variant="outline" onClick={() => setSearchQuery("")}>
-                  Clear search
-                </Button>
+                <Button
+                  label="Clear search"
+                  variant="secondary"
+                  onClick={() => setSearchQuery("")}
+                />
               ) : (
-                <Link href="/dashboard/contacts/import" className={buttonVariants()}>
-                  <Upload data-icon="inline-start" />
-                  Import contacts
-                </Link>
+                <Button
+                  label="Import contacts"
+                  variant="primary"
+                  icon={<Icon icon={Upload} />}
+                  onClick={() => router.push("/dashboard/contacts/import")}
+                />
               )
             }
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-base">
-              <thead>
-                <tr className="border-b text-sm text-secondary">
-                  <th className="w-10 py-2.5 pl-4">
-                    <Checkbox
-                      checked={allSelected}
-                      indeterminate={someSelected}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all contacts"
-                    />
-                  </th>
-                  <th className="px-4 py-2.5 font-medium">Contact</th>
-                  <th className="px-4 py-2.5 font-medium">Email</th>
-                  <th className="px-4 py-2.5 font-medium">Time zone</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="w-12 px-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {contacts.map((contact) => {
-                  const isSelected = selectedIds.has(contact._id);
-                  const name = contact.customVars?.name as string | undefined;
-                  return (
-                    <tr
-                      key={contact._id}
-                      data-state={isSelected ? "selected" : undefined}
-                      className="group cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/60 data-[state=selected]:bg-accent-muted"
-                      onClick={() => openContact(contact._id)}
-                    >
-                      <td className="py-3 pl-4" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelect(contact._id)}
-                          aria-label={`Select ${contact.email}`}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar name={name || contact.email} size={32} tooltip={false} />
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">{name || "—"}</p>
-                            <p className="truncate text-sm text-secondary">
-                              {contact.customVars?.company || "No company"}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-secondary">{contact.email}</td>
-                      <td className="px-4 py-3 text-secondary">{contact.timezone || "Not set"}</td>
-                      <td className="px-4 py-3">
-                        {contact.bounceStatus === "hard" ? (
-                          <StatusPill tone="error" label="Hard bounce" />
-                        ) : contact.bounceStatus === "soft" ? (
-                          <StatusPill tone="warning" label="Soft bounce" />
-                        ) : (
-                          <StatusPill tone="success" label="Deliverable" />
-                        )}
-                      </td>
-                      <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-secondary opacity-0 group-hover:opacity-100 hover:text-error focus-visible:opacity-100"
-                          aria-label={`Delete ${contact.email}`}
-                          onClick={() => setPendingDelete([contact._id])}
-                        >
-                          <Trash2 />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Table data={contacts} columns={columns} idKey="_id" hasHover plugins={{ selection }} />
         )}
       </Panel>
 
@@ -341,43 +319,95 @@ export default function ContactsPage() {
         onAdded={() => setSelectedIds(new Set())}
       />
 
-      <Dialog open={showTimezoneModal} onOpenChange={setShowTimezoneModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Set time zone</DialogTitle>
-            <DialogDescription>
-              Emails to these {selectedIds.size} contact{selectedIds.size === 1 ? "" : "s"} follow
-              this time zone&apos;s send window.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2 px-6 pt-5">
-            <Label htmlFor="bulk-timezone">Time zone</Label>
-            <NativeSelect
-              id="bulk-timezone"
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-            >
-              {TIMEZONES.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className="flex justify-end gap-2 p-6">
-            <Button
-              variant="outline"
-              onClick={() => setShowTimezoneModal(false)}
-              disabled={isUpdating}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleBulkUpdateTimezone} disabled={isUpdating}>
-              {isUpdating ? "Saving…" : "Set time zone"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TimezoneDialog
+        contactIds={Array.from(selectedIds)}
+        isOpen={showTimezoneModal}
+        onOpenChange={setShowTimezoneModal}
+        onSaved={() => {
+          setSelectedIds(new Set());
+          refetch();
+        }}
+      />
     </Page>
+  );
+}
+
+/** Sets one time zone on the selected contacts; their sends follow its window. */
+function TimezoneDialog({
+  contactIds,
+  isOpen,
+  onOpenChange,
+  onSaved,
+}: {
+  contactIds: string[];
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [timezone, setTimezone] = React.useState<string>(TIMEZONES[0][0]);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const count = contactIds.length;
+
+  const close = () => {
+    if (!isSaving) onOpenChange(false);
+  };
+
+  async function save() {
+    setIsSaving(true);
+    try {
+      const result = await requestJson<{ success: string[]; errors: unknown[] }>("/api/contacts", {
+        method: "PATCH",
+        body: JSON.stringify({ ids: contactIds, timezone }),
+      });
+      if (result.errors.length > 0) {
+        toast.warning(`Updated ${result.success.length} contacts. ${result.errors.length} failed.`);
+      } else {
+        toast.success(`Time zone set for ${result.success.length} contacts`);
+      }
+      onOpenChange(false);
+      onSaved();
+    } catch (cause: unknown) {
+      toast.error(errorMessage(cause, "Couldn't update contacts"));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <Dialog isOpen={isOpen} onOpenChange={(open) => !open && close()} purpose="form" width={440}>
+      <Layout
+        header={
+          <DialogHeader
+            title="Set time zone"
+            subtitle={`Emails to ${count === 1 ? "this contact" : `these ${count} contacts`} follow this time zone's send window.`}
+            onOpenChange={close}
+          />
+        }
+        content={
+          <LayoutContent>
+            <Selector
+              label="Time zone"
+              width="100%"
+              value={timezone}
+              onChange={setTimezone}
+              options={TIMEZONES.map(([value, label]) => ({ value, label }))}
+            />
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter>
+            <HStack gap={2} hAlign="end">
+              <Button label="Cancel" variant="secondary" isDisabled={isSaving} onClick={close} />
+              <Button
+                label="Set time zone"
+                variant="primary"
+                isLoading={isSaving}
+                onClick={() => void save()}
+              />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
+    </Dialog>
   );
 }

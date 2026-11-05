@@ -28,8 +28,8 @@ interface AssignmentRow extends Record<string, unknown> {
   lastEmailSentAt?: number;
 }
 
-// Labels match the "Where contacts are" breakdown above this table.
-const STATUS: Record<string, { tone: StatusTone; label: string }> = {
+// A contact's state within one campaign; labels match the "Where contacts are" breakdown.
+export const ASSIGNMENT_STATUS: Record<string, { tone: StatusTone; label: string }> = {
   active: { tone: "info", label: "In sequence" },
   replied: { tone: "success", label: "Replied" },
   bounced: { tone: "error", label: "Bounced" },
@@ -69,7 +69,7 @@ const COLUMNS: TableColumn<AssignmentRow>[] = [
     key: "status",
     header: "Status",
     renderCell: (row) => {
-      const status = STATUS[row.status] ?? STATUS.active;
+      const status = ASSIGNMENT_STATUS[row.status] ?? ASSIGNMENT_STATUS.active;
       return <StatusPill tone={status.tone} label={status.label} />;
     },
   },

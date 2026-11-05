@@ -1,37 +1,80 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { Button } from "@astryxdesign/core/Button";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Link } from "@astryxdesign/core/Link";
+import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { proportional, Table, type TableColumn } from "@astryxdesign/core/Table";
+import { Text } from "@astryxdesign/core/Text";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
+import { VStack } from "@astryxdesign/core/VStack";
 import { ArrowLeft, Clock, Mail, Megaphone, Phone, Plus, Trash2, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Page, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState } from "@/components/page-state";
-import { StatusBadge, StatusPill } from "@/components/status-badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ASSIGNMENT_STATUS } from "@/components/campaigns/contact-activity";
+import { StatusPill } from "@/components/status-badge";
 import { useApi } from "@/hooks/use-api";
 import { errorMessage, requestJson } from "@/lib/request";
 
-type CampaignHistoryAssignment = {
+interface CampaignHistoryAssignment extends Record<string, unknown> {
   _id: string;
   _creationTime: number;
   orgId: string;
   campaignId: string;
+  campaignName: string | null;
   contactId: string;
   status: string;
   currentStep: number;
   lastEmailSentAt?: number;
-};
+}
 
-const HISTORY_STATUS: Record<string, string> = {
-  active: "running",
-  replied: "replied",
-  bounced: "bounced",
-  completed: "completed",
-  unsubscribed: "unsubscribed",
-};
+const HISTORY_COLUMNS: TableColumn<CampaignHistoryAssignment>[] = [
+  {
+    key: "campaign",
+    header: "Campaign",
+    width: proportional(2, { minWidth: 180 }),
+    renderCell: (row) =>
+      row.campaignName ? (
+        <Link href={`/dashboard/campaigns/${row.campaignId}`} isStandalone>
+          {row.campaignName}
+        </Link>
+      ) : (
+        <Text color="secondary">Deleted campaign</Text>
+      ),
+  },
+  {
+    key: "status",
+    header: "Status",
+    renderCell: (row) => {
+      const status = ASSIGNMENT_STATUS[row.status] ?? ASSIGNMENT_STATUS.active;
+      return <StatusPill tone={status.tone} label={status.label} />;
+    },
+  },
+  {
+    key: "progress",
+    header: "Progress",
+    renderCell: (row) => (
+      <Text color="secondary" className="tabular-nums">
+        {row.currentStep > 0 ? `Step ${row.currentStep} sent` : "Not started"}
+      </Text>
+    ),
+  },
+  {
+    key: "lastEmail",
+    header: "Last email",
+    renderCell: (row) =>
+      row.lastEmailSentAt ? (
+        <Timestamp value={new Date(row.lastEmailSentAt).toISOString()} format="date" />
+      ) : (
+        <Text color="secondary">Not sent</Text>
+      ),
+  },
+];
 
 export default function ContactDetailPage() {
   const params = useParams();
@@ -80,8 +123,8 @@ export default function ContactDetailPage() {
     return (
       <Page title="Contact" breadcrumbs={crumbs}>
         <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-          <Skeleton className="h-72 rounded-lg" />
-          <Skeleton className="h-72 rounded-lg" />
+          <Skeleton height={288} />
+          <Skeleton height={288} index={1} />
         </div>
       </Page>
     );
@@ -96,10 +139,12 @@ export default function ContactDetailPage() {
             title="Contact not found"
             description="It may have been deleted, or it belongs to another workspace."
             action={
-              <Link href="/dashboard/contacts" className={buttonVariants({ variant: "outline" })}>
-                <ArrowLeft data-icon="inline-start" />
-                Back to contacts
-              </Link>
+              <Button
+                label="Back to contacts"
+                variant="secondary"
+                icon={<Icon icon={ArrowLeft} />}
+                onClick={() => router.push("/dashboard/contacts")}
+              />
             }
           />
         </Panel>
@@ -116,62 +161,63 @@ export default function ContactDetailPage() {
       breadcrumbs={crumbs}
       actions={
         <>
-          <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
-            <Trash2 data-icon="inline-start" />
-            Delete
-          </Button>
-          <Link href="/dashboard/campaigns/new" className={buttonVariants()}>
-            <Plus data-icon="inline-start" />
-            New campaign
-          </Link>
+          <Button
+            label="Delete"
+            variant="secondary"
+            icon={<Icon icon={Trash2} />}
+            onClick={() => setConfirmDelete(true)}
+          />
+          <Button
+            label="New campaign"
+            variant="primary"
+            icon={<Icon icon={Plus} />}
+            onClick={() => router.push("/dashboard/campaigns/new")}
+          />
         </>
       }
     >
+      {/* Sidebar plus main column on wide screens, stacked on narrow ones. */}
       <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="flex flex-col gap-4">
-          <Panel title="Details">
-            <dl className="flex flex-col gap-4 p-4">
-              {[
-                { icon: Mail, label: "Email", value: contact.email },
-                { icon: Phone, label: "Phone", value: contact.customVars?.phone || "—" },
-                { icon: Clock, label: "Time zone", value: contact.timezone || "Not set" },
-              ].map(({ icon: Icon, label, value }) => (
-                <div key={label} className="flex items-start gap-3">
-                  <Icon className="mt-0.5 size-4 shrink-0 text-secondary" />
-                  <div className="min-w-0">
-                    <dt className="text-sm text-secondary">{label}</dt>
-                    <dd className="truncate text-base font-medium">{String(value)}</dd>
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center justify-between border-t pt-4">
-                <dt className="text-sm text-secondary">Delivery</dt>
-                <dd>
-                  {contact.bounceStatus === "hard" ? (
-                    <StatusPill tone="error" label="Hard bounce" />
-                  ) : contact.bounceStatus === "soft" ? (
-                    <StatusPill tone="warning" label="Soft bounce" />
-                  ) : (
-                    <StatusPill tone="success" label="Deliverable" />
-                  )}
-                </dd>
-              </div>
-            </dl>
+        <VStack gap={4}>
+          <Panel title="Details" bodyClassName="p-4">
+            <MetadataList label={{ position: "top" }}>
+              <MetadataListItem label="Email" icon={<Icon icon={Mail} />}>
+                <Text className="wrap-anywhere">{contact.email}</Text>
+              </MetadataListItem>
+              <MetadataListItem label="Phone" icon={<Icon icon={Phone} />}>
+                {contact.customVars?.phone || "Not set"}
+              </MetadataListItem>
+              <MetadataListItem label="Time zone" icon={<Icon icon={Clock} />}>
+                {contact.timezone || "Not set"}
+              </MetadataListItem>
+              <MetadataListItem label="Delivery">
+                {contact.bounceStatus === "hard" ? (
+                  <StatusPill tone="error" label="Hard bounce" />
+                ) : contact.bounceStatus === "soft" ? (
+                  <StatusPill tone="warning" label="Soft bounce" />
+                ) : (
+                  <StatusPill tone="success" label="Deliverable" />
+                )}
+              </MetadataListItem>
+            </MetadataList>
           </Panel>
 
           {customVars.length > 0 && (
-            <Panel title="Merge fields" description="Available as {{field}} in your emails.">
-              <dl className="divide-y">
+            <Panel
+              title="Merge fields"
+              description="Available as {{field}} in your emails."
+              bodyClassName="p-4"
+            >
+              <MetadataList>
                 {customVars.map(([key, value]) => (
-                  <div key={key} className="flex items-start justify-between gap-4 px-4 py-2.5">
-                    <dt className="font-mono text-sm text-secondary">{key}</dt>
-                    <dd className="text-right text-base break-all">{String(value)}</dd>
-                  </div>
+                  <MetadataListItem key={key} label={key}>
+                    <Text className="wrap-anywhere">{String(value)}</Text>
+                  </MetadataListItem>
                 ))}
-              </dl>
+              </MetadataList>
             </Panel>
           )}
-        </div>
+        </VStack>
 
         <Panel title="Campaign history">
           {history.length === 0 ? (
@@ -181,36 +227,7 @@ export default function ContactDetailPage() {
               description="When a campaign includes this contact, each step shows up here."
             />
           ) : (
-            <ol className="flex flex-col">
-              {history.map((assignment) => (
-                <li
-                  key={assignment._id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 last:border-0"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <StatusBadge status={HISTORY_STATUS[assignment.status] ?? assignment.status} />
-                    <Link
-                      href={`/dashboard/campaigns/${assignment.campaignId}`}
-                      className="truncate text-base font-medium hover:text-accent"
-                    >
-                      Campaign {assignment.campaignId.slice(0, 8)}
-                    </Link>
-                    <span className="text-sm text-secondary tabular-nums">
-                      Step {assignment.currentStep}
-                    </span>
-                  </div>
-                  <span className="text-sm text-secondary tabular-nums">
-                    {new Date(
-                      assignment.lastEmailSentAt ?? assignment._creationTime
-                    ).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </span>
-                </li>
-              ))}
-            </ol>
+            <Table data={history} columns={HISTORY_COLUMNS} idKey="_id" />
           )}
         </Panel>
       </div>

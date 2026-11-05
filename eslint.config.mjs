@@ -67,8 +67,6 @@ const eslintConfig = [
       "src/app/dashboard/campaigns/new/wizard/steps/email-sequence.tsx",
       "src/app/dashboard/campaigns/new/wizard/steps/mailboxes.tsx",
       "src/app/dashboard/campaigns/page.tsx",
-      "src/app/dashboard/contacts/[[]id]/page.tsx",
-      "src/app/dashboard/contacts/page.tsx",
       "src/app/dashboard/layout.tsx",
       "src/app/dashboard/mailboxes/add-mailbox-dialog.tsx",
       "src/app/dashboard/mailboxes/page.tsx",

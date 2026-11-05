@@ -156,15 +156,20 @@ export class PostgresAssignmentRepo {
 
   async listByContact(contactId: ContactId, orgId: OrgId, limit = 50) {
     const rows = await this.db
-      .select()
+      .select({ assignment: contactAssignments, campaignName: campaigns.name })
       .from(contactAssignments)
+      .leftJoin(
+        campaigns,
+        and(eq(campaigns.id, contactAssignments.campaignId), eq(campaigns.orgId, orgId))
+      )
       .where(and(eq(contactAssignments.contactId, contactId), eq(contactAssignments.orgId, orgId)))
       .limit(limit);
 
-    return rows.map((row) => ({
+    return rows.map(({ assignment: row, campaignName }) => ({
       _id: row.id,
       _creationTime: row.createdAt.getTime(),
       campaignId: row.campaignId,
+      campaignName: campaignName ?? null,
       contactId: row.contactId,
       orgId: row.orgId,
       status: row.status,
