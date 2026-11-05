@@ -32,17 +32,18 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
           <BreadcrumbItem isCurrent>{title}</BreadcrumbItem>
         </Breadcrumbs>
       )}
-      <HStack gap={4} hAlign="between" vAlign="center" wrap="wrap">
-        <VStack gap={1}>
+      <VStack gap={1}>
+        {/* Astryx header pattern: actions share the title's row and center on it. */}
+        <HStack gap={4} hAlign="between" vAlign="center" wrap="wrap">
           <Heading level={1}>{title}</Heading>
-          {description && <Text type="supporting">{description}</Text>}
-        </VStack>
-        {actions && (
-          <HStack gap={2} vAlign="center" wrap="wrap">
-            {actions}
-          </HStack>
-        )}
-      </HStack>
+          {actions && (
+            <HStack gap={2} vAlign="center" wrap="wrap">
+              {actions}
+            </HStack>
+          )}
+        </HStack>
+        {description && <Text type="supporting">{description}</Text>}
+      </VStack>
     </VStack>
   );
 }
