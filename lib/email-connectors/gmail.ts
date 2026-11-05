@@ -2,7 +2,7 @@
  * GmailApiConnector — Google Workspace mailboxes (OAuth2)
  *
  * Send:  Gmail API v1 users.messages.send (thread-aware)
- * Poll:  Gmail API v1 users.messages.list with q:"is:unread"; caller marks read after DB work.
+ * Poll:  Gmail API v1 users.messages.list for unread mail, Spam included; caller marks read after DB work.
  */
 
 import { MailboxConnectionError } from "./errors";
@@ -116,15 +116,17 @@ export class GmailApiConnector implements MailboxConnector {
 
   async pollNewMessages(options?: PollOptions): Promise<RawMessage[]> {
     const token = await this.getFreshAccessToken();
+    // Replies to cold email often land in Spam; missing them would keep sending follow-ups.
     const query = options?.since
-      ? `is:unread after:${Math.floor(options.since / 1000)}`
-      : "is:unread";
+      ? `is:unread -in:trash after:${Math.floor(options.since / 1000)}`
+      : "is:unread -in:trash";
 
     const ids: string[] = [];
     let pageToken: string | undefined;
     for (let page = 0; page < MAX_POLL_PAGES; page += 1) {
       const params = new URLSearchParams({
         q: query,
+        includeSpamTrash: "true",
         maxResults: "50",
         ...(pageToken ? { pageToken } : {}),
       });

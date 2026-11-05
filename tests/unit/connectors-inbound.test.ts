@@ -158,6 +158,16 @@ describe("polling past unrelated unread mail", () => {
     expect(decodeURIComponent(calls.urls()[0])).toContain(`after:${since / 1000}`);
   });
 
+  test("Gmail includes replies that landed in Spam but not Trash", async () => {
+    const calls = stubFetch(() => Response.json({}));
+
+    await gmail().pollNewMessages();
+
+    const list = new URL(calls.urls()[0]);
+    expect(list.searchParams.get("includeSpamTrash")).toBe("true");
+    expect(list.searchParams.get("q")).toBe("is:unread -in:trash");
+  });
+
   test("Gmail stops at the page limit", async () => {
     const calls = stubFetch((url) =>
       url.includes("?q=")
