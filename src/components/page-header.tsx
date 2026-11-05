@@ -1,6 +1,11 @@
 import * as React from "react";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { BreadcrumbItem, Breadcrumbs } from "@astryxdesign/core/Breadcrumbs";
+import { Card } from "@astryxdesign/core/Card";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Heading } from "@astryxdesign/core/Heading";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Text } from "@astryxdesign/core/Text";
+import { VStack } from "@astryxdesign/core/VStack";
 import { cn } from "@/lib/utils";
 
 export interface PageHeaderProps {
@@ -16,28 +21,29 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
   const parents = breadcrumbs?.slice(0, -1).filter((crumb) => crumb.href) ?? [];
 
   return (
-    <header className="flex flex-col gap-2">
+    <VStack as="header" gap={2}>
       {parents.length > 0 && (
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-secondary">
+        <Breadcrumbs variant="supporting">
           {parents.map((crumb) => (
-            <React.Fragment key={crumb.label}>
-              <Link href={crumb.href!} className="transition-colors hover:text-primary">
-                {crumb.label}
-              </Link>
-              <ChevronRight className="size-3" aria-hidden />
-            </React.Fragment>
+            <BreadcrumbItem key={crumb.label} href={crumb.href}>
+              {crumb.label}
+            </BreadcrumbItem>
           ))}
-          <span className="text-primary">{title}</span>
-        </nav>
+          <BreadcrumbItem isCurrent>{title}</BreadcrumbItem>
+        </Breadcrumbs>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-2xl leading-8 font-semibold tracking-tight">{title}</h1>
-          {description && <p className="max-w-2xl text-base text-secondary">{description}</p>}
-        </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
-      </div>
-    </header>
+      <HStack gap={4} hAlign="between" vAlign="center" wrap="wrap">
+        <VStack gap={1}>
+          <Heading level={1}>{title}</Heading>
+          {description && <Text type="supporting">{description}</Text>}
+        </VStack>
+        {actions && (
+          <HStack gap={2} vAlign="center" wrap="wrap">
+            {actions}
+          </HStack>
+        )}
+      </HStack>
+    </VStack>
   );
 }
 
@@ -53,18 +59,16 @@ export function Page({
   width?: "default" | "narrow" | "full";
 }) {
   return (
-    <div
-      className={cn(
-        // Astryx LayoutContent: padding step 6, header-to-content gap step 6.
-        "mx-auto flex w-full flex-col gap-6 p-4 sm:p-6",
-        width === "default" && "max-w-[1200px]",
-        width === "narrow" && "max-w-3xl",
-        className
-      )}
+    <VStack
+      gap={6}
+      width="100%"
+      maxWidth={width === "default" ? 1200 : width === "narrow" ? 768 : undefined}
+      // Phone gutter is one step tighter than the Astryx LayoutContent padding.
+      className={cn("mx-auto p-4 sm:p-6", className)}
     >
       <PageHeader {...header} />
       {children}
-    </div>
+    </VStack>
   );
 }
 
@@ -85,22 +89,25 @@ export function Panel({
   bodyClassName?: string;
 }) {
   return (
-    <section
-      className={cn(
-        "flex flex-col overflow-hidden rounded-lg border bg-card text-primary",
-        className
-      )}
-    >
+    <Card padding={0} className={cn("flex flex-col overflow-hidden", className)}>
       {(title || actions) && (
-        <div className="flex items-center justify-between gap-4 border-b px-4 py-3">
-          <div className="flex min-w-0 flex-col">
-            {title && <h2 className="text-base font-semibold">{title}</h2>}
-            {description && <p className="text-sm text-secondary">{description}</p>}
-          </div>
-          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
-        </div>
+        <>
+          <HStack gap={4} hAlign="between" vAlign="center" paddingInline={4} paddingBlock={3}>
+            <VStack gap={0}>
+              {/* Level 3 is the theme's section size (17px); level 2 (20px) outweighs the page. */}
+              {title && <Heading level={3}>{title}</Heading>}
+              {description && <Text type="supporting">{description}</Text>}
+            </VStack>
+            {actions && (
+              <HStack gap={2} vAlign="center">
+                {actions}
+              </HStack>
+            )}
+          </HStack>
+          <Divider />
+        </>
       )}
       <div className={cn("flex-1", bodyClassName)}>{children}</div>
-    </section>
+    </Card>
   );
 }

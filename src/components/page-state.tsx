@@ -1,9 +1,12 @@
 import * as React from "react";
+import { Button } from "@astryxdesign/core/Button";
 import { EmptyState as AstryxEmptyState } from "@astryxdesign/core/EmptyState";
+import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
-import { Loader2, RotateCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { VStack } from "@astryxdesign/core/VStack";
+import { RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -23,14 +26,14 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("px-6 py-12", className)}>
+    <VStack paddingInline={6} paddingBlock={10} className={className}>
       <AstryxEmptyState
         title={title}
         description={description}
         icon={icon ? <Icon icon={icon} size="lg" color="secondary" /> : undefined}
         actions={action}
       />
-    </div>
+    </VStack>
   );
 }
 
@@ -46,21 +49,23 @@ export function ErrorState({
   className?: string;
 }) {
   return (
-    <div role="alert" className={cn("px-6 py-12", className)}>
+    <VStack role="alert" paddingInline={6} paddingBlock={10} className={className}>
       <AstryxEmptyState
         title={title}
         description={description}
         icon={<Icon icon="error" size="lg" color="error" />}
         actions={
           onRetry ? (
-            <Button variant="outline" onClick={onRetry}>
-              <RotateCw data-icon="inline-start" />
-              Try again
-            </Button>
+            <Button
+              label="Try again"
+              variant="secondary"
+              icon={<Icon icon={RotateCw} />}
+              onClick={onRetry}
+            />
           ) : undefined
         }
       />
-    </div>
+    </VStack>
   );
 }
 
@@ -72,33 +77,26 @@ export function LoadingState({
   className?: string;
 }) {
   return (
-    <div
-      role="status"
-      className={cn(
-        "flex items-center justify-center gap-2 px-6 py-14 text-base text-secondary",
-        className
-      )}
-    >
-      <Loader2 className="size-4 animate-spin" aria-hidden />
-      <span>{label}</span>
-    </div>
+    <VStack role="status" hAlign="center" paddingInline={6} paddingBlock={10} className={className}>
+      <Spinner label={label} />
+    </VStack>
   );
 }
 
 /** Placeholder rows for a list or table while it loads. */
 export function RowsSkeleton({ rows = 5, className }: { rows?: number; className?: string }) {
   return (
-    <div className={cn("divide-y divide-border", className)} aria-hidden>
+    <VStack gap={0} className={cn("divide-y divide-border", className)} aria-hidden>
       {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="flex items-center gap-4 px-4 py-3.5">
-          <Skeleton className="size-8 rounded-full" />
-          <div className="flex flex-1 flex-col gap-1.5">
-            <Skeleton className="h-3.5 w-1/3" />
-            <Skeleton className="h-3 w-1/5" />
-          </div>
-          <Skeleton className="h-5 w-16 rounded-full" />
-        </div>
+        <HStack key={index} gap={4} vAlign="center" paddingInline={4} paddingBlock={3}>
+          <Skeleton width={32} height={32} radius="rounded" index={index} />
+          <VStack gap={1.5} className="flex-1">
+            <Skeleton width="33%" height={14} index={index} />
+            <Skeleton width="20%" height={12} index={index} />
+          </VStack>
+          <Skeleton width={64} height={20} radius="rounded" index={index} />
+        </HStack>
       ))}
-    </div>
+    </VStack>
   );
 }

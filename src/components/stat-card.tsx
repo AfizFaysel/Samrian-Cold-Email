@@ -1,37 +1,45 @@
 import * as React from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { Card } from "@astryxdesign/core/Card";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Skeleton } from "@astryxdesign/core/Skeleton";
+import { Text } from "@astryxdesign/core/Text";
+import { VStack } from "@astryxdesign/core/VStack";
 
 /** One headline figure: small label, large tabular number, one supporting line. */
 export function StatCard({
   label,
   value,
   hint,
-  icon: Icon,
+  icon,
   isLoading,
   className,
 }: {
   label: string;
   value: React.ReactNode;
   hint?: React.ReactNode;
-  icon?: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   isLoading?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-2 rounded-lg border bg-card p-4", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-secondary">{label}</span>
-        {Icon && <Icon className="size-4 text-secondary" />}
-      </div>
-      {isLoading ? (
-        <Skeleton className="h-8 w-24" />
-      ) : (
-        <span className="text-3xl leading-9 font-semibold tracking-tight tabular-nums">
-          {value}
-        </span>
-      )}
-      {hint && <span className="text-sm text-secondary">{hint}</span>}
-    </div>
+    <Card padding={4} className={className}>
+      <VStack gap={2}>
+        <HStack gap={2} hAlign="between" vAlign="center">
+          <Text type="supporting" weight="medium">
+            {label}
+          </Text>
+          {icon && <Icon icon={icon} size="sm" color="secondary" />}
+        </HStack>
+        {isLoading ? (
+          <Skeleton width={96} height={32} />
+        ) : (
+          <Text type="display-3" className="tabular-nums">
+            {value}
+          </Text>
+        )}
+        {hint && <Text type="supporting">{hint}</Text>}
+      </VStack>
+    </Card>
   );
 }
