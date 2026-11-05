@@ -69,7 +69,6 @@
     "@opentelemetry/sdk-node": "^0.221.0",
     "@opentelemetry/sdk-trace-node": "^2.10.0",
     "@samrian/contracts": "workspace:*",
-    "@tanstack/react-table": "^8.21.3",
     "@workos-inc/authkit-nextjs": "^4.3.1",
     "@workos-inc/node": "^10.9.0",
     "better-auth": "1.7.14",

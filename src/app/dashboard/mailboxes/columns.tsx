@@ -1,13 +1,16 @@
 "use client";
 
-import { ColumnDef } from "@tanstack/react-table";
-import { StatusBadge } from "@/components/status-badge";
+import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
+import { pixel, proportional, type TableColumn } from "@astryxdesign/core/Table";
 import { Text } from "@astryxdesign/core/Text";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
+import { VStack } from "@astryxdesign/core/VStack";
+import { StatusBadge } from "@/components/status-badge";
 import { MailboxActions } from "./mailbox-actions";
 
-export type MailboxListItem = {
+export interface MailboxListItem extends Record<string, unknown> {
   _id: string;
   name: string;
   provider: "smtp" | "puzzle" | "mailpool" | "google" | "microsoft";
@@ -28,7 +31,7 @@ export type MailboxListItem = {
   rampReason?: string;
   effectiveDailyLimit: number;
   availableToday: number;
-};
+}
 
 const readable = (value: string) => {
   const words = value.replace(/[_-]+/g, " ");
@@ -43,114 +46,122 @@ const PROVIDER_LABELS: Record<string, string> = {
   puzzle: "Puzzle",
 };
 
-export const mailboxColumns = (onChanged: () => void): ColumnDef<MailboxListItem>[] => [
+export const mailboxEmail = (mailbox: MailboxListItem) =>
+  mailbox.userEmail || mailbox.username || "";
+
+export const mailboxColumns = (onChanged: () => void): TableColumn<MailboxListItem>[] => [
   {
-    accessorKey: "name",
-    header: () => <div className="text-sm font-medium text-secondary">Mailbox</div>,
-    cell: ({ row }) => {
-      const email = row.original.userEmail || row.original.username;
+    key: "name",
+    header: "Mailbox",
+    width: proportional(2, { minWidth: 180 }),
+    renderCell: (mailbox) => (
+      <VStack gap={0} className="min-w-0">
+        <Text weight="medium" maxLines={1}>
+          {mailbox.name}
+        </Text>
+        <Text type="supporting" maxLines={1}>
+          {mailboxEmail(mailbox) || "No address"}
+        </Text>
+      </VStack>
+    ),
+  },
+  {
+    key: "provider",
+    width: pixel(120),
+    header: "Provider",
+    renderCell: (mailbox) => <Text>{PROVIDER_LABELS[mailbox.provider] ?? mailbox.provider}</Text>,
+  },
+  {
+    key: "status",
+    width: pixel(120),
+    header: "Status",
+    renderCell: (mailbox) => <StatusBadge status={mailbox.status} />,
+  },
+  {
+    key: "usage",
+    header: "Sent today",
+    width: proportional(1, { minWidth: 110 }),
+    renderCell: (mailbox) => {
+      const limit = mailbox.effectiveDailyLimit;
+      const sent = mailbox.emailsSentToday;
       return (
-        <div className="min-w-0">
-          <div className="font-medium text-primary">{row.getValue("name")}</div>
-          <div className="text-sm text-secondary">{email || "—"}</div>
-        </div>
+        <ProgressBar
+          label="Sent today"
+          isLabelHidden
+          value={Math.min(sent, limit)}
+          max={limit}
+          hasValueLabel
+          formatValueLabel={() => `${sent} / ${limit}`}
+          variant={sent >= limit ? "warning" : "accent"}
+        />
       );
     },
   },
   {
-    accessorKey: "provider",
-    header: () => <div className="text-sm font-medium text-secondary">Provider</div>,
-    cell: ({ row }) => {
-      const provider = row.getValue("provider") as string;
-      return <div className="text-base text-primary">{PROVIDER_LABELS[provider] ?? provider}</div>;
-    },
-  },
-  {
-    accessorKey: "status",
-    header: () => <div className="text-sm font-medium text-secondary">Status</div>,
-    cell: ({ row }) => {
-      const status = row.getValue("status") as any;
-      return <StatusBadge status={status} />;
-    },
-  },
-  {
-    id: "ramp",
-    header: () => <div className="text-sm font-medium text-secondary">Ramp</div>,
-    cell: ({ row }) => {
-      const mailbox = row.original;
+    key: "ramp",
+    header: "Ramp",
+    width: proportional(1, { minWidth: 150 }),
+    renderCell: (mailbox) => {
       if (!mailbox.rampEnabled) return <Text type="supporting">Off</Text>;
-      const current = mailbox.rampCurrentLimit ?? 5;
+      const showReason =
+        mailbox.rampReason && mailbox.rampReason.toLowerCase() !== mailbox.rampStatus.toLowerCase();
       return (
-        <div className="flex w-36 flex-col gap-1">
+        <VStack gap={1}>
           <ProgressBar
             label={readable(mailbox.rampStatus)}
-            value={current}
+            value={mailbox.rampCurrentLimit ?? 5}
             max={mailbox.rampTargetLimit}
             hasValueLabel
             formatValueLabel={(value, max) => `${value} / ${max} a day`}
           />
-          {mailbox.rampReason &&
-          mailbox.rampReason.toLowerCase() !== mailbox.rampStatus.toLowerCase() ? (
-            <Text type="supporting">{mailbox.rampReason}</Text>
-          ) : null}
+          {showReason ? <Text type="supporting">{readable(mailbox.rampReason ?? "")}</Text> : null}
           {mailbox.rampNextCheckAt ? (
-            <Text type="supporting">
-              Next step {new Date(mailbox.rampNextCheckAt).toLocaleDateString()}
-            </Text>
+            <HStack gap={1}>
+              <Text type="supporting">Next step</Text>
+              <Timestamp value={new Date(mailbox.rampNextCheckAt).toISOString()} format="date" />
+            </HStack>
           ) : null}
-        </div>
+        </VStack>
       );
     },
   },
   {
-    id: "usage",
-    header: () => <div className="text-sm font-medium text-secondary">Sent today</div>,
-    cell: ({ row }) => {
-      const limit = row.original.effectiveDailyLimit;
-      const sent = row.original.emailsSentToday;
-      return (
-        <div className="w-28">
-          <ProgressBar
-            label="Sent today"
-            isLabelHidden
-            value={Math.min(sent, limit)}
-            max={limit}
-            hasValueLabel
-            formatValueLabel={() => `${sent} / ${limit}`}
-            variant={sent >= limit ? "warning" : "accent"}
-          />
-        </div>
-      );
-    },
-  },
-  {
-    id: "health",
-    header: () => <div className="text-sm font-medium text-secondary">Health</div>,
-    cell: ({ row }) => {
-      const mailbox = row.original;
+    key: "health",
+    header: "Health",
+    width: proportional(1, { minWidth: 140 }),
+    renderCell: (mailbox) => {
       const error =
         mailbox.lastConnectionError ||
         mailbox.lastTokenRefreshError ||
         (mailbox.providerLimitCode ? `Provider limit: ${mailbox.providerLimitCode}` : undefined);
       if (error) {
         return (
-          <div className="flex max-w-48 items-start gap-1.5">
+          <HStack gap={1.5} vAlign="start">
             <Icon icon="error" color="error" size="sm" label="Problem" />
-            <Text type="supporting">{error}</Text>
-          </div>
+            <Text type="supporting" maxLines={2}>
+              {error}
+            </Text>
+          </HStack>
         );
       }
-      return (
-        <Text type="supporting">
-          {mailbox.lastConnectionTestAt
-            ? `Checked ${new Date(mailbox.lastConnectionTestAt).toLocaleDateString()}`
-            : "Not checked"}
-        </Text>
+      return mailbox.lastConnectionTestAt ? (
+        <HStack gap={1}>
+          <Text type="supporting">Checked</Text>
+          <Timestamp
+            value={new Date(mailbox.lastConnectionTestAt).toISOString()}
+            format="relative"
+          />
+        </HStack>
+      ) : (
+        <Text type="supporting">Not checked</Text>
       );
     },
   },
   {
-    id: "actions",
-    cell: ({ row }) => <MailboxActions mailbox={row.original} onChanged={onChanged} />,
+    key: "actions",
+    width: pixel(56),
+    header: "",
+    align: "end",
+    renderCell: (mailbox) => <MailboxActions mailbox={mailbox} onChanged={onChanged} />,
   },
 ];

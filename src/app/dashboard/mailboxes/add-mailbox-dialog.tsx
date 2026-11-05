@@ -1,286 +1,278 @@
 "use client";
 
 import * as React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { errorMessage, requestJson } from "@/lib/request";
-import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
+import { Button } from "@astryxdesign/core/Button";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { Grid } from "@astryxdesign/core/Grid";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Selector } from "@astryxdesign/core/Selector";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { VStack } from "@astryxdesign/core/VStack";
+import { ArrowLeft, Mail } from "lucide-react";
+import { toast } from "sonner";
+import { errorMessage, requestJson } from "@/lib/request";
 
 export interface AddMailboxDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  onConnected: () => void;
 }
 
-type Provider = "google" | "microsoft" | "smtp";
+// "smtp" is any server the user names; the others fill in their own hosts on the server.
+type SmtpProvider = "smtp" | "mailpool" | "puzzle";
 
-export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) {
-  const [step, setStep] = React.useState<"choose" | "form">("choose");
-  const [selectedProvider, setSelectedProvider] = React.useState<Provider | null>(null);
+const SMTP_PROVIDERS = [
+  { value: "smtp", label: "Custom SMTP / IMAP server" },
+  { value: "mailpool", label: "Mailpool" },
+  { value: "puzzle", label: "Puzzle" },
+];
+
+const EMPTY_FORM = {
+  provider: "smtp" as SmtpProvider,
+  name: "",
+  username: "",
+  password: "",
+  dailySendLimit: 50,
+  smtpHost: "",
+  smtpPort: 587,
+  imapHost: "",
+  imapPort: 993,
+};
+
+export function AddMailboxDialog({ isOpen, onOpenChange, onConnected }: AddMailboxDialogProps) {
+  const [step, setStep] = React.useState<"choose" | "smtp">("choose");
+  const [form, setForm] = React.useState(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const isCustom = form.provider === "smtp";
+  const update = <K extends keyof typeof EMPTY_FORM>(key: K, value: (typeof EMPTY_FORM)[K]) =>
+    setForm((current) => ({ ...current, [key]: value }));
 
-  const [formData, setFormData] = React.useState({
-    name: "",
-    username: "",
-    password: "",
-    dailySendLimit: 50,
-  });
-
-  // Reset state when dialog closes
   React.useEffect(() => {
-    if (!open) {
+    if (!isOpen) {
       setStep("choose");
-      setSelectedProvider(null);
-      setFormData({
-        name: "",
-        username: "",
-        password: "",
-        dailySendLimit: 50,
-      });
+      setForm(EMPTY_FORM);
     }
-  }, [open]);
+  }, [isOpen]);
 
-  const handleProviderSelect = (provider: Provider) => {
-    setSelectedProvider(provider);
-    if (provider === "google" || provider === "microsoft") {
-      // Redirect to OAuth flow immediately
-      const route = provider === "google" ? "/api/auth/google" : "/api/auth/microsoft";
-      window.location.href = route;
-    } else {
-      // Show SMTP form
-      setStep("form");
-    }
+  const close = () => {
+    if (!isSubmitting) onOpenChange(false);
   };
 
-  const handleSmtpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  const missing = [
+    !form.name.trim() && "a name",
+    !form.username.trim() && "the email address",
+    !form.password && "the app password",
+    isCustom && !form.smtpHost.trim() && "the SMTP host",
+    isCustom && !form.imapHost.trim() && "the IMAP host",
+  ].filter(Boolean);
 
+  async function connectSmtp() {
+    if (missing.length > 0) {
+      toast.error(`Add ${missing.join(", ")}.`);
+      return;
+    }
+    setIsSubmitting(true);
     try {
       await requestJson("/api/mailboxes/connect-smtp", {
         method: "POST",
         body: JSON.stringify({
-          name: formData.name,
-          provider: "mailpool", // Default SMTP provider
-          username: formData.username,
-          password: formData.password,
-          dailySendLimit: formData.dailySendLimit,
+          name: form.name.trim(),
+          provider: form.provider,
+          username: form.username.trim(),
+          password: form.password,
+          dailySendLimit: form.dailySendLimit,
+          ...(isCustom
+            ? {
+                smtpHost: form.smtpHost.trim(),
+                smtpPort: form.smtpPort,
+                imapHost: form.imapHost.trim(),
+                imapPort: form.imapPort,
+              }
+            : {}),
         }),
       });
-
-      toast.success("Mailbox added successfully");
+      toast.success("Mailbox connected");
       onOpenChange(false);
+      onConnected();
     } catch (error) {
       toast.error(errorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }
+
+  const logo = (src: string, alt: string) => <Image src={src} alt={alt} width={24} height={24} />;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[540px] p-0">
-        <DialogHeader className="px-6 pt-6 pb-4">
-          <div className="flex items-center gap-3">
-            {step === "form" && (
-              <button
-                onClick={() => setStep("choose")}
-                className="-ml-1 rounded-sm p-1 transition-colors hover:bg-muted"
-                aria-label="Back to provider selection"
-              >
-                <ArrowLeft className="size-4 text-secondary" />
-              </button>
-            )}
-            <div>
-              <DialogTitle>Connect a mailbox</DialogTitle>
-              <DialogDescription className="mt-1">
-                {step === "choose"
-                  ? "Choose where your sending account lives."
-                  : "Enter the SMTP details for this account."}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="px-6 pb-6">
-          {step === "choose" ? (
-            <div className="grid gap-3">
-              {/* Google Workspace Card */}
-              <button
-                onClick={() => handleProviderSelect("google")}
-                className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <Image
-                  src="/logos/google.svg"
-                  alt="Google"
-                  width={32}
-                  height={32}
-                  className="size-6 shrink-0"
+    <Dialog isOpen={isOpen} onOpenChange={(open) => !open && close()} purpose="form" width={520}>
+      <Layout
+        header={
+          <DialogHeader
+            title="Connect a mailbox"
+            subtitle={
+              step === "choose"
+                ? "Choose where your sending account lives."
+                : "Enter the details for this account."
+            }
+            onOpenChange={close}
+          />
+        }
+        content={
+          <LayoutContent>
+            {step === "choose" ? (
+              <List hasDividers>
+                <ListItem
+                  label="Google Workspace"
+                  description="Sign in with Google. Recommended."
+                  startContent={logo("/logos/google.svg", "")}
+                  endContent={<Icon icon="chevronRight" color="secondary" />}
+                  onClick={() => {
+                    window.location.href = "/api/auth/google";
+                  }}
                 />
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold">Google Workspace</h3>
-                  <p className="text-sm text-secondary">Sign in with OAuth. Recommended.</p>
-                </div>
-                <div className="shrink-0 text-secondary">
-                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </div>
-              </button>
-
-              {/* Microsoft 365 Card */}
-              <button
-                onClick={() => handleProviderSelect("microsoft")}
-                className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <Image
-                  src="/logos/microsoft.svg"
-                  alt="Microsoft"
-                  width={32}
-                  height={32}
-                  className="size-6 shrink-0"
+                <ListItem
+                  label="Microsoft 365"
+                  description="Sign in with Microsoft. Recommended."
+                  startContent={logo("/logos/microsoft.svg", "")}
+                  endContent={<Icon icon="chevronRight" color="secondary" />}
+                  onClick={() => {
+                    window.location.href = "/api/auth/microsoft";
+                  }}
                 />
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold">Microsoft 365</h3>
-                  <p className="text-sm text-secondary">Sign in with OAuth. Recommended.</p>
-                </div>
-                <div className="shrink-0 text-secondary">
-                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </div>
-              </button>
-
-              {/* SMTP/IMAP Card */}
-              <button
-                onClick={() => handleProviderSelect("smtp")}
-                className="group relative flex items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors outline-none hover:border-border-strong hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                <svg
-                  className="size-6 shrink-0 text-secondary"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold">SMTP / IMAP</h3>
-                  <p className="text-sm text-secondary">
-                    Any provider, with host and app password.
-                  </p>
-                </div>
-                <div className="shrink-0 text-secondary">
-                  <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </div>
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSmtpSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Friendly Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g. Sales Account 1"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
+                <ListItem
+                  label="SMTP / IMAP"
+                  description="Any provider, with its server details and an app password."
+                  startContent={<Icon icon={Mail} color="secondary" />}
+                  endContent={<Icon icon="chevronRight" color="secondary" />}
+                  onClick={() => setStep("smtp")}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="username">Email Address</Label>
-                <Input
-                  id="username"
+              </List>
+            ) : (
+              <VStack gap={4}>
+                <Selector
+                  label="Provider"
+                  width="100%"
+                  value={form.provider}
+                  onChange={(value) => update("provider", value as SmtpProvider)}
+                  options={SMTP_PROVIDERS}
+                />
+                <TextInput
+                  label="Name"
+                  description="Only your team sees this."
+                  width="100%"
+                  value={form.name}
+                  onChange={(value) => update("name", value)}
+                  placeholder="Sales mailbox 1"
+                  isRequired
+                />
+                <TextInput
+                  label="Email address"
                   type="email"
+                  width="100%"
+                  value={form.username}
+                  onChange={(value) => update("username", value)}
                   placeholder="hello@example.com"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  required
+                  autoComplete="off"
+                  isRequired
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">App Password</Label>
-                <Input
-                  id="password"
+                <TextInput
+                  label="App password"
+                  description="An app-specific password, not your main account password."
                   type="password"
-                  placeholder="••••••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
+                  width="100%"
+                  value={form.password}
+                  onChange={(value) => update("password", value)}
+                  autoComplete="new-password"
+                  isRequired
                 />
-                <p className="text-sm text-secondary">
-                  Use an app-specific password, not your main account password
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dailyLimit">Daily Send Limit</Label>
-                <Input
-                  id="dailyLimit"
-                  type="number"
+                {isCustom ? (
+                  <Grid columns={{ minWidth: 160, repeat: "fit" }} gap={3}>
+                    <TextInput
+                      label="SMTP host"
+                      width="100%"
+                      value={form.smtpHost}
+                      onChange={(value) => update("smtpHost", value)}
+                      placeholder="smtp.example.com"
+                      isRequired
+                    />
+                    <NumberInput
+                      label="SMTP port"
+                      width="100%"
+                      value={form.smtpPort}
+                      onChange={(value) => update("smtpPort", value)}
+                      min={1}
+                      max={65535}
+                      isIntegerOnly
+                    />
+                    <TextInput
+                      label="IMAP host"
+                      width="100%"
+                      value={form.imapHost}
+                      onChange={(value) => update("imapHost", value)}
+                      placeholder="imap.example.com"
+                      isRequired
+                    />
+                    <NumberInput
+                      label="IMAP port"
+                      width="100%"
+                      value={form.imapPort}
+                      onChange={(value) => update("imapPort", value)}
+                      min={1}
+                      max={65535}
+                      isIntegerOnly
+                    />
+                  </Grid>
+                ) : null}
+                <NumberInput
+                  label="Daily send limit"
+                  description="Most providers allow 30 to 50 cold emails a day per mailbox."
+                  width="100%"
+                  value={form.dailySendLimit}
+                  onChange={(value) => update("dailySendLimit", value)}
                   min={1}
                   max={2000}
-                  value={formData.dailySendLimit}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      dailySendLimit: parseInt(e.target.value) || 50,
-                    })
-                  }
-                  required
+                  isIntegerOnly
+                  units="a day"
                 />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
+              </VStack>
+            )}
+          </LayoutContent>
+        }
+        footer={
+          step === "smtp" ? (
+            <LayoutFooter>
+              <HStack gap={2} hAlign="between">
                 <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Connecting…" : "Connect mailbox"}
-                </Button>
-              </div>
-            </form>
-          )}
-        </div>
-      </DialogContent>
+                  label="Back"
+                  variant="ghost"
+                  icon={<Icon icon={ArrowLeft} />}
+                  isDisabled={isSubmitting}
+                  onClick={() => setStep("choose")}
+                />
+                <HStack gap={2}>
+                  <Button
+                    label="Cancel"
+                    variant="secondary"
+                    isDisabled={isSubmitting}
+                    onClick={close}
+                  />
+                  <Button
+                    label="Connect mailbox"
+                    variant="primary"
+                    isLoading={isSubmitting}
+                    onClick={() => void connectSmtp()}
+                  />
+                </HStack>
+              </HStack>
+            </LayoutFooter>
+          ) : undefined
+        }
+      />
     </Dialog>
   );
 }
