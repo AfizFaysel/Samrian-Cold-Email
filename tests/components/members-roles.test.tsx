@@ -105,11 +105,11 @@ describe("members and roles", () => {
   });
 
   it("shows load errors without exposing a broken editor", async () => {
-    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Could not load roles"));
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
     render(<MembersRoles />);
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Could not load roles");
+    expect(await screen.findByRole("status")).toHaveTextContent("Can't reach Samrian");
     expect(screen.getByRole("button", { name: "Create role" })).toBeDisabled();
   });
 

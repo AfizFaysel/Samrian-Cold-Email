@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { errorMessage, requestJson } from "@/lib/request";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
@@ -65,9 +66,8 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/mailboxes/connect-smtp", {
+      await requestJson("/api/mailboxes/connect-smtp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
           provider: "mailpool", // Default SMTP provider
@@ -77,16 +77,10 @@ export function AddMailboxDialog({ open, onOpenChange }: AddMailboxDialogProps) 
         }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error ?? "Failed to add mailbox");
-      }
-
       toast.success("Mailbox added successfully");
       onOpenChange(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to add mailbox");
+      toast.error(errorMessage(error));
     } finally {
       setIsSubmitting(false);
     }

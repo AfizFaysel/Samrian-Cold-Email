@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { responseError } from "@/lib/request";
+import { errorMessage, requestJson } from "@/lib/request";
 import { cn } from "@/lib/utils";
 
 type ComplianceSettings = {
@@ -80,77 +80,72 @@ export default function SettingsPage() {
   const [sendingStatus, setSendingStatus] = React.useState("");
 
   React.useEffect(() => {
-    fetch("/api/settings/compliance")
-      .then((response) => response.json())
+    requestJson<Partial<ComplianceSettings>>("/api/settings/compliance")
       .then((data) => setSettings({ ...fallbackSettings, ...data }))
-      .catch(() => setStatus("Could not load settings"));
+      .catch((error) => setStatus(errorMessage(error)));
 
-    fetch("/api/settings/notifications")
-      .then((response) => response.json())
+    requestJson<Partial<NotificationPrefs>>("/api/settings/notifications")
       .then((data) => setNotificationPrefs({ ...fallbackNotificationPrefs, ...data }))
-      .catch(() => setNotificationStatus("Could not load notification settings"));
+      .catch((error) => setNotificationStatus(errorMessage(error)));
 
-    fetch("/api/settings/sending")
-      .then((response) => response.json())
+    requestJson<Partial<SendingSettings>>("/api/settings/sending")
       .then((data) => setSending({ ...fallbackSendingSettings, ...data }))
-      .catch(() => setSendingStatus("Could not load sending settings"));
+      .catch((error) => setSendingStatus(errorMessage(error)));
   }, []);
 
   async function save() {
     setStatus("Saving...");
-    const response = await fetch("/api/settings/compliance", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    });
-    if (!response.ok) {
-      setStatus(await responseError(response, "Could not save settings"));
-      return;
+    try {
+      const saved = await requestJson<Partial<ComplianceSettings>>("/api/settings/compliance", {
+        method: "PATCH",
+        body: JSON.stringify(settings),
+      });
+      setSettings({ ...fallbackSettings, ...saved });
+      setStatus("Saved");
+    } catch (error) {
+      setStatus(errorMessage(error));
     }
-    setSettings({ ...fallbackSettings, ...(await response.json()) });
-    setStatus("Saved");
   }
 
   async function checkDomain() {
     if (!domain.trim()) return;
     setDomainStatus("Checking...");
-    const response = await fetch(`/api/domains/check?domain=${encodeURIComponent(domain.trim())}`);
-    if (!response.ok) {
-      setDomainStatus("Could not check domain");
-      return;
+    try {
+      setReadiness(
+        await requestJson(`/api/domains/check?domain=${encodeURIComponent(domain.trim())}`)
+      );
+      setDomainStatus("");
+    } catch (error) {
+      setDomainStatus(errorMessage(error));
     }
-    setReadiness(await response.json());
-    setDomainStatus("");
   }
 
   async function saveNotificationPrefs() {
     setNotificationStatus("Saving...");
-    const response = await fetch("/api/settings/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(notificationPrefs),
-    });
-    if (!response.ok) {
-      setNotificationStatus("Could not save notification settings");
-      return;
+    try {
+      const saved = await requestJson<Partial<NotificationPrefs>>("/api/settings/notifications", {
+        method: "PATCH",
+        body: JSON.stringify(notificationPrefs),
+      });
+      setNotificationPrefs({ ...fallbackNotificationPrefs, ...saved });
+      setNotificationStatus("Saved");
+    } catch (error) {
+      setNotificationStatus(errorMessage(error));
     }
-    setNotificationPrefs({ ...fallbackNotificationPrefs, ...(await response.json()) });
-    setNotificationStatus("Saved");
   }
 
   async function saveSending() {
     setSendingStatus("Saving...");
-    const response = await fetch("/api/settings/sending", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sending),
-    });
-    if (!response.ok) {
-      setSendingStatus("Could not save sending settings");
-      return;
+    try {
+      const saved = await requestJson<Partial<SendingSettings>>("/api/settings/sending", {
+        method: "PATCH",
+        body: JSON.stringify(sending),
+      });
+      setSending({ ...fallbackSendingSettings, ...saved });
+      setSendingStatus("Saved");
+    } catch (error) {
+      setSendingStatus(errorMessage(error));
     }
-    setSending({ ...fallbackSendingSettings, ...(await response.json()) });
-    setSendingStatus("Saved");
   }
 
   return (

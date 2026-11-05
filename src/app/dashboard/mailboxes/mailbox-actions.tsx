@@ -11,6 +11,7 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { errorMessage, requestJson, responseError } from "@/lib/request";
 import type { MailboxListItem } from "./columns";
 
 type RampAction = "enable" | "disable" | "pause" | "resume" | "reset" | "update";
@@ -27,13 +28,6 @@ const RAMP_MESSAGES: Record<RampAction, string> = {
 
 const MIN_TARGET = 5;
 const MAX_TARGET = 100;
-
-async function send(url: string, init: RequestInit, fallback: string) {
-  const response = await fetch(url, init);
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error ?? fallback);
-  return result;
-}
 
 export function MailboxActions({
   mailbox,
@@ -54,7 +48,7 @@ export function MailboxActions({
     try {
       await work();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Something went wrong");
+      toast.error(errorMessage(error));
     } finally {
       setIsBusy(false);
     }
@@ -62,15 +56,10 @@ export function MailboxActions({
 
   const changeRamp = (action: RampAction, targetLimit = mailbox.rampTargetLimit || 30) =>
     run(async () => {
-      await send(
-        `${base}/ramp`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, targetLimit }),
-        },
-        "Ramp update failed"
-      );
+      await requestJson(`${base}/ramp`, {
+        method: "PATCH",
+        body: JSON.stringify({ action, targetLimit }),
+      });
       toast.success(RAMP_MESSAGES[action]);
       setConfirm(null);
       setIsTargetOpen(false);
@@ -79,7 +68,9 @@ export function MailboxActions({
 
   const checkMailbox = () =>
     run(async () => {
-      const result = await send(`${base}/check`, { method: "POST" }, "Mailbox check failed");
+      const result = await requestJson<{ status: string; issue?: string }>(`${base}/check`, {
+        method: "POST",
+      });
       if (result.status === "healthy") toast.success("Mailbox healthy");
       else toast.error(result.issue ?? "Mailbox needs attention");
       onChanged();
@@ -87,11 +78,10 @@ export function MailboxActions({
 
   const reconnectMailbox = () =>
     run(async () => {
-      const result = await send(
-        `${base}/reconnect`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
-        "Reconnect failed"
-      );
+      const result = await requestJson<{ reconnectUrl?: string }>(`${base}/reconnect`, {
+        method: "POST",
+        body: "{}",
+      });
       if (result.reconnectUrl) {
         window.location.href = result.reconnectUrl;
         return;
@@ -102,10 +92,9 @@ export function MailboxActions({
 
   const evaluateRamp = () =>
     run(async () => {
-      const result = await send(
+      const result = await requestJson<{ decision: { status: string; reason: string } }>(
         `${base}/ramp/evaluate`,
-        { method: "POST" },
-        "Ramp evaluation failed"
+        { method: "POST" }
       );
       toast.success(`Ramp ${result.decision.status}: ${result.decision.reason}`);
       onChanged();
@@ -118,8 +107,7 @@ export function MailboxActions({
         setConfirm("archive");
         return;
       }
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error ?? "Delete failed");
+      if (!response.ok) throw new Error(await responseError(response));
       toast.success("Mailbox archived");
       setConfirm(null);
       onChanged();

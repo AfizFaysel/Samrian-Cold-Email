@@ -38,3 +38,7 @@ export async function requestJson<T = unknown>(url: string, init: RequestInit = 
   if (!response.ok) throw new Error(await responseError(response));
   return response.json().catch(() => undefined) as Promise<T>;
 }
+
+export function errorMessage(error: unknown, fallback = SERVER): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}

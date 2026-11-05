@@ -7,6 +7,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { errorMessage, requestJson } from "@/lib/request";
 
 type KeyMetadata = {
   id: string;
@@ -24,29 +25,25 @@ export function ApiKeys() {
   const [error, setError] = React.useState("");
 
   const load = React.useCallback(async () => {
-    const response = await fetch("/api/settings/api-keys");
-    if (!response.ok) throw new Error("Could not load API keys");
-    setKeys(await response.json());
+    setKeys(await requestJson<KeyMetadata[]>("/api/settings/api-keys"));
   }, []);
 
   React.useEffect(() => {
-    load().catch((loadError: unknown) =>
-      setError(loadError instanceof Error ? loadError.message : "Could not load API keys")
-    );
+    load().catch((loadError: unknown) => setError(errorMessage(loadError)));
   }, [load]);
 
   async function create() {
     setError("");
-    const response = await fetch("/api/settings/api-keys", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, scopes: selected }),
-    });
-    if (!response.ok) {
-      setError("Could not create API key");
+    let result: KeyMetadata & { value: string };
+    try {
+      result = await requestJson("/api/settings/api-keys", {
+        method: "POST",
+        body: JSON.stringify({ name, scopes: selected }),
+      });
+    } catch (createError) {
+      setError(errorMessage(createError));
       return;
     }
-    const result = (await response.json()) as KeyMetadata & { value: string };
     setCreated(result.value);
     setKeys((current) => [result, ...current]);
     setName("");
@@ -54,14 +51,15 @@ export function ApiKeys() {
   }
 
   async function revoke(key: KeyMetadata) {
-    const response = await fetch(`/api/settings/api-keys/${encodeURIComponent(key.id)}/revoke`, {
-      method: "POST",
-    });
-    if (!response.ok) {
-      setError("Could not revoke API key");
-      return;
+    setError("");
+    try {
+      await requestJson(`/api/settings/api-keys/${encodeURIComponent(key.id)}/revoke`, {
+        method: "POST",
+      });
+      await load();
+    } catch (revokeError) {
+      setError(errorMessage(revokeError));
     }
-    await load();
   }
 
   return (

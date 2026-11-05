@@ -12,6 +12,7 @@ import { StatusBadge, StatusPill } from "@/components/status-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/hooks/use-api";
+import { errorMessage, requestJson } from "@/lib/request";
 
 type CampaignHistoryAssignment = {
   _id: string;
@@ -51,16 +52,14 @@ export default function ContactDetailPage() {
   async function handleDelete() {
     setIsDeleting(true);
     try {
-      const response = await fetch("/api/contacts", {
+      await requestJson("/api/contacts", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [contactId] }),
       });
-      if (!response.ok) throw new Error(`Request failed: ${response.status}`);
       toast.success("Contact deleted");
       router.push("/dashboard/contacts");
     } catch (cause: unknown) {
-      toast.error(cause instanceof Error ? cause.message : "Couldn't delete the contact");
+      toast.error(errorMessage(cause));
     } finally {
       setIsDeleting(false);
       setConfirmDelete(false);

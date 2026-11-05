@@ -48,7 +48,10 @@ describe("API keys", () => {
     expect(await screen.findByText("CI")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Revoke CI" }));
     await waitFor(() =>
-      expect(fetch).toHaveBeenCalledWith("/api/settings/api-keys/key_1/revoke", { method: "POST" })
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/settings/api-keys/key_1/revoke",
+        expect.objectContaining({ method: "POST" })
+      )
     );
   });
 });

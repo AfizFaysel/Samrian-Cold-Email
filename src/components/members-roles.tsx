@@ -8,6 +8,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { errorMessage, requestJson, responseError } from "@/lib/request";
 
 type Role = {
   id: string;
@@ -37,23 +38,19 @@ export function MembersRoles() {
   const [status, setStatus] = React.useState("Loading members and roles...");
 
   const loadRoles = React.useCallback(async () => {
-    const response = await fetch("/api/settings/roles");
-    if (!response.ok) throw new Error("Could not load roles");
-    const data = (await response.json()) as { roles: Role[]; permissions: string[] };
+    const data = await requestJson<{ roles: Role[]; permissions: string[] }>("/api/settings/roles");
     setRoles(data.roles);
     setPermissions(data.permissions);
   }, []);
 
   const loadMembers = React.useCallback(async () => {
-    const response = await fetch("/api/settings/members");
-    if (!response.ok) throw new Error("Could not load members");
-    setMembers((await response.json()) as Member[]);
+    setMembers(await requestJson<Member[]>("/api/settings/members"));
   }, []);
 
   React.useEffect(() => {
     Promise.all([loadRoles(), loadMembers()])
       .then(() => setStatus(""))
-      .catch((error) => setStatus(error instanceof Error ? error.message : "Could not load team"));
+      .catch((error) => setStatus(errorMessage(error)));
   }, [loadMembers, loadRoles]);
 
   async function saveRole() {
@@ -66,7 +63,7 @@ export function MembersRoles() {
         body: JSON.stringify({ name, permissions: selected }),
       }
     );
-    if (!response.ok) return setStatus(await readError(response));
+    if (!response.ok) return setStatus(await responseError(response));
     setName("");
     setSelected([]);
     setEditing(null);
@@ -84,7 +81,7 @@ export function MembersRoles() {
     if (!window.confirm(`Delete ${role.name}? Members using it will become members.`)) return;
     setStatus("Deleting role...");
     const response = await fetch(`/api/settings/roles/${role.id}`, { method: "DELETE" });
-    if (!response.ok) return setStatus(await readError(response));
+    if (!response.ok) return setStatus(await responseError(response));
     await Promise.all([loadRoles(), loadMembers()]);
     setStatus("Role deleted");
   }
@@ -96,7 +93,7 @@ export function MembersRoles() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ memberId: member.id, role }),
     });
-    if (!response.ok) return setStatus(await readError(response));
+    if (!response.ok) return setStatus(await responseError(response));
     await loadMembers();
     setStatus("Member updated");
   }
@@ -108,7 +105,7 @@ export function MembersRoles() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, role: inviteRole }),
     });
-    if (!response.ok) return setStatus(await readError(response));
+    if (!response.ok) return setStatus(await responseError(response));
     setEmail("");
     setStatus("Invitation sent");
   }
@@ -272,9 +269,4 @@ function RoleList({
       </div>
     </div>
   );
-}
-
-async function readError(response: Response) {
-  const body = (await response.json().catch(() => null)) as { error?: string } | null;
-  return body?.error ?? "Operation failed";
 }
