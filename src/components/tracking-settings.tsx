@@ -43,10 +43,10 @@ export function TrackingSettings() {
   }
 
   return (
-    <Card>
-      <VStack gap={4}>
+    <Card padding={5}>
+      <VStack gap={5}>
         <VStack gap={1}>
-          <Heading level={2}>Tracking</Heading>
+          <Heading level={3}>Tracking</Heading>
           <Text type="supporting">
             Off by default: tracking pixels and rewritten links can hurt cold email delivery.
           </Text>
@@ -54,12 +54,15 @@ export function TrackingSettings() {
         {error ? (
           <Text type="supporting">{error}</Text>
         ) : (
-          <VStack gap={3}>
+          <VStack gap={4}>
             <Switch
               label="Open tracking"
               description="Adds a tiny image to each email. Counts are estimates, since mail apps like Gmail load images through a proxy."
               value={tracking?.openTrackingEnabled ?? false}
               isDisabled={!tracking}
+              labelPosition="start"
+              labelSpacing="spread"
+              width="100%"
               changeAction={(checked) => save("openTrackingEnabled", checked)}
             />
             <Switch
@@ -67,6 +70,9 @@ export function TrackingSettings() {
               description="Routes links through Samrian to count clicks before sending people on."
               value={tracking?.clickTrackingEnabled ?? false}
               isDisabled={!tracking}
+              labelPosition="start"
+              labelSpacing="spread"
+              width="100%"
               changeAction={(checked) => save("clickTrackingEnabled", checked)}
             />
           </VStack>

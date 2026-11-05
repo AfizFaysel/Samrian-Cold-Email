@@ -82,7 +82,11 @@ export function AddToGroupDialog({
         header={
           <DialogHeader
             title="Add to group"
-            subtitle={`Group these ${count} contact${count === 1 ? "" : "s"} so a campaign can target them together.`}
+            subtitle={
+              count === 1
+                ? "Put this contact in a group a campaign can target."
+                : `Put these ${count} contacts in a group a campaign can target.`
+            }
             onOpenChange={close}
           />
         }
