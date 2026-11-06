@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Icon } from "@astryxdesign/core/Icon";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 
 export type ThemeChoice = "light" | "dark" | "system";
 
@@ -75,41 +76,31 @@ export function useTheme() {
   return { theme, resolved, setTheme };
 }
 
-const OPTIONS = [
+export const THEME_OPTIONS = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
   { value: "system", label: "System", icon: Monitor },
 ] as const;
 
-export function ThemeToggle({ className }: { className?: string }) {
+/** Light, dark or follow the system. */
+export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-
   return (
-    <div
-      role="radiogroup"
-      aria-label="Theme"
-      className={cn("inline-flex items-center gap-0.5 rounded-md bg-muted p-0.5", className)}
+    <SegmentedControl
+      label="Theme"
+      size="sm"
+      value={theme}
+      onChange={(value) => setTheme(value as ThemeChoice)}
     >
-      {OPTIONS.map(({ value, label, icon: Icon }) => {
-        const checked = theme === value;
-        return (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={checked}
-            aria-label={label}
-            title={label}
-            onClick={() => setTheme(value)}
-            className={cn(
-              "flex size-7 items-center justify-center rounded-sm text-secondary transition-colors outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-accent",
-              checked && "bg-card text-primary shadow-sm"
-            )}
-          >
-            <Icon className="size-3.5" aria-hidden />
-          </button>
-        );
-      })}
-    </div>
+      {THEME_OPTIONS.map(({ value, label, icon }) => (
+        <SegmentedControlItem
+          key={value}
+          value={value}
+          label={label}
+          isLabelHidden
+          icon={<Icon icon={icon} />}
+        />
+      ))}
+    </SegmentedControl>
   );
 }

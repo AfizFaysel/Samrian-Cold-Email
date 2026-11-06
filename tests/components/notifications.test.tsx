@@ -35,7 +35,8 @@ describe("NotificationsBell", () => {
     expect(await screen.findByText("New reply from ada@example.com")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /mark read/i }));
+    // Opening a notification marks it read.
+    await userEvent.click(screen.getByRole("button", { name: /New reply from ada@example.com/ }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/notifications/notification_1", {

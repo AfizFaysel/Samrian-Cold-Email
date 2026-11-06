@@ -1,14 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { Bell, Check, Loader2 } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Button } from "@astryxdesign/core/Button";
+import { Divider } from "@astryxdesign/core/Divider";
+import { Heading } from "@astryxdesign/core/Heading";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Popover } from "@astryxdesign/core/Popover";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
+import { Text } from "@astryxdesign/core/Text";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
+import { VStack } from "@astryxdesign/core/VStack";
+import { Bell, Check } from "lucide-react";
 
 type NotificationItem = {
   id: string;
@@ -26,7 +33,7 @@ type NotificationResponse = {
 };
 
 export function NotificationsBell() {
-  const [open, setOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [data, setData] = React.useState<NotificationResponse>({
     notifications: [],
@@ -50,18 +57,18 @@ export function NotificationsBell() {
     void load();
   }, [load]);
 
-  async function markRead(id: string) {
-    await fetch(`/api/notifications/${id}`, { method: "PATCH" });
-    await load();
-  }
-
+  // Opening a notification marks it read and, for a reply, jumps to its conversation.
   async function openNotification(notification: NotificationItem) {
-    if (!notification.readAt) await markRead(notification.id);
+    if (!notification.readAt) {
+      await fetch(`/api/notifications/${notification.id}`, { method: "PATCH" });
+    }
     const threadId =
       typeof notification.data?.threadId === "string" ? notification.data.threadId : undefined;
     if (notification.type === "reply" && threadId) {
       window.location.href = `/dashboard/inbox?thread=${encodeURIComponent(threadId)}`;
+      return;
     }
+    await load();
   }
 
   async function markAllRead() {
@@ -69,84 +76,100 @@ export function NotificationsBell() {
     await load();
   }
 
+  const unread = data.unreadCount;
+
   return (
-    <DropdownMenu
-      open={open}
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen);
-        if (nextOpen) void load();
+    <Popover
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (open) void load();
       }}
-    >
-      <DropdownMenuTrigger
-        type="button"
-        className="relative inline-flex size-8 items-center justify-center rounded-md text-secondary outline-none hover:bg-muted hover:text-primary focus-visible:ring-2 focus-visible:ring-accent data-popup-open:bg-muted"
-        aria-label="Notifications"
-      >
-        <Bell className="size-4" />
-        {data.unreadCount > 0 ? (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-bg px-1 text-xs font-semibold text-on-accent tabular-nums ring-2 ring-background">
-            {data.unreadCount}
-          </span>
-        ) : null}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-base font-semibold text-primary">Notifications</h2>
-          <Button type="button" variant="ghost" size="sm" onClick={markAllRead}>
-            <Check data-icon="inline-start" />
-            Mark all read
-          </Button>
-        </div>
-        <div className="max-h-96 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-8 text-secondary">
-              <Loader2 className="h-5 w-5 animate-spin" />
-            </div>
+      placement="below"
+      alignment="end"
+      content={
+        <VStack gap={0} width={340}>
+          <HStack gap={2} hAlign="between" vAlign="center" paddingInline={4} paddingBlock={3}>
+            <Heading level={4}>Notifications</Heading>
+            <Button
+              label="Mark all read"
+              variant="ghost"
+              size="sm"
+              icon={<Icon icon={Check} />}
+              isDisabled={unread === 0}
+              onClick={() => void markAllRead()}
+            />
+          </HStack>
+          <Divider />
+          {loading && data.notifications.length === 0 ? (
+            <VStack hAlign="center" paddingBlock={8}>
+              <Spinner label="Loading notifications" />
+            </VStack>
           ) : data.notifications.length === 0 ? (
-            <div className="flex flex-col items-center gap-1 px-4 py-10 text-center">
-              <Bell className="size-5 text-secondary" />
-              <p className="text-base font-medium">You&apos;re all caught up</p>
-              <p className="text-sm text-secondary">Replies and alerts will show here.</p>
-            </div>
+            <VStack
+              gap={1}
+              hAlign="center"
+              paddingInline={4}
+              paddingBlock={8}
+              className="text-center"
+            >
+              <Icon icon={Bell} color="secondary" />
+              <Text weight="medium">You&apos;re all caught up</Text>
+              <Text type="supporting">Replies and alerts will show here.</Text>
+            </VStack>
           ) : (
-            data.notifications.map((notification) => (
-              <div
-                key={notification.id}
-                className="relative border-b border-border px-4 py-3 last:border-0 hover:bg-muted/60"
-              >
-                {!notification.readAt ? (
-                  <span
-                    className="absolute top-4.5 left-1.5 size-1.5 rounded-full bg-accent-bg"
-                    aria-label="Unread"
+            <VStack gap={0} isScrollable className="max-h-96">
+              <List hasDividers>
+                {data.notifications.map((notification) => (
+                  <ListItem
+                    key={notification.id}
+                    align="start"
+                    onClick={() => void openNotification(notification)}
+                    startContent={
+                      notification.readAt ? undefined : (
+                        <StatusDot variant="accent" label="Unread" />
+                      )
+                    }
+                    label={
+                      <Text weight={notification.readAt ? "normal" : "medium"}>
+                        {notification.title}
+                      </Text>
+                    }
+                    description={
+                      <VStack gap={0.5}>
+                        {notification.body ? (
+                          <Text type="supporting" maxLines={2}>
+                            {notification.body}
+                          </Text>
+                        ) : null}
+                        <Timestamp
+                          value={new Date(notification.createdAt).toISOString()}
+                          format="relative"
+                        />
+                      </VStack>
+                    }
                   />
-                ) : null}
-                <div className="flex items-start justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => openNotification(notification)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <p className="text-base font-medium text-primary">{notification.title}</p>
-                    {notification.body ? (
-                      <p className="mt-1 text-sm text-secondary">{notification.body}</p>
-                    ) : null}
-                  </button>
-                  {!notification.readAt ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => markRead(notification.id)}
-                    >
-                      Mark read
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            ))
+                ))}
+              </List>
+            </VStack>
           )}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </VStack>
+      }
+    >
+      {/* The count sits on the bell; the button's label carries it for screen readers. */}
+      <HStack className="relative">
+        <IconButton
+          label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+          tooltip="Notifications"
+          variant="ghost"
+          icon={<Icon icon={Bell} />}
+        />
+        {unread > 0 ? (
+          <HStack className="pointer-events-none absolute -top-1 -right-1" aria-hidden>
+            <Badge variant="blue" label={unread > 99 ? "99+" : String(unread)} />
+          </HStack>
+        ) : null}
+      </HStack>
+    </Popover>
   );
 }

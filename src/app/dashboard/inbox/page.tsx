@@ -139,9 +139,9 @@ export default function InboxPage() {
   const senderLabel = (sender?: InboxSender) => sender?.name ?? sender?.address ?? "Unknown sender";
 
   return (
-    // Two panes on desktop and one at a time on phones, so the pane frame stays a CSS grid.
-    <div className="flex h-[calc(100svh-3rem)] min-h-0 flex-col md:h-svh">
-      <div className="grid min-h-0 flex-1 md:grid-cols-[340px_minmax(0,1fr)]">
+    // Fills the shell's content area. Two panes on desktop, one at a time on phones.
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] md:grid-cols-[340px_minmax(0,1fr)]">
         <VStack
           as="aside"
           gap={0}
@@ -163,7 +163,13 @@ export default function InboxPage() {
             />
           </HStack>
           <Divider />
-          <VStack gap={0} isScrollable className="min-h-0 flex-1">
+          <VStack
+            gap={0}
+            isScrollable
+            paddingInline={2}
+            paddingBlock={2}
+            className="min-h-0 flex-1"
+          >
             {listError && !data ? (
               <ErrorState title="Couldn't load replies" onRetry={refetch} />
             ) : data === undefined ? (
@@ -175,7 +181,7 @@ export default function InboxPage() {
                 description="When someone answers a campaign email, the conversation lands here."
               />
             ) : (
-              <List hasDividers edge="flush">
+              <List hasDividers>
                 {threads.map((thread) => {
                   const name = senderLabel(thread.sender);
                   return (
@@ -350,8 +356,8 @@ export default function InboxPage() {
                   onChange={setDraft}
                   placeholder="Write a reply…"
                 />
-                <HStack gap={2} hAlign="between" vAlign="center">
-                  <HStack gap={1.5} vAlign="center" className="max-sm:hidden">
+                <HStack gap={2} hAlign="end" vAlign="center">
+                  <HStack gap={1.5} vAlign="center" className="mr-auto max-sm:hidden">
                     <Kbd keys="mod+enter" />
                     <Text type="supporting">to send</Text>
                   </HStack>

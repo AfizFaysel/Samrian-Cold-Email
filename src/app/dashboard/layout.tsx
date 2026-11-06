@@ -1,13 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { AppShell } from "@astryxdesign/core/AppShell";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Link } from "@astryxdesign/core/Link";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { TopNav } from "@astryxdesign/core/TopNav";
+import { VStack } from "@astryxdesign/core/VStack";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AccountMenu, AppSideNav } from "@/components/app-sidebar";
 import { NotificationsBell } from "@/components/notifications";
 import { Logo, Wordmark } from "@/components/logo";
 import { ensureActiveOrganization, useAuthSession } from "@/lib/auth";
-import { Loader2 } from "lucide-react";
 
 /**
  * Ensures the user has an active organization on their session.
@@ -47,10 +51,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (isPending || (user && !orgReady)) {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-body">
+      <VStack gap={4} hAlign="center" vAlign="center" minHeight="100svh" className="bg-body">
         <Logo className="size-9" />
-        <Loader2 className="size-4 animate-spin text-secondary" aria-label="Loading" />
-      </div>
+        <Spinner aria-label="Loading" />
+      </VStack>
     );
   }
 
@@ -59,19 +63,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="min-w-0">
-        {/* Phones only: the sidebar is a drawer there, so it needs an opener. */}
-        <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 bg-body/85 px-3 backdrop-blur supports-backdrop-filter:bg-body/70 md:hidden">
-          <SidebarTrigger className="text-secondary" />
-          <Wordmark className="h-5" />
-          <div className="ml-auto">
-            <NotificationsBell />
-          </div>
-        </header>
-        <div className="flex flex-1 flex-col">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    // Astryx shell: brand, bell and account in the top bar; on phones the side nav becomes
+    // a drawer opened from that bar. AppShell also renders the skip link and <main>.
+    <AppShell
+      height="fill"
+      variant="section"
+      contentPadding={0}
+      topNav={
+        <TopNav
+          label="Samrian"
+          heading={
+            <Link href="/dashboard" label="Samrian overview">
+              <Wordmark className="h-6" />
+            </Link>
+          }
+          endContent={
+            <HStack gap={1} vAlign="center">
+              <NotificationsBell />
+              <AccountMenu />
+            </HStack>
+          }
+        />
+      }
+      sideNav={<AppSideNav />}
+    >
+      {children}
+    </AppShell>
   );
 }
