@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { Card } from "@astryxdesign/core/Card";
 import { Page } from "@/components/page-header";
 import { Stepper } from "@/components/stepper";
 import { MethodSelection } from "@/components/add-contacts-wizard/method-selection";
@@ -70,7 +71,7 @@ export default function ImportContactsPage() {
       )}
 
       {/* Step Content */}
-      <div className="overflow-hidden rounded-lg border bg-card">
+      <Card padding={0} className="overflow-hidden">
         {step === "method" && (
           <MethodSelection
             onSelect={(selectedMethod) => {
@@ -130,7 +131,7 @@ export default function ImportContactsPage() {
         )}
 
         {step === "success" && <Success result={importResult} onClose={handleSuccess} />}
-      </div>
+      </Card>
     </Page>
   );
 }
