@@ -24,7 +24,8 @@ export function Stepper({
           key={step.id}
           step={index}
           label={step.name}
-          isDisabled={!onSelect || step.id > current}
+          // Without onSelect nothing is clickable; disabling would also dim the labels.
+          isDisabled={onSelect ? step.id > current : false}
         />
       ))}
     </AstryxStepper>

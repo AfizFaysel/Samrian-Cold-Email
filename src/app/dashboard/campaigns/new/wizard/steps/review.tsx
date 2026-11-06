@@ -108,17 +108,15 @@ export function ReviewStep({ draft, goToStep }: ReviewStepProps) {
             ))}
           </List>
         </Banner>
-      ) : (
+      ) : capacityShortfall ? (
+        // Nothing blocks launch, so no "ready" banner: the Launch button says that. Only a
+        // shortfall is worth a note, since it changes when the last emails go out.
         <Banner
-          status="success"
-          title="Ready to launch"
-          description={
-            capacityShortfall
-              ? `Selected mailboxes have ${availableToday} sends available today for ${targetCount} contacts. The rest go out in later send windows.`
-              : "Emails start on the schedule below."
-          }
+          status="info"
+          title="Some emails go out after today"
+          description={`Selected mailboxes have ${availableToday} sends available today for ${targetCount} contacts. The rest go out in later send windows.`}
         />
-      )}
+      ) : null}
 
       <Panel title="Summary" bodyClassName="p-4">
         <MetadataList>
