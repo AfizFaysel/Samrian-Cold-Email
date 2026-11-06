@@ -3,9 +3,8 @@
 import * as React from "react";
 import { AppShell } from "@astryxdesign/core/AppShell";
 import { HStack } from "@astryxdesign/core/HStack";
-import { Link } from "@astryxdesign/core/Link";
 import { Spinner } from "@astryxdesign/core/Spinner";
-import { TopNav } from "@astryxdesign/core/TopNav";
+import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { AccountMenu, AppSideNav } from "@/components/app-sidebar";
@@ -67,15 +66,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // a drawer opened from that bar. AppShell also renders the skip link and <main>.
     <AppShell
       height="fill"
-      variant="section"
       contentPadding={0}
       topNav={
         <TopNav
           label="Samrian"
           heading={
-            <Link href="/dashboard" label="Samrian overview">
-              <Wordmark className="h-6" />
-            </Link>
+            // TopNavHeading keeps the brand on the nav's inset and in text colour, so the
+            // wordmark lines up with the side nav and follows light and dark mode.
+            <TopNavHeading logo={<Wordmark className="h-5" />} headingHref="/dashboard" />
           }
           endContent={
             <HStack gap={1} vAlign="center">
