@@ -145,7 +145,7 @@ export default function InboxPage() {
         <VStack
           as="aside"
           gap={0}
-          className={cn("min-h-0 border-r bg-card", selectedId && !mobileList && "max-md:hidden")}
+          className={cn("min-h-0 border-r", selectedId && !mobileList && "max-md:hidden")}
         >
           <HStack gap={2} hAlign="between" vAlign="center" paddingInline={4} paddingBlock={3}>
             <VStack gap={0}>
@@ -248,7 +248,7 @@ export default function InboxPage() {
             />
           ) : (
             <>
-              <VStack gap={3} paddingInline={6} paddingBlock={3} className="bg-card">
+              <VStack gap={3} paddingInline={6} paddingBlock={3}>
                 <HStack gap={2} vAlign="start">
                   <HStack className="md:hidden">
                     <IconButton
@@ -337,7 +337,6 @@ export default function InboxPage() {
                 as="form"
                 gap={2}
                 padding={4}
-                className="bg-card"
                 onSubmit={(event: React.FormEvent) => {
                   event.preventDefault();
                   void sendReply();
