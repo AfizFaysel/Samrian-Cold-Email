@@ -1,29 +1,30 @@
 "use client";
 
 import * as React from "react";
-import { Plus, ShieldOff, Trash2 } from "lucide-react";
+import { Button } from "@astryxdesign/core/Button";
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
+import { Divider } from "@astryxdesign/core/Divider";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { IconButton } from "@astryxdesign/core/IconButton";
+import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
+import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
+import { pixel, proportional, Table, type TableColumn } from "@astryxdesign/core/Table";
+import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
+import { Timestamp } from "@astryxdesign/core/Timestamp";
+import { Plus, Search, ShieldOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Page, Panel } from "@/components/page-header";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/page-state";
 import { StatusPill, type StatusTone } from "@/components/status-badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useApi } from "@/hooks/use-api";
-import { cn } from "@/lib/utils";
-import { requestJson } from "@/lib/request";
+import { errorMessage, requestJson } from "@/lib/request";
 
 type ReasonFilter = "all" | "unsubscribed" | "bounced_hard" | "manual";
 
-type DoNotContactEntry = {
+interface DoNotContactEntry extends Record<string, unknown> {
   _id: string;
   _creationTime: number;
   orgId: string;
@@ -32,7 +33,7 @@ type DoNotContactEntry = {
   campaignId?: string;
   unsubscribeToken?: string;
   createdAt: number;
-};
+}
 
 const REASONS: Record<DoNotContactEntry["reason"], { label: string; tone: StatusTone }> = {
   unsubscribed: { label: "Unsubscribed", tone: "neutral" },
@@ -49,6 +50,7 @@ const FILTERS: Array<{ value: ReasonFilter; label: string }> = [
 
 export default function BlocklistPage() {
   const [activeFilter, setActiveFilter] = React.useState<ReasonFilter>("all");
+  const [query, setQuery] = React.useState("");
   const [showAddModal, setShowAddModal] = React.useState(false);
   const [newEmail, setNewEmail] = React.useState("");
   const [isAdding, setIsAdding] = React.useState(false);
@@ -57,8 +59,12 @@ export default function BlocklistPage() {
 
   const { data, error, refetch } = useApi<{ page: DoNotContactEntry[] }>("/api/blocklist");
   const entries: DoNotContactEntry[] = data?.page ?? [];
-  const filteredEntries =
-    activeFilter === "all" ? entries : entries.filter((entry) => entry.reason === activeFilter);
+  const term = query.trim().toLowerCase();
+  const filteredEntries = entries.filter(
+    (entry) =>
+      (activeFilter === "all" || entry.reason === activeFilter) &&
+      (!term || entry.email.toLowerCase().includes(term))
+  );
 
   const counts: Record<ReasonFilter, number> = {
     all: entries.length,
@@ -67,10 +73,64 @@ export default function BlocklistPage() {
     manual: entries.filter((e) => e.reason === "manual").length,
   };
 
-  const handleAddEntry = async (event?: React.FormEvent) => {
-    event?.preventDefault();
-    if (!newEmail.trim()) return;
+  const columns = React.useMemo<TableColumn<DoNotContactEntry>[]>(
+    () => [
+      {
+        key: "email",
+        header: "Email",
+        width: proportional(3, { minWidth: 220 }),
+        renderCell: (entry) => (
+          <Text weight="medium" maxLines={1}>
+            {entry.email}
+          </Text>
+        ),
+      },
+      {
+        key: "reason",
+        header: "Reason",
+        width: pixel(150),
+        renderCell: (entry) => {
+          const reason = REASONS[entry.reason] ?? { label: entry.reason, tone: "neutral" as const };
+          return <StatusPill tone={reason.tone} label={reason.label} />;
+        },
+      },
+      {
+        key: "createdAt",
+        header: "Added",
+        width: pixel(140),
+        renderCell: (entry) => (
+          <Timestamp value={new Date(entry.createdAt).toISOString()} format="date" />
+        ),
+      },
+      {
+        key: "actions",
+        header: "",
+        align: "end",
+        width: pixel(56),
+        renderCell: (entry) => (
+          <IconButton
+            label={`Remove ${entry.email} from the blocklist`}
+            tooltip="Remove"
+            variant="ghost"
+            size="sm"
+            icon={<Icon icon={Trash2} />}
+            onClick={() => setPendingRemoval(entry.email)}
+          />
+        ),
+      },
+    ],
+    []
+  );
 
+  const closeAdd = () => {
+    if (!isAdding) {
+      setShowAddModal(false);
+      setNewEmail("");
+    }
+  };
+
+  const handleAddEntry = async () => {
+    if (!newEmail.trim()) return;
     setIsAdding(true);
     try {
       await requestJson("/api/blocklist", {
@@ -82,7 +142,7 @@ export default function BlocklistPage() {
       setShowAddModal(false);
       refetch();
     } catch (cause: unknown) {
-      toast.error(cause instanceof Error ? cause.message : "Couldn't add to the blocklist");
+      toast.error(errorMessage(cause, "Couldn't add to the blocklist"));
     } finally {
       setIsAdding(false);
     }
@@ -98,7 +158,7 @@ export default function BlocklistPage() {
       toast.success(`${email} removed from the blocklist`);
       refetch();
     } catch (cause: unknown) {
-      toast.error(cause instanceof Error ? cause.message : "Couldn't remove the address");
+      toast.error(errorMessage(cause, "Couldn't remove the address"));
     } finally {
       setIsRemoving(false);
       setPendingRemoval(null);
@@ -110,37 +170,50 @@ export default function BlocklistPage() {
       title="Blocklist"
       description="Addresses Samrian will never email: unsubscribes, hard bounces and ones you add."
       actions={
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus data-icon="inline-start" />
-          Block an address
-        </Button>
+        <Button
+          label="Block an address"
+          variant="primary"
+          icon={<Icon icon={Plus} />}
+          onClick={() => setShowAddModal(true)}
+        />
       }
     >
       <Panel>
-        <div className="border-b p-3">
-          <div
-            role="tablist"
-            aria-label="Filter by reason"
-            className="no-scrollbar flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-md bg-muted p-0.5"
+        <HStack
+          gap={3}
+          hAlign="between"
+          vAlign="center"
+          wrap="wrap"
+          paddingInline={3}
+          paddingBlock={2}
+        >
+          <SegmentedControl
+            label="Filter by reason"
+            size="sm"
+            value={activeFilter}
+            onChange={(value) => setActiveFilter(value as ReasonFilter)}
           >
             {FILTERS.map((filter) => (
-              <button
+              <SegmentedControlItem
                 key={filter.value}
-                type="button"
-                role="tab"
-                aria-selected={activeFilter === filter.value}
-                onClick={() => setActiveFilter(filter.value)}
-                className={cn(
-                  "flex h-7 shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-sm font-medium text-secondary transition-colors hover:text-primary",
-                  activeFilter === filter.value && "bg-card text-primary shadow-sm"
-                )}
-              >
-                {filter.label}
-                <span className="tabular-nums opacity-60">{counts[filter.value]}</span>
-              </button>
+                value={filter.value}
+                label={`${filter.label} ${counts[filter.value]}`}
+              />
             ))}
-          </div>
-        </div>
+          </SegmentedControl>
+          <TextInput
+            label="Search the blocklist"
+            isLabelHidden
+            type="search"
+            width={256}
+            startIcon={Search}
+            hasClear
+            value={query}
+            onChange={setQuery}
+            placeholder="Search by email"
+          />
+        </HStack>
+        <Divider />
 
         {error && !data ? (
           <ErrorState title="Couldn't load the blocklist" onRetry={refetch} />
@@ -148,64 +221,24 @@ export default function BlocklistPage() {
           <RowsSkeleton rows={4} />
         ) : filteredEntries.length === 0 ? (
           <EmptyState
-            icon={ShieldOff}
-            title={activeFilter === "all" ? "Nobody is blocked" : "Nothing in this filter"}
+            icon={term ? Search : ShieldOff}
+            title={
+              term
+                ? "No addresses match"
+                : activeFilter === "all"
+                  ? "Nobody is blocked"
+                  : "Nothing in this filter"
+            }
             description={
-              activeFilter === "all"
-                ? "Unsubscribes and hard bounces are added here automatically."
-                : "Try another reason."
+              term
+                ? `Nothing matches “${query.trim()}”.`
+                : activeFilter === "all"
+                  ? "Unsubscribes and hard bounces are added here automatically."
+                  : "Try another reason."
             }
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-base">
-              <thead>
-                <tr className="border-b text-sm text-secondary">
-                  <th className="px-4 py-2.5 font-medium">Email</th>
-                  <th className="px-4 py-2.5 font-medium">Reason</th>
-                  <th className="px-4 py-2.5 font-medium">Added</th>
-                  <th className="w-12 px-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEntries.map((entry) => {
-                  const reason = REASONS[entry.reason] ?? {
-                    label: entry.reason,
-                    tone: "neutral" as const,
-                  };
-                  return (
-                    <tr
-                      key={entry._id}
-                      className="group border-b transition-colors last:border-0 hover:bg-muted/60"
-                    >
-                      <td className="px-4 py-3 font-medium">{entry.email}</td>
-                      <td className="px-4 py-3">
-                        <StatusPill tone={reason.tone} label={reason.label} />
-                      </td>
-                      <td className="px-4 py-3 text-secondary tabular-nums">
-                        {new Date(entry.createdAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="px-2 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-secondary opacity-0 group-hover:opacity-100 hover:text-error focus-visible:opacity-100"
-                          aria-label={`Remove ${entry.email} from the blocklist`}
-                          onClick={() => setPendingRemoval(entry.email)}
-                        >
-                          <Trash2 />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Table data={filteredEntries} columns={columns} idKey="_id" hasHover />
         )}
       </Panel>
 
@@ -220,42 +253,55 @@ export default function BlocklistPage() {
         onConfirm={() => (pendingRemoval ? handleRemove(pendingRemoval) : undefined)}
       />
 
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-w-md">
-          <form onSubmit={handleAddEntry}>
-            <DialogHeader>
-              <DialogTitle>Block an address</DialogTitle>
-              <DialogDescription>
-                No campaign will email this address, even if it is imported again.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col gap-2 px-6 pt-5">
-              <Label htmlFor="block-email">Email</Label>
-              <Input
-                id="block-email"
+      <Dialog
+        isOpen={showAddModal}
+        onOpenChange={(open) => !open && closeAdd()}
+        purpose="form"
+        width={440}
+      >
+        <Layout
+          header={
+            <DialogHeader
+              title="Block an address"
+              subtitle="No campaign will email this address, even if it is imported again."
+              onOpenChange={closeAdd}
+            />
+          }
+          content={
+            <LayoutContent>
+              <TextInput
+                label="Email"
                 type="email"
-                required
-                autoFocus
+                width="100%"
+                hasAutoFocus
+                isRequired
                 placeholder="name@company.com"
                 value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
+                onChange={setNewEmail}
+                onEnter={() => void handleAddEntry()}
               />
-            </div>
-            <div className="flex justify-end gap-2 p-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowAddModal(false)}
-                disabled={isAdding}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isAdding || !newEmail.trim()}>
-                {isAdding ? "Blocking…" : "Block address"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
+            </LayoutContent>
+          }
+          footer={
+            <LayoutFooter>
+              <HStack gap={2} hAlign="end">
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  isDisabled={isAdding}
+                  onClick={closeAdd}
+                />
+                <Button
+                  label="Block address"
+                  variant="primary"
+                  isLoading={isAdding}
+                  isDisabled={!newEmail.trim()}
+                  onClick={() => void handleAddEntry()}
+                />
+              </HStack>
+            </LayoutFooter>
+          }
+        />
       </Dialog>
     </Page>
   );
