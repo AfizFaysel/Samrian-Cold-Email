@@ -7,7 +7,11 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Page } from "@/components/page-header";
 import { Stepper } from "@/components/stepper";
-import { Button } from "@/components/ui/button";
+import { Button } from "@astryxdesign/core/Button";
+import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Text } from "@astryxdesign/core/Text";
+import { VStack } from "@astryxdesign/core/VStack";
 import { useApi } from "@/hooks/use-api";
 
 // Step components
@@ -185,50 +189,64 @@ export default function CampaignWizardPage() {
       ]}
       actions={
         <>
-          <span className="text-sm text-secondary" aria-live="polite">
+          <Text type="supporting" aria-live="polite">
             {isSaving ? "Saving…" : lastSaved ? `Saved ${formatRelativeTime(lastSaved)}` : ""}
-          </span>
+          </Text>
           <Button
-            variant="outline"
+            label="Save draft"
+            variant="secondary"
+            icon={<Icon icon={Save} />}
+            isDisabled={isSaving || !draft.name.trim()}
             onClick={handleSaveDraft}
-            disabled={isSaving || !draft.name.trim()}
-          >
-            <Save data-icon="inline-start" />
-            Save draft
-          </Button>
+          />
         </>
       }
     >
       <Stepper steps={STEPS} current={currentStep} onSelect={setCurrentStep} />
 
-      <div className="min-h-[420px]">
+      <VStack minHeight={420}>
         {isLastStep ? (
           <ReviewStep draft={draft} setDraft={setDraft} goToStep={setCurrentStep} />
         ) : (
           <CurrentStepComponent draft={draft} setDraft={setDraft} />
         )}
-      </div>
+      </VStack>
 
-      <div className="sticky bottom-0 -mx-4 flex items-center justify-between gap-3 border-t bg-body/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <Button variant="outline" onClick={handleBack} disabled={isFirstStep}>
-          <ChevronLeft data-icon="inline-start" />
-          Back
-        </Button>
-        <span className="text-sm text-secondary tabular-nums">
+      {/* Pinned so Continue stays reachable on long steps. */}
+      <HStack
+        gap={3}
+        hAlign="between"
+        vAlign="center"
+        className="sticky bottom-0 -mx-4 border-t bg-body/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6"
+      >
+        <Button
+          label="Back"
+          variant="secondary"
+          icon={<Icon icon={ChevronLeft} />}
+          isDisabled={isFirstStep}
+          onClick={handleBack}
+        />
+        <Text type="supporting" className="tabular-nums">
           Step {currentStep} of {STEPS.length}
-        </span>
+        </Text>
         {isLastStep ? (
-          <Button onClick={handleLaunchClick} disabled={!draft.id || isLaunching}>
-            <Rocket data-icon="inline-start" />
-            {isLaunching ? "Launching…" : "Launch campaign"}
-          </Button>
+          <Button
+            label="Launch campaign"
+            variant="primary"
+            icon={<Icon icon={Rocket} />}
+            isLoading={isLaunching}
+            isDisabled={!draft.id}
+            onClick={handleLaunchClick}
+          />
         ) : (
-          <Button onClick={handleNext}>
-            Continue
-            <ChevronRight data-icon="inline-end" />
-          </Button>
+          <Button
+            label="Continue"
+            variant="primary"
+            endContent={<Icon icon={ChevronRight} />}
+            onClick={handleNext}
+          />
         )}
-      </div>
+      </HStack>
 
       <ConfirmDialog
         isOpen={showLaunchConfirm}

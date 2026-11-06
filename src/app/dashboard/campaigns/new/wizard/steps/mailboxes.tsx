@@ -1,10 +1,10 @@
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@astryxdesign/core/Button";
 import { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
 import { Mailbox } from "lucide-react";
 import { EmptyState, RowsSkeleton } from "@/components/page-state";
 import { StatusBadge } from "@/components/status-badge";
-import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
 import type { CampaignDraft } from "../page";
 import { StepIntro } from "./step-intro";
@@ -28,6 +28,7 @@ type MailboxesStepProps = {
 };
 
 export function MailboxesStep({ draft, setDraft }: MailboxesStepProps) {
+  const router = useRouter();
   const { data } = useApi<{ mailboxes: MailboxItem[] }>("/api/mailboxes");
   const mailboxes = data?.mailboxes;
 
@@ -45,9 +46,11 @@ export function MailboxesStep({ draft, setDraft }: MailboxesStepProps) {
           title="No mailboxes connected"
           description="Connect a mailbox before you launch this campaign."
           action={
-            <Link href="/dashboard/mailboxes" className={buttonVariants({ variant: "outline" })}>
-              Connect a mailbox
-            </Link>
+            <Button
+              label="Connect a mailbox"
+              variant="secondary"
+              onClick={() => router.push("/dashboard/mailboxes")}
+            />
           }
         />
       ) : (

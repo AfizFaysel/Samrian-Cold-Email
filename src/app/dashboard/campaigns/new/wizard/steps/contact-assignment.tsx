@@ -3,10 +3,10 @@ import type { CampaignDraft } from "../page";
 import { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
 import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 import { Text } from "@astryxdesign/core/Text";
+import { TextInput } from "@astryxdesign/core/TextInput";
 import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
 import { Layers, Search, X } from "lucide-react";
 import { EmptyState, RowsSkeleton } from "@/components/page-state";
-import { Input } from "@/components/ui/input";
 import { useApi } from "@/hooks/use-api";
 import { StepIntro } from "./step-intro";
 
@@ -103,26 +103,17 @@ export function ContactAssignmentStep({ draft, setDraft }: ContactAssignmentStep
 
       {mode === "specific" && (
         <div className="flex flex-col gap-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-secondary" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, email or company"
-              aria-label="Search contacts"
-              className="pr-8 pl-8"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                aria-label="Clear search"
-                className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-secondary hover:text-primary"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
+          <TextInput
+            label="Search contacts"
+            isLabelHidden
+            type="search"
+            width="100%"
+            startIcon={Search}
+            hasClear
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search by name, email or company"
+          />
           {contacts === undefined ? (
             <RowsSkeleton rows={3} />
           ) : filteredContacts.length === 0 ? (

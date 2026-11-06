@@ -389,7 +389,6 @@ export const COMPONENTS: Entry[] = [
         "stepper",
         <Stepper
           key="s"
-          className="w-[560px]"
           current={3}
           steps={["Basics", "Schedule", "Sequence", "Contacts"].map((name, i) => ({
             id: i + 1,

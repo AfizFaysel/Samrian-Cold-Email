@@ -1,21 +1,21 @@
 import * as React from "react";
 import type { CampaignDraft } from "../page";
-import { Button as AstryxButton } from "@astryxdesign/core/Button";
+import { Button } from "@astryxdesign/core/Button";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
+import { List, ListItem } from "@astryxdesign/core/List";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import { Panel } from "@/components/page-header";
 import { EmptyState } from "@/components/page-state";
-import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/use-api";
-import { cn } from "@/lib/utils";
 import { StepIntro } from "./step-intro";
 
 interface EmailSequenceStepProps {
@@ -137,40 +137,43 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
         description="Each step goes out after the one before. Replies stop the sequence for that contact."
       />
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)_300px]">
-        <nav aria-label="Sequence steps" className="flex flex-col gap-1">
-          {draft.steps.map((step, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => setActiveStepIndex(index)}
-              aria-current={activeStepIndex === index ? "step" : undefined}
-              className={cn(
-                "flex items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-muted",
-                activeStepIndex === index && "bg-muted"
-              )}
-            >
-              <Mail className="mt-0.5 size-4 shrink-0 text-secondary" />
-              <span className="flex min-w-0 flex-col">
-                <span className="text-base font-medium">Step {index + 1}</span>
-                <span className="truncate text-sm text-secondary">
-                  {step.subject || "No subject"}
-                </span>
-                {index > 0 && <Text type="supporting">{formatDelay(step)}</Text>}
-              </span>
-            </button>
-          ))}
-          <Button variant="ghost" className="justify-start" onClick={addStep}>
-            <Plus data-icon="inline-start" />
-            Add step
-          </Button>
-        </nav>
+        <VStack gap={1}>
+          <List header={<VisuallyHidden>Sequence steps</VisuallyHidden>} density="compact">
+            {draft.steps.map((step, index) => (
+              <ListItem
+                key={index}
+                align="start"
+                isSelected={activeStepIndex === index}
+                onClick={() => setActiveStepIndex(index)}
+                startContent={<Icon icon={Mail} color="secondary" />}
+                label={`Step ${index + 1}`}
+                description={
+                  <VStack gap={0}>
+                    <Text type="supporting" maxLines={1}>
+                      {step.subject || "No subject"}
+                    </Text>
+                    {index > 0 ? <Text type="supporting">{formatDelay(step)}</Text> : null}
+                  </VStack>
+                }
+              />
+            ))}
+          </List>
+          <HStack>
+            <Button
+              label="Add step"
+              variant="ghost"
+              icon={<Icon icon={Plus} />}
+              onClick={addStep}
+            />
+          </HStack>
+        </VStack>
 
         {activeStep ? (
           <div className="flex min-w-0 flex-col gap-5">
             <HStack gap={3} hAlign="between" vAlign="center">
               <Heading level={3}>Step {activeStepIndex + 1}</Heading>
               {draft.steps.length > 1 && (
-                <AstryxButton
+                <Button
                   label="Delete step"
                   variant="ghost"
                   size="sm"
@@ -209,7 +212,7 @@ export function EmailSequenceStep({ draft, setDraft }: EmailSequenceStepProps) {
               <Text type="label">Merge fields</Text>
               <HStack gap={1.5} wrap="wrap">
                 {VARIABLES.map((v) => (
-                  <AstryxButton
+                  <Button
                     key={v.key}
                     label={`{{${v.key}}}`}
                     variant="secondary"
