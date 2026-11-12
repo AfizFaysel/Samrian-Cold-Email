@@ -24,14 +24,8 @@
   </p>
 </div>
 
-<!-- Hero video: drag hero-1080p.mp4 into this README in GitHub's web editor and paste the
-     https://github.com/user-attachments/assets/... link it produces on the line below. -->
-
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshot-overview-dark.png">
-    <img src="docs/assets/screenshot-overview-light.png" alt="Samrian overview: what needs you today and how outreach is doing">
-  </picture>
+  <img src="docs/assets/hero.gif" alt="Samrian product demo: pacing mailboxes, running a sequence, and answering replies in one inbox" width="100%">
 </p>
 
 ## Why Samrian
