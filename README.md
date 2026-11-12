@@ -10,7 +10,6 @@
   <p>Campaigns, mailboxes, and every reply in one inbox. One Next.js app and one Postgres database.</p>
 
   <p>
-    <a href="#try-the-demo"><strong>Try the demo</strong></a> ·
     <a href="#self-host"><strong>Self-host</strong></a> ·
     <a href="docs/DEPLOYMENT.md"><strong>Docs</strong></a> ·
     <a href="CONTRIBUTING.md"><strong>Contribute</strong></a>
@@ -86,17 +85,6 @@ worker on any VPS). If you can deploy a web app, you can run your own cold email
     </td>
   </tr>
 </table>
-
-## Try the demo
-
-See the whole product with sample data, no database or accounts needed:
-
-```bash
-bun install
-bun run demo
-```
-
-Open `http://localhost:3101/dashboard`. Everything you see is fictional and kept in memory.
 
 ## Self-host
 
