@@ -1,64 +1,153 @@
-# Samrian Cold Email
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/samrian-wordmark-light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/samrian-wordmark-dark.svg">
+    <img src="docs/assets/samrian-wordmark-dark.svg" alt="Samrian" width="320">
+  </picture>
 
-Self-hostable cold email platform for campaigns, contacts, mailboxes, inbox replies, durable notifications, and delivery jobs.
+  <h3>The open-source cold email platform you can actually self-host.</h3>
 
-## Stack
+  <p>Campaigns, mailboxes, and every reply in one inbox. One Next.js app and one Postgres database.</p>
 
-- Next.js 16, React 19, TypeScript, Tailwind CSS
-- PostgreSQL with Drizzle ORM
-- Better Auth with organizations
-- Inngest for managed/serverless jobs
-- BullMQ + Redis for Docker/VPS jobs
-- Optional S3-compatible object storage adapter. No feature requires it yet.
+  <p>
+    <a href="#try-the-demo"><strong>Try the demo</strong></a> ·
+    <a href="#self-host"><strong>Self-host</strong></a> ·
+    <a href="docs/DEPLOYMENT.md"><strong>Docs</strong></a> ·
+    <a href="CONTRIBUTING.md"><strong>Contribute</strong></a>
+  </p>
 
-## Local Setup
+  <p>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-7aa2ff?style=flat-square" alt="Apache-2.0 license"></a>
+    <a href="https://github.com/AfizFaysel/Samrian-Cold-Email/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/AfizFaysel/Samrian-Cold-Email/ci.yml?branch=main&style=flat-square&label=CI" alt="CI status"></a>
+    <img src="https://img.shields.io/badge/self--hosted-Docker%20%7C%20Vercel-111?style=flat-square" alt="Self-hosted on Docker or Vercel">
+    <img src="https://img.shields.io/badge/API-SDK%20%C2%B7%20CLI%20%C2%B7%20MCP-111?style=flat-square" alt="API, SDK, CLI and MCP">
+  </p>
+</div>
 
-Install deps:
+<!-- Hero video: drag hero-1080p.mp4 into this README in GitHub's web editor and paste the
+     https://github.com/user-attachments/assets/... link it produces on the line below. -->
 
-```powershell
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshot-overview-dark.png">
+    <img src="docs/assets/screenshot-overview-light.png" alt="Samrian overview: what needs you today and how outreach is doing">
+  </picture>
+</p>
+
+## Why Samrian
+
+Cold email tools are rented. Your mailboxes, contacts, and every reply live on someone else's
+servers, priced per seat. Samrian is the same workflow as open source: run it on your own Postgres,
+keep your data, and change anything.
+
+It is small on purpose. One Next.js app, one database, and a job runner (Inngest, or a BullMQ
+worker on any VPS). If you can deploy a web app, you can run your own cold email platform.
+
+## Features
+
+- **Sends like a person.** Every mailbox waits a random 90 seconds to 7 minutes between emails,
+  sends at most 8 an hour, and warms up gradually toward its daily limit.
+- **Sequences that run themselves.** Multi-step campaigns send in each contact's time zone and stop
+  the moment someone replies.
+- **One inbox for every reply.** Replies from all your mailboxes land in one place, ready to answer.
+  Bounces, unsubscribes, and auto-replies are sorted out for you.
+- **Google, Microsoft, or any SMTP.** Connect mailboxes with sign-in or an app password, and see
+  their health and daily capacity at a glance.
+- **Compliance built in.** One-click unsubscribe headers, a physical address footer, a blocklist,
+  and automatic pauses when bounce or complaint rates climb.
+- **Built for teams and agents.** Roles and permissions, scoped API keys, a typed SDK, a CLI, and an
+  MCP server so AI agents can run campaigns safely.
+
+<table>
+  <tr>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshot-inbox-dark.png">
+        <img src="docs/assets/screenshot-inbox-light.png" alt="Inbox with replies from every mailbox">
+      </picture>
+      <p align="center"><sub>Every reply, one inbox</sub></p>
+    </td>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshot-campaign-dark.png">
+        <img src="docs/assets/screenshot-campaign-light.png" alt="Campaign with contacts by stage">
+      </picture>
+      <p align="center"><sub>Campaigns that report where every contact is</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshot-mailboxes-dark.png">
+        <img src="docs/assets/screenshot-mailboxes-light.png" alt="Mailboxes with daily sends and warm-up">
+      </picture>
+      <p align="center"><sub>Mailboxes with daily limits and warm-up</sub></p>
+    </td>
+    <td width="50%">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshot-overview-dark.png">
+        <img src="docs/assets/screenshot-overview-light.png" alt="Overview of what needs you today">
+      </picture>
+      <p align="center"><sub>What needs you today, at a glance</sub></p>
+    </td>
+  </tr>
+</table>
+
+## Try the demo
+
+See the whole product with sample data, no database or accounts needed:
+
+```bash
 bun install
+bun run demo
 ```
 
-Copy env:
+Open `http://localhost:3101/dashboard`. Everything you see is fictional and kept in memory.
 
-```powershell
-Copy-Item .env.example .env.local
+## Self-host
+
+**Docker on any VPS.** Runs the app, Postgres, Redis, and the sending worker:
+
+```bash
+bun run env:init
+docker compose up -d --build
 ```
 
-Start local infrastructure:
+`env:init` writes `.env` with generated secrets, and migrations run before the app starts. Set
+`NEXT_PUBLIC_APP_URL` to your public address before building for a server.
 
-```powershell
+**Managed.** Vercel, a managed Postgres such as Neon, and Inngest. See
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), which also covers how often jobs run on each setup.
+
+## Development
+
+```bash
+bun install
+cp .env.example .env.local
 bun run db:test:up
 bun run queue:test:up
-```
-
-Run migrations:
-
-```powershell
 bun run db:migrate
-```
-
-Start app:
-
-```powershell
 bun run dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000`. Common checks:
 
-## Common Commands
-
-```powershell
+```bash
+bun run validate
 bun run test
 bun run test:db
-bun run type-check
-bun run lint
 bun run build
-bun run smoke
-docker compose config
 ```
 
-## Architecture
+### Stack
+
+- Next.js 16, React 19, TypeScript, and the Astryx design system
+- PostgreSQL with Drizzle ORM and row-level security per organization
+- Better Auth or WorkOS for sign-in and organizations
+- Inngest for managed jobs, or BullMQ and Redis on a VPS
+- Optional S3-compatible object storage
+
+### Architecture
 
 Runtime code depends on app-owned seams, not provider SDKs:
 
@@ -69,59 +158,16 @@ UI / route handlers / workers
   -> provider adapters
 ```
 
-Provider adapters:
+| Path          | Contents                                         |
+| ------------- | ------------------------------------------------ |
+| `src/app/`    | Next.js routes and UI                            |
+| `src/server/` | Modules, jobs, ports, repos, and adapters        |
+| `packages/`   | Public contracts, SDK, CLI, and MCP server (MIT) |
+| `tests/`      | Unit, contract, repo, API, and component tests   |
+| `docs/`       | Development and deployment guides                |
+| `drizzle/`    | Generated migrations                             |
 
-- DB: Drizzle/PostgreSQL under `src/server/db` and `src/server/repos`
-- Auth: Better Auth under `src/server/auth`
-- Jobs: shared handlers under `src/server/jobs`; Inngest and BullMQ adapters call same handlers
-- Storage: `ObjectStore` port with S3-compatible adapter
-- Crypto: versioned, context-bound mailbox credential encryption with rotatable keyring
-
-## Project Layout
-
-```txt
-src/app/          Next.js routes and UI
-src/components/   shared React components
-src/server/auth/  auth config and session/org helpers
-src/server/db/    Drizzle schema, DB client, transactions
-src/server/jobs/  provider-neutral job handlers
-src/server/ports/ app-owned interfaces
-src/server/repos/ Postgres repo adapters
-src/server/queue/ queue provider adapters
-src/server/storage/ object storage adapters
-tests/            unit, contract, repo, API, component, deploy tests
-docs/             current development and deployment docs
-drizzle/          generated migrations
-```
-
-## Deployment
-
-Docker/VPS mode runs app, Postgres, Redis, and worker:
-
-```powershell
-bun run env:init
-docker compose up -d --build
-bun run smoke
-```
-
-`env:init` writes `.env` with generated secrets, and migrations run before the app starts. Set
-`NEXT_PUBLIC_APP_URL` to your public address before building for a server.
-
-Managed/serverless mode uses Vercel, managed Postgres, and Inngest. See `docs/DEPLOYMENT.md`.
-
-## Quality Bar
-
-Before release:
-
-```powershell
-bun run validate
-bun run test
-bun run test:db
-bun run build
-docker compose config
-```
-
-Use short domain-first names, keep provider SDKs inside adapter folders, and add tests before changing behavior.
+Read [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) before changing behavior.
 
 ## License
 
