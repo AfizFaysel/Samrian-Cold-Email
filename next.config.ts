@@ -16,6 +16,8 @@ export const securityHeaders = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  // `bun run demo` hides the dev badge so screenshots and recordings show only the product.
+  ...(process.env.SAMRIAN_DEMO === "1" && { devIndicators: false }),
   async headers() {
     return [{ source: "/(.*)", headers: [...securityHeaders] }];
   },
