@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vitest";
 
 import { dispatchDueSends, type DispatchDeps } from "../../../src/server/jobs/dispatch";
+import { SEND_GAP_MIN_MS } from "../../../src/server/modules/pacing";
 import { FakeJobQueue } from "../../fakes/fake-queue";
+
+const HOUR = 60 * 60 * 1000;
 
 function makeDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
   const due = [
@@ -28,6 +31,7 @@ function makeDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
   const queue = new FakeJobQueue();
   return {
     queue,
+    horizonMs: 5 * 60 * 1000,
     now: () => Date.parse("2026-07-06T14:00:00.000Z"),
     random: () => 0,
     repos: {
@@ -150,6 +154,49 @@ describe("dispatchDueSends", () => {
         idempotencyKey: "assignment_1:0",
       },
     });
+  });
+
+  test("delays the send to the mailbox's next slot and books the one after", async () => {
+    const deps = makeDeps();
+    const now = deps.now!();
+    deps.repos.campaignMailboxes.listDispatchMailboxes = async () => [
+      { mailboxId: "mailbox_1", emailsSentToday: 1, dailySendLimit: 25, nextSendAt: now + 120_000 },
+    ];
+    let booked: unknown;
+    deps.repos.campaignMailboxes.reserveCapacity = async (input) => {
+      booked = input.pacing;
+      return true;
+    };
+
+    await expect(dispatchDueSends(deps)).resolves.toMatchObject({ enqueued: 1 });
+
+    expect((deps.queue as FakeJobQueue).jobs[0].options).toMatchObject({ delayMs: 120_000 });
+    expect(booked).toMatchObject({
+      expectedNextSendAt: now + 120_000,
+      next: { nextSendAt: now + 120_000 + SEND_GAP_MIN_MS, hourSends: 1 },
+    });
+  });
+
+  test("defers until the earliest mailbox slot when every mailbox is mid-gap", async () => {
+    const deps = makeDeps();
+    const now = deps.now!();
+    deps.repos.campaignMailboxes.listDispatchMailboxes = async () => [
+      { mailboxId: "mailbox_1", emailsSentToday: 1, dailySendLimit: 25, nextSendAt: now + HOUR },
+      {
+        mailboxId: "mailbox_2",
+        emailsSentToday: 1,
+        dailySendLimit: 25,
+        nextSendAt: now + 2 * HOUR,
+      },
+    ];
+    let deferredAt = 0;
+    deps.repos.assignments.deferUntil = async (_id, _orgId, at) => {
+      deferredAt = at;
+    };
+
+    await expect(dispatchDueSends(deps)).resolves.toMatchObject({ enqueued: 0, deferred: 1 });
+
+    expect(deferredAt).toBe(now + HOUR);
   });
 
   test("defers work outside send window", async () => {

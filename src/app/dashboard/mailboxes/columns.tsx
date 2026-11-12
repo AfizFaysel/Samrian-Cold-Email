@@ -27,6 +27,7 @@ export interface MailboxListItem extends Record<string, unknown> {
   rampStatus: string;
   rampCurrentLimit?: number;
   rampTargetLimit: number;
+  timezone?: string;
   rampNextCheckAt?: number;
   rampReason?: string;
   effectiveDailyLimit: number;

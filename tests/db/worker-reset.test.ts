@@ -83,4 +83,28 @@ describe.skipIf(!adminUrl || !workerUrl)("daily reset on the worker database rol
 
     expect((await counters(id)).sent).toBe(0);
   });
+
+  // Kiritimati runs 25 hours ahead of Pago Pago, so the two are never on the same date.
+  test("resets each mailbox when its own local day starts", async () => {
+    const pagoDay = localDate("Pacific/Pago_Pago");
+    const behind = await seed({ sent: 10, reserved: 0, live: 0 });
+    const ahead = await seed({ sent: 10, reserved: 0, live: 0 });
+    await admin
+      .update(mailboxes)
+      .set({ countersDay: pagoDay, timezone: "Pacific/Pago_Pago" })
+      .where(eq(mailboxes.id, behind));
+    await admin
+      .update(mailboxes)
+      .set({ countersDay: pagoDay, timezone: "Pacific/Kiritimati" })
+      .where(eq(mailboxes.id, ahead));
+
+    await createWorkerDeps().resetCounters();
+
+    expect((await counters(behind)).sent).toBe(10);
+    expect((await counters(ahead)).sent).toBe(0);
+  });
 });
+
+function localDate(timeZone: string) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+}

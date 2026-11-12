@@ -7,6 +7,7 @@ export {
   type WorkerProcessorMap,
 } from "./worker";
 
+import { JOB_CADENCE } from "../jobs/cadence";
 import { readQueueConfig } from "../queue";
 import type { JobQueue } from "../ports";
 import { createWorkerDeps } from "./deps";
@@ -36,12 +37,14 @@ export function createWorkerShutdown(input: {
 }
 
 export async function scheduleWorkerJobs(queue: JobQueue) {
+  const cadence = JOB_CADENCE.bullmq;
+  const at = (job: { cron: string }) => ({ cron: job.cron, timezone: "UTC" });
   await Promise.all([
-    queue.scheduleCampaignDispatch({ cron: "*/5 * * * *", timezone: "UTC" }),
-    queue.scheduleMailboxPolls({ cron: "*/5 * * * *", timezone: "UTC" }),
-    queue.scheduleMailboxChecks({ cron: "0 * * * *", timezone: "UTC" }),
-    queue.scheduleMailboxRamp({ cron: "15 0 * * *", timezone: "UTC" }),
-    queue.scheduleDailyCounterReset({ cron: "0 0 * * *", timezone: "UTC" }),
-    queue.scheduleRetentionPurge({ cron: "0 2 * * *", timezone: "UTC" }),
+    queue.scheduleCampaignDispatch(at(cadence.dispatch)),
+    queue.scheduleMailboxPolls(at(cadence.poll)),
+    queue.scheduleMailboxChecks(at(cadence.check)),
+    queue.scheduleMailboxRamp(at(cadence.ramp)),
+    queue.scheduleDailyCounterReset(at(cadence.reset)),
+    queue.scheduleRetentionPurge(at(cadence.purge)),
   ]);
 }

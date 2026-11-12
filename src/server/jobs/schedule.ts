@@ -2,11 +2,8 @@ import { isTimezone } from "@samrian/contracts";
 import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 
 export const DISPATCH_BATCH_LIMIT = 100;
-export const DISPATCH_CRON = "*/5 * * * *";
 export const DISPATCH_TIMEZONE = "UTC";
 export const DEFAULT_FOLLOW_UP_DELAY_DAYS = 3;
-export const SEND_JITTER_MIN_MS = 5_000;
-export const SEND_JITTER_MAX_MS = 45_000;
 
 type CampaignSchedule = {
   timezone?: string;
@@ -72,20 +69,6 @@ export function getStepDelayMs(steps: readonly unknown[], stepNumber: number): n
   const days = step?.delayDays ?? DEFAULT_FOLLOW_UP_DELAY_DAYS;
   const hours = step?.delayHours ?? 0;
   return (days * 24 + hours) * 60 * 60 * 1000;
-}
-
-export function getJitterMs(
-  input: {
-    minMs?: number;
-    maxMs?: number;
-    random?: () => number;
-  } = {}
-): number {
-  const minMs = input.minMs ?? SEND_JITTER_MIN_MS;
-  const maxMs = input.maxMs ?? SEND_JITTER_MAX_MS;
-  const random = input.random ?? Math.random;
-  if (maxMs <= minMs) return minMs;
-  return Math.round(minMs + (maxMs - minMs) * random());
 }
 
 // Stored rows can predate input validation, and one bad value must not stop sending.

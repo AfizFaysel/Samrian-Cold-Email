@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Activity, Gauge, Pause, Play, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Activity, Gauge, Globe, Pause, Play, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog } from "@astryxdesign/core/AlertDialog";
 import { Button } from "@astryxdesign/core/Button";
@@ -11,7 +11,9 @@ import { Icon } from "@astryxdesign/core/Icon";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { HStack, Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
+import { Selector } from "@astryxdesign/core/Selector";
 import { errorMessage, requestJson, responseError } from "@/lib/request";
+import { TIMEZONES } from "@/lib/timezones";
 import type { MailboxListItem } from "./columns";
 
 type RampAction = "enable" | "disable" | "pause" | "resume" | "reset" | "update";
@@ -40,6 +42,8 @@ export function MailboxActions({
   const [isTargetOpen, setIsTargetOpen] = React.useState(false);
   const [target, setTarget] = React.useState(mailbox.rampTargetLimit || 30);
   const [isBusy, setIsBusy] = React.useState(false);
+  const [isZoneOpen, setIsZoneOpen] = React.useState(false);
+  const [zone, setZone] = React.useState(mailbox.timezone ?? "UTC");
   const base = `/api/mailboxes/${mailbox._id}`;
   const isPaused = mailbox.rampStatus === "paused";
 
@@ -100,6 +104,17 @@ export function MailboxActions({
       onChanged();
     });
 
+  const saveZone = () =>
+    run(async () => {
+      await requestJson(base, {
+        method: "PATCH",
+        body: JSON.stringify({ timezone: zone === "UTC" ? null : zone }),
+      });
+      toast.success("Time zone saved");
+      setIsZoneOpen(false);
+      onChanged();
+    });
+
   const deleteMailbox = (force: boolean) =>
     run(async () => {
       const response = await fetch(force ? `${base}?force=true` : base, { method: "DELETE" });
@@ -138,6 +153,21 @@ export function MailboxActions({
           icon: RefreshCw,
           isDisabled: isBusy,
           onClick: () => void reconnectMailbox(),
+        },
+      ],
+    },
+    {
+      type: "section",
+      title: "Sending",
+      items: [
+        {
+          label: "Set time zone",
+          icon: Globe,
+          isDisabled: isBusy,
+          onClick: () => {
+            setZone(mailbox.timezone ?? "UTC");
+            setIsZoneOpen(true);
+          },
         },
       ],
     },
@@ -297,6 +327,60 @@ export function MailboxActions({
           }
         />
       </Dialog>
+
+      <Dialog
+        isOpen={isZoneOpen}
+        onOpenChange={(isOpen) => !isBusy && setIsZoneOpen(isOpen)}
+        purpose="form"
+        width={420}
+      >
+        <Layout
+          header={
+            <DialogHeader
+              title="Set time zone"
+              subtitle="The daily send count starts over at midnight in this time zone."
+              onOpenChange={() => !isBusy && setIsZoneOpen(false)}
+            />
+          }
+          content={
+            <LayoutContent>
+              <Selector
+                label="Time zone"
+                width="100%"
+                value={zone}
+                onChange={setZone}
+                options={zoneOptions(mailbox.timezone)}
+              />
+            </LayoutContent>
+          }
+          footer={
+            <LayoutFooter>
+              <HStack gap={2} hAlign="end">
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  isDisabled={isBusy}
+                  onClick={() => setIsZoneOpen(false)}
+                />
+                <Button
+                  label="Save time zone"
+                  variant="primary"
+                  isLoading={isBusy}
+                  onClick={() => void saveZone()}
+                />
+              </HStack>
+            </LayoutFooter>
+          }
+        />
+      </Dialog>
     </>
   );
+}
+
+// A zone set through the API may not be in the short list, so it is kept as an option.
+function zoneOptions(current: string | undefined) {
+  const options = [{ value: "UTC", label: "UTC" }, ...TIMEZONES];
+  return current && !options.some((option) => option.value === current)
+    ? [...options, { value: current, label: current }]
+    : options;
 }

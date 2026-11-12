@@ -38,6 +38,11 @@ export const mailboxes = pgTable(
     emailsSentToday: integer("emails_sent_today").notNull().default(0),
     reservedSends: integer("reserved_sends").notNull().default(0),
     countersDay: date("counters_day"),
+    // IANA zone whose midnight resets the daily counters; null means UTC.
+    timezone: text("timezone"),
+    nextSendAt: timestamp("next_send_at", { withTimezone: true }),
+    hourStartedAt: timestamp("hour_started_at", { withTimezone: true }),
+    hourSends: integer("hour_sends").notNull().default(0),
     status: mailboxStatus("status").notNull().default("active"),
     lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
     lastSuccessfulSendAt: timestamp("last_successful_send_at", { withTimezone: true }),

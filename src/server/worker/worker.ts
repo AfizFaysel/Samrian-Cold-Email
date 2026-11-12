@@ -36,6 +36,8 @@ export type WorkerDeps = {
   dispatchDueSends(): Promise<DispatchResult>;
   evaluateMailboxRamps(): Promise<RampResult>;
   dispatchMailboxPolls(): Promise<MailboxPollFanOut>;
+  listMailboxes(): Promise<MailboxPollPayload[]>;
+  pollMailboxBatch(payloads: MailboxPollPayload[]): Promise<{ polled: number; failed: number }>;
   dispatchMailboxChecks(): Promise<MailboxCheckFanOut>;
 };
 

@@ -1,11 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  getJitterMs,
-  getStepDelayMs,
-  isInSendWindow,
-  nextWindowStart,
-} from "../../../src/server/jobs/schedule";
+import { getStepDelayMs, isInSendWindow, nextWindowStart } from "../../../src/server/jobs/schedule";
 
 const schedule = {
   timezone: "America/New_York",
@@ -134,9 +129,5 @@ describe("send schedule", () => {
     expect(
       getStepDelayMs([{ subject: "A" }, { subject: "B", delayDays: 1, delayHours: 6 }], 1)
     ).toBe(30 * 60 * 60 * 1000);
-  });
-
-  test("jitter uses injected random within bounds", () => {
-    expect(getJitterMs({ minMs: 1000, maxMs: 5000, random: () => 0.5 })).toBe(3000);
   });
 });

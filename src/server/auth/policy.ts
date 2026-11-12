@@ -59,6 +59,7 @@ export const sessionOperations = {
   mailboxRampRead: permission("mailbox.ramp.read", { mailbox: ["read"] }),
   mailboxRampUpdate: permission("mailbox.ramp.update", { mailbox: ["update"] }),
   mailboxReconnect: permission("mailbox.reconnect", { mailbox: ["update"] }),
+  mailboxUpdate: permission("mailbox.update", { mailbox: ["update"] }),
   notificationList: authenticated("notification.list"),
   notificationUpdate: authenticated("notification.update"),
   notificationUpdateAll: authenticated("notification.update-all"),

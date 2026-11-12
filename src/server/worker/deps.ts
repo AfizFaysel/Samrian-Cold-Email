@@ -15,6 +15,7 @@ import {
   dispatchDueSends,
   evaluateMailboxRamps,
   pollMailbox,
+  pollMailboxBatch,
   processBounce,
   resetCounters,
   sendCampaign,
@@ -24,7 +25,8 @@ import { withTenant } from "../db/tenant";
 import { purgeExpired } from "../jobs/retention";
 import { PostgresRetentionRepo } from "../repos/retention";
 import type { DbExecutor } from "../db/tx";
-import { createJobQueue } from "../queue";
+import { JOB_CADENCE } from "../jobs/cadence";
+import { createJobQueue, readQueueConfig } from "../queue";
 import type { JobQueue } from "../ports";
 import { getLimitGuard } from "../limits";
 
@@ -108,6 +110,7 @@ export function createWorkerDeps(queue?: JobQueue) {
             }
           ),
         now: Date.now,
+        horizonMs: JOB_CADENCE[readQueueConfig().provider].dispatch.intervalMs,
       }),
     evaluateMailboxRamps: () =>
       evaluateMailboxRamps({
@@ -147,13 +150,31 @@ export function createWorkerDeps(queue?: JobQueue) {
     dispatchMailboxPolls: async () => {
       const jobs = getQueue();
       const mailboxes = await listActiveMailboxes(db);
+      // One poll per mailbox per minute, however often the schedule fires.
+      const minute = Math.floor(Date.now() / 60_000);
       await Promise.all(
         mailboxes.map((mailbox) =>
-          jobs.enqueueMailboxPoll({ mailboxId: mailbox.id, orgId: mailbox.orgId })
+          jobs.enqueueMailboxPoll(
+            { mailboxId: mailbox.id, orgId: mailbox.orgId },
+            { idempotencyKey: `poll:${mailbox.id}:${minute}` }
+          )
         )
       );
       return { status: "dispatched" as const, count: mailboxes.length };
     },
+    listMailboxes: async () =>
+      (await listActiveMailboxes(db)).map((mailbox) => ({
+        mailboxId: mailbox.id,
+        orgId: mailbox.orgId,
+      })),
+    pollMailboxBatch: (payloads) =>
+      pollMailboxBatch(payloads, (payload) =>
+        pollMailbox(payload, {
+          transaction: jobTransaction(db, payload.orgId),
+          connectorForMailbox,
+          now: Date.now,
+        })
+      ),
     dispatchMailboxChecks: async () => {
       const jobs = getQueue();
       const mailboxes = await listActiveMailboxes(db);

@@ -82,6 +82,31 @@ Smoke check:
 bun run smoke
 ```
 
+## Job schedules
+
+`JOB_PROVIDER` also picks how often scheduled jobs run, from `src/server/jobs/cadence.ts`. An
+always-on BullMQ worker pays nothing per tick, so it runs often. Inngest bills every run and every
+step, so it ticks less and polls mailboxes in batches.
+
+| Job                     | `bullmq` (VPS, Railway)           | `inngest` (managed)                    |
+| ----------------------- | --------------------------------- | -------------------------------------- |
+| Campaign dispatch       | Every minute                      | Every 15 minutes                       |
+| Reply checks            | Every minute, one job per mailbox | Every 10 minutes, 5 mailboxes per step |
+| Mailbox health checks   | Hourly                            | Daily                                  |
+| Daily counter reset     | Every 15 minutes                  | Hourly                                 |
+| Ramp review, data purge | Daily                             | Daily                                  |
+
+Sending is unaffected by the cadence: every mailbox keeps its random gap between sends and its
+hourly ceiling either way. A slower dispatch books sends further ahead, and a slower reply check
+means replies show up later.
+
+On Inngest Free (50,000 executions a month, counting each step), the fixed schedules use about
+18,000 a month with up to 5 mailboxes, and each email sent uses about 3 more. That leaves room for
+roughly 10,000 emails a month. Move to the BullMQ worker, or a paid Inngest plan, before that.
+
+Switching from Inngest to BullMQ needs no data migration: set `JOB_PROVIDER=bullmq` and
+`REDIS_URL`, and run the worker (`bun run worker`).
+
 ## Managed/serverless
 
 Managed/serverless mode combines replaceable providers behind Samrian's existing database, job,

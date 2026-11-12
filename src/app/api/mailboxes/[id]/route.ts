@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isTimezone } from "@samrian/contracts";
 
 import { errorResponse } from "@/server/api/error-response";
-import { createSessionAction } from "@/server/api/session-route";
+import { createSessionAction, createSessionRoute } from "@/server/api/session-route";
 import { sessionOperations } from "@/server/auth/policy";
 import { removeMailbox } from "@/server/modules/mailboxes";
 import { PostgresAuditRepo, PostgresMailboxRepo } from "@/server/repos";
@@ -51,5 +52,21 @@ export const DELETE = createSessionAction(
     } catch (error) {
       return errorResponse(error, "Failed to delete mailbox", "/api/mailboxes/[id]");
     }
+  }
+);
+
+// The time zone whose midnight resets this mailbox's daily send count. Null means UTC.
+export const PATCH = createSessionRoute(
+  sessionOperations.mailboxUpdate,
+  async ({ db, orgId }, request: Request, context: { params: Promise<{ id: string }> }) => {
+    const { id } = await context.params;
+    const body = (await request.json().catch(() => null)) as { timezone?: unknown } | null;
+    const timezone = body?.timezone;
+    if (timezone !== null && (typeof timezone !== "string" || !isTimezone(timezone))) {
+      return NextResponse.json({ error: "Choose a valid time zone" }, { status: 400 });
+    }
+    const updated = await new PostgresMailboxRepo(db).setTimezone(id, orgId, timezone);
+    if (!updated) return NextResponse.json({ error: "Mailbox not found" }, { status: 404 });
+    return NextResponse.json({ id, timezone });
   }
 );

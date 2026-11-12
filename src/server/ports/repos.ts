@@ -104,6 +104,9 @@ export type DispatchMailboxRecord = {
   providerLimitResetAt?: number;
   rampEnabled?: boolean;
   rampCurrentLimit?: number;
+  nextSendAt?: number;
+  hourStartedAt?: number;
+  hourSends?: number;
 };
 
 export type ThreadAttachment = {

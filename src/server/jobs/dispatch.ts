@@ -11,16 +11,11 @@ import type {
 import { getObservabilityContext } from "../observability";
 import { logger } from "../observability/runtime";
 import { failedEvent, recordEvent } from "../modules/events";
+import { planSendSlot, type PacingState, type SendSlot } from "../modules/pacing";
 import { getMailboxCapacity } from "../modules/ramp";
 import type { LimitGuard } from "../modules/limits";
 import type { JobRepos } from "./types";
-import {
-  DISPATCH_BATCH_LIMIT,
-  getJitterMs,
-  getStepDelayMs,
-  isInSendWindow,
-  nextWindowStart,
-} from "./schedule";
+import { DISPATCH_BATCH_LIMIT, getStepDelayMs, isInSendWindow, nextWindowStart } from "./schedule";
 
 const CAPACITY_RETRY_MS = 15 * 60 * 1000;
 const SKIPPED_RETRY_MS = 24 * 60 * 60 * 1000;
@@ -64,6 +59,7 @@ export type DispatchRepos = {
       orgId: OrgId;
       limit: number;
       now: number;
+      pacing?: { expectedNextSendAt?: number; next: PacingState };
     }): Promise<boolean>;
     releaseCapacity(input: {
       mailboxId: MailboxId;
@@ -79,6 +75,8 @@ export type DispatchRepos = {
 
 type DispatchBase = {
   queue: JobQueue;
+  // How far ahead this run books sends: the time until the next dispatch run.
+  horizonMs: number;
   now?: () => number;
   random?: () => number;
   limit?: number;
@@ -185,19 +183,29 @@ export async function dispatchDueSends(
         continue;
       }
 
-      const mailbox = await tenant(async (repos) =>
+      const pick = await tenant(async (repos) =>
         pickMailbox(
           await repos.campaignMailboxes.listDispatchMailboxes(item.campaignId, item.orgId),
-          now
+          now,
+          deps.horizonMs,
+          deps.random
         )
       );
-      if (!mailbox) {
+      if (pick?.status === "wait") {
+        await tenant((repos) =>
+          repos.assignments.deferUntil(item.assignmentId, item.orgId, pick.until)
+        );
+        result.deferred += 1;
+        continue;
+      }
+      if (!pick) {
         await tenant((repos) =>
           repos.assignments.deferUntil(item.assignmentId, item.orgId, now + CAPACITY_RETRY_MS)
         );
         result.missingCapacity += 1;
         continue;
       }
+      const { mailbox, slot } = pick;
 
       if (deps.limits) {
         const backpressure = await deps.limits.checkSubject({
@@ -222,6 +230,7 @@ export async function dispatchDueSends(
           orgId: item.orgId,
           limit: capacity(mailbox).campaignLimit,
           now,
+          pacing: { expectedNextSendAt: mailbox.nextSendAt, next: slot.next },
         })
       );
       if (!available) {
@@ -242,7 +251,7 @@ export async function dispatchDueSends(
             stepNumber: item.currentStep,
           },
           {
-            delayMs: getJitterMs({ random: deps.random }),
+            delayMs: slot.sendAt - now,
             idempotencyKey: `${item.assignmentId}:${item.currentStep}`,
             metadata: queueMetadata(),
           }
@@ -332,16 +341,40 @@ function shouldSkip(item: DueAssignment): boolean {
   );
 }
 
-function pickMailbox(mailboxes: DispatchMailbox[], now: number): DispatchMailbox | null {
-  return (
-    mailboxes
-      .filter((mailbox) => canUseMailbox(mailbox, now))
-      .sort((left, right) => {
-        const byUse = capacity(left).utilization - capacity(right).utilization;
-        if (byUse !== 0) return byUse;
-        return (left.lastUsedAt ?? 0) - (right.lastUsedAt ?? 0);
-      })[0] ?? null
-  );
+type MailboxPick =
+  | { status: "ready"; mailbox: DispatchMailbox; slot: Extract<SendSlot, { status: "ready" }> }
+  | { status: "wait"; until: number };
+
+// The least-used mailbox with a free slot in this run, or when the earliest one frees up.
+function pickMailbox(
+  mailboxes: DispatchMailbox[],
+  now: number,
+  horizonMs: number,
+  random?: () => number
+): MailboxPick | null {
+  let wait: number | undefined;
+  const ready: Extract<MailboxPick, { status: "ready" }>[] = [];
+  for (const mailbox of mailboxes.filter((candidate) => canUseMailbox(candidate, now))) {
+    const slot = planSendSlot({
+      state: {
+        nextSendAt: mailbox.nextSendAt,
+        hourStartedAt: mailbox.hourStartedAt,
+        hourSends: mailbox.hourSends ?? 0,
+      },
+      now,
+      horizonMs,
+      random,
+    });
+    if (slot.status === "wait") wait = Math.min(wait ?? slot.until, slot.until);
+    else ready.push({ status: "ready", mailbox, slot });
+  }
+  const [best] = ready.sort((left, right) => {
+    const byUse = capacity(left.mailbox).utilization - capacity(right.mailbox).utilization;
+    if (byUse !== 0) return byUse;
+    return left.slot.sendAt - right.slot.sendAt;
+  });
+  if (best) return best;
+  return wait === undefined ? null : { status: "wait", until: wait };
 }
 
 function canUseMailbox(mailbox: DispatchMailbox, now: number): boolean {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { dispatchMailboxPolls, pollMailbox } from "../../../src/server/jobs/poll";
+import { dispatchMailboxPolls, pollMailbox, pollMailboxBatch } from "../../../src/server/jobs/poll";
 import type { RawMessage } from "../../../src/server/jobs/types";
 import { FakeJobQueue } from "../../fakes/fake-queue";
 import { FakeRepos } from "../../fakes/fake-repos";
@@ -37,6 +37,26 @@ describe("poll cursor", () => {
 
   test("scans everything unread on a first poll", async () => {
     await expect(pollFrom(undefined)).resolves.toEqual({ since: undefined });
+  });
+});
+
+describe("pollMailboxBatch", () => {
+  test("keeps polling the rest of the batch when one mailbox fails", async () => {
+    const polled: string[] = [];
+    const result = await pollMailboxBatch(
+      [
+        { mailboxId: "mailbox_1", orgId: "org_1" },
+        { mailboxId: "mailbox_2", orgId: "org_1" },
+        { mailboxId: "mailbox_3", orgId: "org_2" },
+      ],
+      async (payload) => {
+        polled.push(payload.mailboxId);
+        if (payload.mailboxId === "mailbox_2") throw new Error("IMAP timed out");
+      }
+    );
+
+    expect(polled).toEqual(["mailbox_1", "mailbox_2", "mailbox_3"]);
+    expect(result).toEqual({ polled: 2, failed: 1 });
   });
 });
 

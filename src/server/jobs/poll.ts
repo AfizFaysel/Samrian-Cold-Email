@@ -28,6 +28,26 @@ export async function dispatchMailboxPolls(deps: PollDispatchDeps) {
   return { status: "dispatched" as const, count: mailboxes.length };
 }
 
+// Polls mailboxes one after another inside a single job, so a managed runtime bills one step
+// for the batch. A failing mailbox is logged and skipped; the next tick polls it again.
+export async function pollMailboxBatch(
+  payloads: MailboxPollPayload[],
+  poll: (payload: MailboxPollPayload) => Promise<unknown>
+) {
+  let polled = 0;
+  let failed = 0;
+  for (const payload of payloads) {
+    try {
+      await poll(payload);
+      polled += 1;
+    } catch (error) {
+      failed += 1;
+      logger.error("poll.mailbox_failed", { ...payload, error });
+    }
+  }
+  return { polled, failed };
+}
+
 export async function pollMailbox(
   payload: MailboxPollPayload,
   deps: {

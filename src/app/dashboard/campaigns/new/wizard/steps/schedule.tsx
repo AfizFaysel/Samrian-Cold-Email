@@ -4,6 +4,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { TimeInput } from "@astryxdesign/core/TimeInput";
 import { ToggleButton, ToggleButtonGroup } from "@astryxdesign/core/ToggleButton";
 import { createISOTimeString } from "@astryxdesign/core/utils";
+import { TIMEZONES } from "@/lib/timezones";
 import type { CampaignDraft } from "../page";
 import { StepIntro } from "./step-intro";
 
@@ -20,18 +21,6 @@ const DAYS = [
   { value: "friday", label: "Fri" },
   { value: "saturday", label: "Sat" },
   { value: "sunday", label: "Sun" },
-];
-
-const TIMEZONES = [
-  { value: "America/New_York", label: "Eastern Time (ET)" },
-  { value: "America/Chicago", label: "Central Time (CT)" },
-  { value: "America/Denver", label: "Mountain Time (MT)" },
-  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
-  { value: "Europe/London", label: "London (GMT)" },
-  { value: "Europe/Paris", label: "Paris (CET)" },
-  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
-  { value: "Asia/Shanghai", label: "Shanghai (CST)" },
-  { value: "Australia/Sydney", label: "Sydney (AEDT)" },
 ];
 
 export function ScheduleStep({ draft, setDraft }: ScheduleStepProps) {

@@ -116,11 +116,15 @@ describe("BullMQ worker processors", () => {
     await scheduleWorkerJobs(queue);
 
     expect(queue.scheduleCampaignDispatch).toHaveBeenCalledWith({
-      cron: "*/5 * * * *",
+      cron: "* * * * *",
       timezone: "UTC",
     });
     expect(queue.scheduleMailboxPolls).toHaveBeenCalledWith({
-      cron: "*/5 * * * *",
+      cron: "* * * * *",
+      timezone: "UTC",
+    });
+    expect(queue.scheduleDailyCounterReset).toHaveBeenCalledWith({
+      cron: "*/15 * * * *",
       timezone: "UTC",
     });
     expect(queue.scheduleMailboxChecks).toHaveBeenCalledWith({
@@ -182,6 +186,8 @@ function createDeps(calls: string[]): WorkerDeps {
       calls.push("poll-all");
       return { status: "dispatched", count: 1 } as const;
     }),
+    listMailboxes: vi.fn(async () => [{ mailboxId: "mailbox_1", orgId: "org_1" }]),
+    pollMailboxBatch: vi.fn(async () => ({ polled: 1, failed: 0 })),
     dispatchMailboxChecks: vi.fn(async () => {
       calls.push("check-all");
       return { enqueued: 1 };

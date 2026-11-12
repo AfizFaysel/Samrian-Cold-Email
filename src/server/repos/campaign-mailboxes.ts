@@ -10,6 +10,7 @@ import {
 } from "../db/schema";
 import type { DbExecutor } from "../db/tx";
 import type { AssignmentId, CampaignId, DispatchMailboxRecord, MailboxId, OrgId } from "../ports";
+import type { PacingState } from "../modules/pacing";
 import { getProviderPolicy } from "../modules/providers";
 import { newId } from "./ids";
 
@@ -161,6 +162,9 @@ export class PostgresCampaignMailboxRepo {
         providerLimitResetAt: mailboxes.providerLimitResetAt,
         rampEnabled: mailboxes.rampEnabled,
         rampCurrentLimit: mailboxes.rampCurrentLimit,
+        nextSendAt: mailboxes.nextSendAt,
+        hourStartedAt: mailboxes.hourStartedAt,
+        hourSends: mailboxes.hourSends,
         replyReserve: orgSettings.replyReserve,
       })
       .from(campaignMailboxes)
@@ -195,6 +199,9 @@ export class PostgresCampaignMailboxRepo {
         providerLimitResetAt: row.providerLimitResetAt?.getTime(),
         rampEnabled: row.rampEnabled,
         rampCurrentLimit: row.rampCurrentLimit ?? undefined,
+        nextSendAt: row.nextSendAt?.getTime(),
+        hourStartedAt: row.hourStartedAt?.getTime(),
+        hourSends: row.hourSends,
       }))
       .sort((left, right) => {
         const bySent = left.emailsSentToday - right.emailsSentToday;
@@ -210,8 +217,12 @@ export class PostgresCampaignMailboxRepo {
     orgId: OrgId;
     limit: number;
     now: number;
+    // The slot this send takes. Booking it only succeeds if no other dispatch moved the
+    // mailbox's next slot since `expectedNextSendAt` was read.
+    pacing?: { expectedNextSendAt?: number; next: PacingState };
   }): Promise<boolean> {
     await this.releaseExpired(input.orgId, input.now);
+    const { pacing } = input;
     const [reservation] = await this.db
       .insert(sendReservations)
       .values({
@@ -243,6 +254,11 @@ export class PostgresCampaignMailboxRepo {
       .update(mailboxes)
       .set({
         reservedSends: sql`${mailboxes.reservedSends} + 1`,
+        ...(pacing && {
+          nextSendAt: toDate(pacing.next.nextSendAt),
+          hourStartedAt: toDate(pacing.next.hourStartedAt),
+          hourSends: pacing.next.hourSends,
+        }),
         updatedAt: new Date(),
       })
       .where(
@@ -251,7 +267,9 @@ export class PostgresCampaignMailboxRepo {
           eq(mailboxes.orgId, input.orgId),
           eq(mailboxes.status, "active"),
           isNull(mailboxes.archivedAt),
-          sql`${mailboxes.emailsSentToday} + ${mailboxes.reservedSends} < ${input.limit}`
+          sql`${mailboxes.emailsSentToday} + ${mailboxes.reservedSends} < ${input.limit}`,
+          pacing &&
+            sql`${mailboxes.nextSendAt} is not distinct from ${toDate(pacing.expectedNextSendAt)}`
         )
       )
       .returning();
@@ -347,4 +365,8 @@ export class PostgresCampaignMailboxRepo {
         .where(and(eq(mailboxes.id, mailboxId), eq(mailboxes.orgId, orgId)));
     }
   }
+}
+
+function toDate(at: number | undefined) {
+  return at === undefined ? null : new Date(at);
 }

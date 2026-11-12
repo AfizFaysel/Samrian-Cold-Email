@@ -129,4 +129,50 @@ describe.skipIf(!testUrl)("postgres dispatch repos", () => {
       campaignMailboxesRepo.listDispatchMailboxes(campaign.id, "org_dispatch")
     ).resolves.toMatchObject([{ mailboxId: lowUse.id }, { mailboxId: highUse.id }]);
   });
+
+  test("books the mailbox's next slot once and refuses a booking made from a stale read", async () => {
+    const campaign = await campaignsRepo.create({
+      orgId: "org_dispatch",
+      name: "Pacing",
+      status: "active",
+      schedule: {},
+      steps: [{}],
+    });
+    const mailbox = await mailboxesRepo.create({
+      orgId: "org_dispatch",
+      name: "Sender",
+      provider: "smtp",
+      userEmail: "sender@example.com",
+      dailySendLimit: 25,
+      encryptedPassword: "secret",
+    });
+    await campaignMailboxesRepo.replaceForCampaign({
+      campaignId: campaign.id,
+      orgId: "org_dispatch",
+      mailboxIds: [mailbox.id],
+    });
+    const now = Date.now();
+    const reserve = (assignmentId: string) =>
+      campaignMailboxesRepo.reserveCapacity({
+        mailboxId: mailbox.id,
+        assignmentId,
+        stepNumber: 0,
+        orgId: "org_dispatch",
+        limit: 25,
+        now,
+        pacing: {
+          expectedNextSendAt: undefined,
+          next: { nextSendAt: now + 90_000, hourStartedAt: now, hourSends: 1 },
+        },
+      });
+
+    await expect(reserve("assignment_first")).resolves.toBe(true);
+    await expect(reserve("assignment_second")).resolves.toBe(false);
+
+    await expect(
+      campaignMailboxesRepo.listDispatchMailboxes(campaign.id, "org_dispatch")
+    ).resolves.toMatchObject([
+      { mailboxId: mailbox.id, reservedSends: 1, nextSendAt: now + 90_000, hourSends: 1 },
+    ]);
+  });
 });

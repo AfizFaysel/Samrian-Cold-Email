@@ -48,7 +48,8 @@ describe("local Inngest runtime", () => {
     );
 
     const functions = sources.join("\n").match(/inngest\.createFunction\(/g) ?? [];
-    const limits = sources.join("\n").match(/concurrency: inngestConcurrency/g) ?? [];
+    // A function may add its own limit beside the shared one, as long as it keeps the shared one.
+    const limits = sources.join("\n").match(/concurrency: \[?inngestConcurrency/g) ?? [];
 
     expect(limits).toHaveLength(functions.length);
   });

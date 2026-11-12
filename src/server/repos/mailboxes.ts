@@ -161,6 +161,7 @@ export class PostgresMailboxRepo {
       rampTargetLimit: row.rampTargetLimit,
       rampNextCheckAt: row.rampNextCheckAt?.getTime(),
       rampReason: row.rampReason ?? undefined,
+      timezone: row.timezone ?? undefined,
       effectiveDailyLimit: Math.min(
         row.dailySendLimit,
         row.rampEnabled ? (row.rampCurrentLimit ?? row.dailySendLimit) : row.dailySendLimit
@@ -599,9 +600,19 @@ export class PostgresMailboxRepo {
       .where(and(eq(mailboxes.id, id), eq(mailboxes.orgId, orgId)));
   }
 
+  async setTimezone(id: MailboxId, orgId: OrgId, timezone: string | null): Promise<boolean> {
+    const rows = await this.db
+      .update(mailboxes)
+      .set({ timezone, updatedAt: new Date() })
+      .where(and(eq(mailboxes.id, id), eq(mailboxes.orgId, orgId), isNull(mailboxes.archivedAt)))
+      .returning();
+    return rows.length === 1;
+  }
+
   // Every reservation row is released exactly once later, even past midnight, so all rows stay counted.
+  // Runs often; each mailbox resets once its own local day has started.
   async resetDailyCounters(): Promise<number> {
-    const today = sql`(now() at time zone 'utc')::date`;
+    const today = sql`(now() at time zone coalesce(${mailboxes.timezone}, 'UTC'))::date`;
     const rows = await this.db
       .update(mailboxes)
       .set({

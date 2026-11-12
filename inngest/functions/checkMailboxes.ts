@@ -2,12 +2,13 @@ import { inngest, inngestConcurrency } from "../client";
 import { createWorkerDeps } from "../../src/server/worker";
 import { createInngestQueue } from "../lib/jobs";
 import type { MailboxHealthPayload } from "../../src/server/jobs/mailbox";
+import { JOB_CADENCE } from "../../src/server/jobs/cadence";
 
 export const checkMailboxes = inngest.createFunction(
   {
     id: "check-mailboxes",
     concurrency: inngestConcurrency,
-    triggers: [{ cron: "0 * * * *" }, { event: "mailbox/check/all" }],
+    triggers: [{ cron: JOB_CADENCE.inngest.check.cron }, { event: "mailbox/check/all" }],
   },
   async ({ step }) => {
     return createWorkerDeps(createInngestQueue(step)).dispatchMailboxChecks();
