@@ -66,8 +66,7 @@ behavior, never milestones or implementation phases.
 
 Contributions are accepted under the license covering the component changed:
 
-- Root application, server, workers, migrations, and operational scripts:
-  `AGPL-3.0-or-later`.
+- Root application, server, workers, migrations, and operational scripts: `Apache-2.0`.
 - `packages/contracts`, `packages/sdk`, `packages/cli`, and `packages/mcp`: `MIT`.
 
 See `LICENSING.md` for exact boundaries. By submitting a contribution, you confirm that you have

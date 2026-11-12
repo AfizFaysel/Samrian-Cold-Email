@@ -125,8 +125,8 @@ Use short domain-first names, keep provider SDKs inside adapter folders, and add
 
 ## License
 
-Samrian application and server code are licensed under AGPL-3.0-or-later. Public contracts, SDK,
-CLI, and MCP packages are licensed under MIT. See [LICENSING.md](LICENSING.md) for exact component
+Samrian application and server code are licensed under Apache-2.0. Public contracts, SDK, CLI, and
+MCP packages are licensed under MIT. See [LICENSING.md](LICENSING.md) for exact component
 boundaries and [TRADEMARKS.md](TRADEMARKS.md) for brand-use guidance.
 
 ## Community

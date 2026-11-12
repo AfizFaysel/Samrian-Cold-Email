@@ -33,15 +33,16 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe("hybrid licensing", () => {
-  test("declares AGPL for application and MIT for public tooling", () => {
+  test("declares Apache-2.0 for application and MIT for public tooling", () => {
     const rootPackage = JSON.parse(read("package.json")) as { license?: string };
 
-    expect(rootPackage.license).toBe("AGPL-3.0-or-later");
+    expect(rootPackage.license).toBe("Apache-2.0");
     const rootLicense = read("LICENSE");
-    expect(rootLicense).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
+    expect(rootLicense).toContain("Apache License");
     expect(rootLicense).not.toContain("Samrian");
+    // The canonical text from apache.org/licenses/LICENSE-2.0.txt, unmodified.
     expect(sha256("LICENSE")).toBe(
-      "4ea76b3f1a0a1a489c16876a558012930a951ea0e716573b7c44e3b1b6b6d12a"
+      "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     );
 
     for (const packageName of permissivePackages) {
@@ -52,9 +53,7 @@ describe("hybrid licensing", () => {
       expect(read(`packages/${packageName}/LICENSE`)).toContain(
         "Permission is hereby granted, free of charge"
       );
-      expect(read(`packages/${packageName}/LICENSE`)).not.toContain(
-        "GNU AFFERO GENERAL PUBLIC LICENSE"
-      );
+      expect(read(`packages/${packageName}/LICENSE`)).not.toContain("Apache License");
       expect(sha256(`packages/${packageName}/LICENSE`)).toBe(
         "5bda8ed9ed42429a8db781e55d3b5388c2a253228d9bf4f60a1c997a8b7ac8a4"
       );
@@ -62,7 +61,7 @@ describe("hybrid licensing", () => {
   });
 
   test("documents component boundaries, source access, and trademark separation", () => {
-    expect(read("LICENSING.md")).toContain("AGPL-3.0-or-later");
+    expect(read("LICENSING.md")).toContain("Apache-2.0");
     expect(read("LICENSING.md")).toContain("packages/sdk");
     expect(read("TRADEMARKS.md")).toContain("based on Samrian");
     expect(read("README.md")).toContain("LICENSING.md");
@@ -78,7 +77,7 @@ describe("hybrid licensing", () => {
     expect(read("CONTRIBUTING.md")).toContain("applicable component license");
   });
 
-  test("keeps permissive packages independent from AGPL server implementation", () => {
+  test("keeps public packages independent from the server implementation", () => {
     const violations = permissivePackages.flatMap((packageName) =>
       sourceFiles(path.join(root, "packages", packageName, "src")).flatMap((file) => {
         const source = readFileSync(file, "utf8");

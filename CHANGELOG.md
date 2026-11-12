@@ -17,10 +17,12 @@ after its first public release.
 - OpenTelemetry and Better Stack-ready observability foundation.
 - Docker/VPS and managed/serverless deployment documentation.
 - Security test matrix, rate limits, outbound-network controls, and encrypted credential lifecycle.
-- AGPL application license with MIT contracts, SDK, CLI, and MCP packages.
+- Apache-2.0 application license with MIT contracts, SDK, CLI, and MCP packages.
 
 ### Changed
 
+- Relicensed the application from AGPL-3.0-or-later to Apache-2.0. Earlier releases stay available
+  under AGPL-3.0-or-later.
 - Rebuilt backend architecture around app-owned modules, ports, repos, and provider adapters.
 - Standardized product identity as Samrian.
 - Replaced npm lock policy with Bun workspaces and `bun.lock`.

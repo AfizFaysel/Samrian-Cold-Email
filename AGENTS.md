@@ -93,7 +93,7 @@ Do not commit `.env.local`, generated reports, build output, local logs, or prov
 
 ## Licensing
 
-Root application code is AGPL-3.0-or-later. Public contracts, SDK, CLI, and MCP packages are MIT.
+Root application code is Apache-2.0. Public contracts, SDK, CLI, and MCP packages are MIT.
 See `LICENSING.md` before moving code across those boundaries.
 
 <!-- ASTRYX:START -->

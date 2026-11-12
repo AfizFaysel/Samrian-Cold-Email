@@ -51,7 +51,7 @@ export function SiteFooter({ className }: { className?: string }) {
       <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 py-8 text-base text-secondary sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-3">
           <Wordmark className="h-4 text-primary" />
-          <span>Open source under AGPL-3.0-or-later</span>
+          <span>Open source under Apache-2.0</span>
         </div>
         <div className="flex gap-5">
           {sourceUrl ? (

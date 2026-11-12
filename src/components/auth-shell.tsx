@@ -17,7 +17,7 @@ const POINTS = [
   {
     icon: ShieldCheck,
     title: "Yours to host",
-    body: "Open source under AGPL-3.0. Your data stays on your infrastructure.",
+    body: "Open source under Apache-2.0. Your data stays on your infrastructure.",
   },
 ];
 
@@ -52,7 +52,7 @@ export function AuthShell({
         </main>
 
         <footer className="flex flex-wrap items-center justify-between gap-2 text-sm text-secondary">
-          <span>Open source under AGPL-3.0-or-later.</span>
+          <span>Open source under Apache-2.0.</span>
           <Link href="/licensing" className="transition-colors hover:text-primary">
             License and source
           </Link>
